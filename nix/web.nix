@@ -46,7 +46,7 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     inherit pnpm;
     fetcherVersion = 4;
     # pnpm-lock.yaml 变动后：改成 lib.fakeHash，`nix build .#web` 报错里取新值。
-    hash = "sha256-puiTfV0S7ef9aTq0IPhTa9EepAtUiOeqSbtSMBiqa6s=";
+    hash = "sha256-5H0CRFWHhGcKAyvnkrrh0Aj0NaI2iPS4ZK+e9cahrss=";
   };
 
   buildPhase = ''
