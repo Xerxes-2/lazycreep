@@ -58,6 +58,12 @@ export function documentVisibility(doc: VisibilityDocument): VisibilitySignal {
   };
 }
 
+/** 恒为可见的信号：给不随页面隐藏暂停的活动用（例如告警依赖的轮询） */
+export const ALWAYS_VISIBLE: VisibilitySignal = {
+  visible: () => true,
+  subscribe: () => () => {},
+};
+
 let page: VisibilitySignal | undefined;
 
 /** 当前页面的可见性；没有 document（Node）时视为一直可见。 */

@@ -9,6 +9,7 @@
  * - 冷却与已告警记录（AlertMemory）按 Server 存在本地，刷新后沿用（alert-memory.ts）
  */
 import { createEffect, createMemo, createSignal, onCleanup, untrack, type Accessor } from "solid-js";
+import { ALWAYS_VISIBLE, pollWhileVisible } from "../power/visibility.ts";
 import type { PvpFeed } from "../pvp/pvp-feed.ts";
 import type { Source, Unsubscribe, UserInfo } from "../source/source.ts";
 import type { KeyValueStorage } from "../storage/local-store.ts";
@@ -50,18 +51,14 @@ export function createAttackAlert(options: AttackAlertOptions): AttackAlert {
     setUsernames({});
     if (!options.enabled()) return;
     let alive = true;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const load = () => {
-      src.getMe().then(
-        (info) => alive && setMe(info),
-        () => {},
-      );
-      timer = setTimeout(load, options.meRefreshMs ?? ME_REFRESH_MS);
-    };
-    load();
+    const stop = pollWhileVisible(
+      ALWAYS_VISIBLE,
+      () => src.getMe().then((info) => alive && setMe(info)),
+      options.meRefreshMs ?? ME_REFRESH_MS,
+    );
     onCleanup(() => {
       alive = false;
-      clearTimeout(timer);
+      stop();
     });
   });
 
