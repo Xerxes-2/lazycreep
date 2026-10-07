@@ -21,8 +21,9 @@ import { Sidebar } from "../shell/Sidebar.tsx";
 import type { SectionContext } from "../shell/sidebar-sections.tsx";
 import { shownVisibility } from "../shell/view-visibility.ts";
 import { createPvpFeed } from "../pvp/pvp-feed.ts";
-import { pvpMapLayers } from "../pvp/pvp-map-layer.ts";
+import { createMapLayerPrefs, mapLayers } from "./map-layer-toggles.ts";
 import { createOwnershipHub } from "./ownership-hub.ts";
+import { createWorldMapLink } from "./world-map-link.ts";
 import type { SceneView, SceneViewOptions } from "../scene/pixi-scene-view.ts";
 import type { Theme } from "../scene/theme.ts";
 import type { SourceFactory } from "../settings/SettingsPage.tsx";
@@ -87,6 +88,8 @@ export function MapAndRoom(props: MapAndRoomProps) {
   const [detailsHost, setDetailsHost] = createSignal<HTMLElement>();
   // 窄屏底部面板的当前标签（#29）
   const tabs = createSheetTabs();
+  const worldMap = createWorldMapLink();
+  const layerPrefs = createMapLayerPrefs(browserStorage());
   const sectionContext: SectionContext = {
     shell,
     settings: props.settings,
@@ -95,6 +98,8 @@ export function MapAndRoom(props: MapAndRoomProps) {
     ownership,
     pvp,
     setDetailsHost,
+    worldMap,
+    mapLayers: layerPrefs,
   };
 
   const mapShown = () => shell.mainView() === "map";
@@ -123,7 +128,8 @@ export function MapAndRoom(props: MapAndRoomProps) {
               {...(props.createView ? { createView: props.createView } : {})}
               visibility={shownVisibility(page, mapShown)}
               ownership={ownership()}
-              overlays={(shard) => pvpMapLayers(pvp.groups()?.find((g) => g.shard === shard))}
+              layers={(shard) => mapLayers(layerPrefs.enabled(), pvp.groups()?.find((g) => g.shard === shard))}
+              link={worldMap}
               {...(props.allies ? { allies: props.allies } : {})}
               active={mapShown()}
               theme={props.theme}

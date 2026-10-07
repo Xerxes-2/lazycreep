@@ -11,7 +11,10 @@
 import type { Accessor, JSX } from "solid-js";
 import type { MessageKey } from "../i18n";
 import { useI18n } from "../i18n";
+import type { MapLayerPrefs } from "../map/map-layer-toggles.ts";
 import type { OwnershipHub } from "../map/ownership-hub.ts";
+import type { WorldMapLink } from "../map/world-map-link.ts";
+import { MapLayersSection, PointedRoomSection, RoomSearchSection } from "../map/WorldMapSections.tsx";
 import type { PvpFeed } from "../pvp/pvp-feed.ts";
 import { PvpOverview } from "../pvp/PvpOverview.tsx";
 import type { SourceFactory } from "../settings/SettingsPage.tsx";
@@ -32,6 +35,10 @@ export interface SectionContext {
   readonly pvp: PvpFeed;
   /** Room View 把选中对象的详情画进这个元素 */
   readonly setDetailsHost: (el: HTMLElement | undefined) => void;
+  /** World Map 的居中与指向房间（#28） */
+  readonly worldMap: WorldMapLink;
+  /** World Map 的图层开关（#28） */
+  readonly mapLayers: MapLayerPrefs;
 }
 
 export interface SectionRender {
@@ -61,7 +68,8 @@ export const SIDEBAR_SECTIONS: Readonly<Record<MainViewMode, readonly SidebarSec
     { id: "room.selected", title: "roomDetails.title", render: (ctx) => <DetailsSection ctx={ctx} /> },
   ],
   map: [
-    // #28：房间搜索、图层开关（排在 PvP Overview 之前）；指向房间信息（之后）
+    { id: "map.search", title: "worldMapSidebar.search.title", render: (ctx) => <RoomSearchSection link={ctx.worldMap} /> },
+    { id: "map.layers", title: "worldMapSidebar.layers.title", render: (ctx) => <MapLayersSection prefs={ctx.mapLayers} /> },
     {
       id: "map.pvp",
       title: "pvp.title",
@@ -73,5 +81,6 @@ export const SIDEBAR_SECTIONS: Readonly<Record<MainViewMode, readonly SidebarSec
         />
       ),
     },
+    { id: "map.pointed", title: "worldMapSidebar.pointed.title", render: (ctx) => <PointedRoomSection link={ctx.worldMap} /> },
   ],
 };

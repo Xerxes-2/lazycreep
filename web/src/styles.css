@@ -1135,3 +1135,37 @@ body {
   min-height: 44px;
   font-size: 16px;
 }
+
+/* World Map 的 Sidebar 区块（#28） */
+.map-search input {
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.map-layers {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.map-layers label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+}
+
+.map-pointed {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 8px;
+  margin: 0;
+}
+
+.map-pointed dd {
+  margin: 0;
+}
+
+.map-pointed__room {
+  font-weight: 600;
+}

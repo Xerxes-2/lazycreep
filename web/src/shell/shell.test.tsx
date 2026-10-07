@@ -68,7 +68,7 @@ describe("固定外壳（#24）", () => {
 
   it("Sidebar 的区块随 Main View 模式变化", () => {
     mount();
-    expect(shownSections()).toEqual(["map.pvp"]);
+    expect(shownSections()).toEqual(["map.search", "map.layers", "map.pvp", "map.pointed"]);
     expect(q("[data-section='map.pvp'] .pvp-overview")).not.toBeNull();
     press("m");
     expect(shownSections()).toEqual(["room.selected"]);
@@ -150,7 +150,7 @@ describe("固定外壳（#24）", () => {
     mount(true);
     expect(q(".shell__body")!.dataset["layout"]).toBe("narrow");
     expect(shownView()).toEqual(["map"]);
-    expect(shownSections()).toEqual(["map.pvp"]);
+    expect(shownSections()).toEqual(["map.search"]);
     press("m");
     expect(shownView()).toEqual(["room"]);
     q<HTMLButtonElement>("[data-action=open-menu]")!.click();

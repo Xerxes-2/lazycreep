@@ -96,10 +96,10 @@ describe("窄屏结构（#29）", () => {
   });
 
   it("窄屏下折叠状态不藏标签内容；区块标题按钮让位给标签", () => {
-    localStorage.setItem("msc.shell", JSON.stringify({ collapsed: { "map.pvp": true } }));
+    localStorage.setItem("msc.shell", JSON.stringify({ collapsed: { "map.search": true } }));
     mountApp(() => true);
-    expect(shownSections()).toEqual(["map.pvp"]);
-    expect(q('[data-section="map.pvp"] .sidebar-section__title')!.hidden).toBe(true);
+    expect(shownSections()).toEqual(["map.search"]);
+    expect(q('[data-section="map.search"] .sidebar-section__title')!.hidden).toBe(true);
   });
 
   it("点关闭或下滑收起底部面板；Top Bar 的 Sidebar 按钮重新打开", () => {

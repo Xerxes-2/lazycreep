@@ -56,45 +56,61 @@ export function paintZones(ctx: MapPaintContext): Primitive[] {
   return out;
 }
 
-/** RCL（房间中央）、矿物类型（右下角）、Power Bank（房间内的实际位置）。 */
-export function paintInfo(ctx: MapPaintContext): Primitive[] {
+function outline(ctx: MapPaintContext, width: number) {
+  return { color: ctx.theme.labelOutline, width };
+}
+
+/** RCL（房间中央） */
+export function paintRcl(ctx: MapPaintContext): Primitive[] {
   if (ctx.zoom < RCL_MIN_ZOOM) return [];
-  const icons = ctx.zoom >= ICON_MIN_ZOOM;
-  const { theme } = ctx;
-  const outline = (width: number) => ({ color: theme.labelOutline, width });
   const out: Primitive[] = [];
   for (const room of ctx.visibleRooms) {
-    const stats = ctx.state.rooms[room.name];
-    const level = stats?.owner?.level ?? 0;
-    if (level > 0) {
-      out.push({
-        kind: "text",
-        key: `rcl:${room.name}`,
-        layer: MAP_LAYER.info,
-        x: room.x + 0.5,
-        y: room.y + 0.5,
-        text: String(level),
-        size: 0.4,
-        color: theme.label,
-        align: "center",
-        stroke: outline(0.06),
-      });
-    }
-    if (!icons) continue;
-    if (stats?.mineral) {
-      out.push({
-        kind: "text",
-        key: `mineral:${room.name}`,
-        layer: MAP_LAYER.info,
-        x: room.x + 0.92,
-        y: room.y + 0.86,
-        text: stats.mineral.type,
-        size: 0.2,
-        color: theme.mineral,
-        align: "right",
-        stroke: outline(0.04),
-      });
-    }
+    const level = ctx.state.rooms[room.name]?.owner?.level ?? 0;
+    if (level <= 0) continue;
+    out.push({
+      kind: "text",
+      key: `rcl:${room.name}`,
+      layer: MAP_LAYER.info,
+      x: room.x + 0.5,
+      y: room.y + 0.5,
+      text: String(level),
+      size: 0.4,
+      color: ctx.theme.label,
+      align: "center",
+      stroke: outline(ctx, 0.06),
+    });
+  }
+  return out;
+}
+
+/** 矿物类型（右下角） */
+export function paintMinerals(ctx: MapPaintContext): Primitive[] {
+  if (ctx.zoom < ICON_MIN_ZOOM) return [];
+  const out: Primitive[] = [];
+  for (const room of ctx.visibleRooms) {
+    const mineral = ctx.state.rooms[room.name]?.mineral;
+    if (!mineral) continue;
+    out.push({
+      kind: "text",
+      key: `mineral:${room.name}`,
+      layer: MAP_LAYER.info,
+      x: room.x + 0.92,
+      y: room.y + 0.86,
+      text: mineral.type,
+      size: 0.2,
+      color: ctx.theme.mineral,
+      align: "right",
+      stroke: outline(ctx, 0.04),
+    });
+  }
+  return out;
+}
+
+/** Power Bank（房间内的实际位置） */
+export function paintPowerBanks(ctx: MapPaintContext): Primitive[] {
+  if (ctx.zoom < ICON_MIN_ZOOM) return [];
+  const out: Primitive[] = [];
+  for (const room of ctx.visibleRooms) {
     const banks = ctx.state.powerBanks[room.name] ?? [];
     banks.forEach(([x, y], i) => {
       out.push({
@@ -104,8 +120,8 @@ export function paintInfo(ctx: MapPaintContext): Primitive[] {
         x: room.x + (x + 0.5) / 50,
         y: room.y + (y + 0.5) / 50,
         radius: 0.06,
-        fill: theme.power,
-        stroke: outline(0.015),
+        fill: ctx.theme.power,
+        stroke: outline(ctx, 0.015),
       });
     });
   }

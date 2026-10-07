@@ -16,6 +16,7 @@ import { ALERT_SETTINGS_STORAGE } from "../alert/alert-settings.ts";
 import { ALLY_LIST_STORAGE } from "../allies/ally-list.ts";
 import { CONSOLE_SETTINGS_STORAGE } from "../console/console-settings.ts";
 import { LOCALE_STORAGE } from "../i18n/locale.ts";
+import { MAP_LAYERS_STORAGE } from "../map/map-layer-toggles.ts";
 import { REPLAY_SETTINGS_STORAGE } from "../replay/replay-settings.ts";
 import { ROOM_CAMERA_STORAGE } from "../room/room-camera-store.ts";
 import { CONNECTION_STORAGE } from "../settings/settings.ts";
@@ -41,6 +42,7 @@ export const STORED_KEYS: readonly StoredKey[] = [
   SHELL_STORAGE,
   CONSOLE_SETTINGS_STORAGE,
   ROOM_CAMERA_STORAGE,
+  MAP_LAYERS_STORAGE,
   /** 不导出的运行状态 */
   ALERT_MEMORY_STORAGE,
   MAIN_VIEW_STORAGE,

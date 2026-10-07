@@ -9,7 +9,7 @@
 import type { Color, Primitive, Scene } from "../scene/scene.ts";
 import type { Theme } from "../scene/theme.ts";
 import { ownerColorRule } from "../room/room-detail-rules.ts";
-import { paintAlliedHighlight, paintInfo, paintZones } from "./map-info-layers.ts";
+import { paintAlliedHighlight, paintMinerals, paintPowerBanks, paintRcl, paintZones } from "./map-info-layers.ts";
 import { roomName, worldOffset, type MapState } from "./map-state.ts";
 
 /** 越大越靠上 */
@@ -164,7 +164,9 @@ export const MAP_LAYERS: readonly MapLayerPainter[] = [
   paintTiles,
   paintOwnership,
   paintZones,
-  paintInfo,
+  paintRcl,
+  paintMinerals,
+  paintPowerBanks,
   paintAlliedHighlight,
 ];
 

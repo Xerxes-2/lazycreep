@@ -29,8 +29,12 @@ function inView(ctx: MapPaintContext, x: number, y: number, margin: number): boo
 }
 
 export function pvpMapLayers(group: PvpShardGroup | undefined): readonly MapLayerPainter[] {
-  if (!group) return [];
-  const hotspots: MapLayerPainter = (ctx) => {
+  return group ? [pvpHotspotLayer(group), nukeLayer(group)] : [];
+}
+
+/** PvP 热点（#28 的图层开关单独控制它与核弹层） */
+export function pvpHotspotLayer(group: PvpShardGroup): MapLayerPainter {
+  return (ctx) => {
     const radius = Math.max(HOTSPOT_RADIUS, HOTSPOT_MIN_PX / ctx.zoom);
     // 最远的那个仍保留 0.35 的不透明度
     const oldest = Math.max(1, ...group.rooms.map((r) => r.ago));
@@ -52,7 +56,11 @@ export function pvpMapLayers(group: PvpShardGroup | undefined): readonly MapLaye
     }
     return out;
   };
-  const nukes: MapLayerPainter = (ctx) => {
+}
+
+/** 核弹落点与发射路径 */
+export function nukeLayer(group: PvpShardGroup): MapLayerPainter {
+  return (ctx) => {
     const radius = Math.max(NUKE_RADIUS, NUKE_MIN_PX / ctx.zoom);
     const out: Primitive[] = [];
     for (const nuke of group.nukes) {
@@ -82,5 +90,4 @@ export function pvpMapLayers(group: PvpShardGroup | undefined): readonly MapLaye
     }
     return out;
   };
-  return [hotspots, nukes];
 }
