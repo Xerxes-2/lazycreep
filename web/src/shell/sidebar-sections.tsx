@@ -21,6 +21,7 @@ import type { PvpFeed } from "../pvp/pvp-feed.ts";
 import type { SceneView, SceneViewOptions } from "../scene/pixi-scene-view.ts";
 import type { Theme } from "../scene/theme.ts";
 import { PvpOverview } from "../pvp/PvpOverview.tsx";
+import { sectionCombatants } from "../pvp/PvpCombatants.tsx";
 import type { RoomDisplayOptions } from "../room/display-options.ts";
 import type { RoomState } from "../room/room-state.ts";
 import { DisplayOptionsSection, RoomInfoSection } from "../room/RoomSidebarSections.tsx";
@@ -104,9 +105,10 @@ export const SIDEBAR_SECTIONS: Readonly<Record<MainViewMode, readonly SidebarSec
     {
       id: "map.pvp",
       title: "pvp.title",
-      render: (ctx) => (
+      render: (ctx, section) => (
         <PvpOverview
           feed={ctx.pvp}
+          combatants={sectionCombatants(ctx, section.shown)}
           onOpenRoom={(target) => ctx.shell.navigate(target)}
           onReplay={({ tick, ...target }) => ctx.shell.navigate({ ...target, replay: { tick, latest: true } })}
         />

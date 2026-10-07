@@ -37,10 +37,10 @@ async function fakeView(options: SceneViewOptions): Promise<SceneView> {
   };
 }
 
-/** narrow：窄屏结构 */
-function mount(narrow = false) {
+/** narrow：窄屏结构；token 为空串时不设 token */
+function mount(narrow = false, token = "token") {
   const settings = createSettings(localStorage);
-  settings.setToken("token");
+  if (token) settings.setToken(token);
   dispose = render(
     () => (
       <I18nProvider>
@@ -63,6 +63,7 @@ const settle = (assertion: () => void) => vi.waitFor(assertion, { timeout: 3000,
 const hotspots = () => (mapScene?.primitives ?? []).filter((p) => p.key.startsWith("pvp:")).map((p) => p.key);
 const slot = (view: string) => container.querySelector<HTMLElement>(`.main-view [data-view="${view}"]`)!;
 const row = (room: string) => container.querySelector<HTMLElement>(`.pvp-overview tr[data-room="${room}"]`);
+const combatants = (room: string) => container.querySelector<HTMLElement>(`.pvp-overview [data-combatants="${room}"]`);
 
 describe("PvP Overview 接入 World Map 与 Room View", () => {
   beforeEach(() => {
@@ -124,5 +125,60 @@ describe("PvP Overview 接入 World Map 与 Room View", () => {
     await settle(() => expect(container.querySelector(".room-view .replay")).not.toBeNull());
     await settle(() => expect(container.querySelector<HTMLInputElement>("[name=room-view-room]")!.value).toBe("W17N21"));
     expect(slot("map").hidden).toBe(true);
+  });
+
+  describe("参战者（#34）", () => {
+    /** 当前订阅着的 roomMap2 房间（所有 FixtureSource 实例合计） */
+    let open: Map<string, number>;
+    beforeEach(() => {
+      open = new Map();
+      const inner = FixtureSource.prototype.subscribeRoomMap;
+      vi.spyOn(FixtureSource.prototype, "subscribeRoomMap").mockImplementation(function (this: FixtureSource, ...args) {
+        const room = args[1];
+        open.set(room, (open.get(room) ?? 0) + 1);
+        const off = inner.apply(this, args);
+        let done = false;
+        return () => {
+          if (done) return;
+          done = true;
+          off();
+          const left = open.get(room)! - 1;
+          if (left === 0) open.delete(room);
+          else open.set(room, left);
+        };
+      });
+    });
+    afterEach(() => vi.restoreAllMocks());
+
+    it("每个 PvP 房间列出参战玩家：名字、GCL 与单位数", async () => {
+      mount();
+      await settle(() => {
+        const text = combatants("E13N21")?.textContent ?? "";
+        expect(text).toContain("volotsyouga");
+        expect(text).toContain("GCL 8");
+        expect(text).toContain("dump_table");
+        expect(text).toContain("GCL 6");
+      });
+      const player = combatants("E13N21")!.querySelector<HTMLElement>('[data-player="685da7c42df7a30011653e6a"]')!;
+      expect(player.dataset["units"]).toBe("1");
+    });
+
+    it("折叠 PvP 区块时退订全部参战者的 roomMap2，展开后重新订阅", async () => {
+      mount();
+      await settle(() => expect(open.has("E13N21")).toBe(true));
+      const toggle = container.querySelector<HTMLButtonElement>('[data-section="map.pvp"] [data-action=toggle-section]')!;
+      toggle.click();
+      expect(open.has("E13N21")).toBe(false);
+      expect(open.has("W17N21")).toBe(false);
+      toggle.click();
+      expect(open.has("E13N21")).toBe(true);
+    });
+
+    it("无 token 时参战者显示“需要 token”，不订阅 roomMap2，其余信息照常", async () => {
+      mount(false, "");
+      await settle(() => expect(row("W17N21")).not.toBeNull());
+      expect(combatants("E13N21")!.textContent).toContain("需要 token");
+      expect(open.size).toBe(0);
+    });
   });
 });

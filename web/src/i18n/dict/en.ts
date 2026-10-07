@@ -136,6 +136,14 @@ export const en: Partial<Record<MessageKey, string>> = {
   "pvp.nuke": "({x}, {y}) from {from}, lands at tick {tick}",
   "pvp.landsIn": "{ticks} ticks left",
 
+  "pvpCombatants.needsToken": "Combatants: token required",
+  "pvpCombatants.unwatched": "Combatants: over the subscription limit, not read",
+  "pvpCombatants.waiting": "Reading combatants…",
+  "pvpCombatants.none": "No player units in the room",
+  "pvpCombatants.gcl": "GCL {level}",
+  "pvpCombatants.units": "{count} units",
+  "pvpCombatants.ally": "ally",
+
   "mapInfo.allies.title": "Ally List",
   "mapInfo.allies.hint": "Allied player names, case-insensitive; the World Map and Room View color their rooms as allies.",
   "mapInfo.allies.empty": "The list is empty.",

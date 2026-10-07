@@ -134,6 +134,14 @@ export const zhCN = {
   "pvp.nuke": "({x}, {y})，来自 {from}，Tick {tick} 落地",
   "pvp.landsIn": "还有 {ticks} Tick",
 
+  "pvpCombatants.needsToken": "参战者：需要 token",
+  "pvpCombatants.unwatched": "参战者：超出订阅上限，未读取",
+  "pvpCombatants.waiting": "正在读取参战者…",
+  "pvpCombatants.none": "房间里没有玩家单位",
+  "pvpCombatants.gcl": "GCL {level}",
+  "pvpCombatants.units": "{count} 个单位",
+  "pvpCombatants.ally": "盟友",
+
   "mapInfo.allies.title": "Ally List",
   "mapInfo.allies.hint": "盟友玩家名，不分大小写；世界地图与房间视图都按它给盟友着色。",
   "mapInfo.allies.empty": "名单为空。",

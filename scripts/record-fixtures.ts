@@ -40,7 +40,7 @@ import {
 } from "../web/src/source/fixture-format.ts";
 import type { ServerConfig } from "../web/src/source/source.ts";
 
-const ALL_KINDS = ["version", "me", "time", "shards", "pvp", "nukes", "terrain", "room", "roomMap2", "history", "worldSize", "mapStats"] as const;
+const ALL_KINDS = ["version", "me", "time", "shards", "pvp", "nukes", "terrain", "room", "roomMap2", "history", "worldSize", "mapStats", "users"] as const;
 
 const { values: args } = parseArgs({
   options: {
@@ -321,6 +321,9 @@ if (want("terrain")) {
   }
 }
 
+/** roomMap2 帧里出现的玩家 id（user/find 补录用；NPC 与地形类键不是 24 位十六进制） */
+const seenPlayers = new Set<string>();
+
 if (want("room") || want("roomMap2")) {
   const prefix = server.sharded ? `${shard}/` : "";
   const streams: StreamRecording[] = [];
@@ -347,12 +350,29 @@ if (want("room") || want("roomMap2")) {
     if (range.length > 0) extra["tickRange"] = [range[0], range[range.length - 1]];
     if (s.kind === "roomMap2") extra["note"] = "roomMap2 帧不带 gameTime；tickRange 取同时录制的房间流";
     if (s.errors.length > 0) extra["serverErrors"] = [...new Set(s.errors)];
+    if (s.kind === "roomMap2") {
+      for (const f of s.frames) for (const key of Object.keys(f.data as WireRoomMap)) if (/^[0-9a-f]{24}$/.test(key)) seenPlayers.add(key);
+    }
     writeFixture(
       fixtureFileName({ kind: s.kind, shard, room: s.room }),
       { meta: meta(s.kind, extra), frames: s.frames as StreamFrame<WireRoomPayload | WireRoomMap>[] },
       "frames",
     );
   }
+}
+
+if (want("users") && seenPlayers.size > 0) {
+  const users: Record<string, { _id: string; username: string; gcl?: number }> = {};
+  for (const id of seenPlayers) {
+    const user = (await api("/user/find", { id })).body?.user;
+    if (typeof user?.username !== "string") continue;
+    users[id] = { _id: id, username: user.username, ...(typeof user.gcl === "number" ? { gcl: user.gcl } : {}) };
+  }
+  writeFixture(fixtureFileName({ kind: "users" }), {
+    meta: meta("users", { note: "roomMap2 录制里出现的玩家的 user/find（仅 _id、username、gcl）" }),
+    status: 200,
+    body: users,
+  });
 }
 
 if (want("history")) {

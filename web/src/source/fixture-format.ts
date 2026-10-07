@@ -20,7 +20,8 @@ export type FixtureKind =
   | "me"
   | "version"
   | "worldSize"
-  | "mapStats";
+  | "mapStats"
+  | "users";
 
 export interface FixtureMeta<K extends FixtureKind = FixtureKind> {
   readonly format: typeof FIXTURE_FORMAT_VERSION;
@@ -115,6 +116,11 @@ export interface WireMe {
   readonly rooms: { readonly shards: Readonly<Record<string, readonly string[]>> };
 }
 
+/** 按 id 收集的 `user/find`：id → 用户（只保留 _id、username、gcl） */
+export type WireUsers = Readonly<
+  Record<string, { readonly _id: string; readonly username: string; readonly gcl?: number }>
+>;
+
 /** `game/world-size`：以房间计的世界宽高 */
 export interface WireWorldSize {
   readonly width: number;
@@ -170,6 +176,7 @@ export type ShardsFixture = ResponseFixture<"shards", WireShards>;
 export type TerrainFixture = ResponseFixture<"terrain", WireTerrain>;
 export type MeFixture = ResponseFixture<"me", WireMe>;
 export type VersionFixture = ResponseFixture<"version", WireVersion>;
+export type UsersFixture = ResponseFixture<"users", WireUsers>;
 export type WorldSizeFixture = ResponseFixture<"worldSize", WireWorldSize> & { readonly meta: { readonly shard: string } };
 /** 录到的是某个区域的房间；播放时只能答出这些房间。 */
 export type MapStatsFixture = ResponseFixture<"mapStats", WireMapStats> & {
@@ -189,7 +196,8 @@ export type FixtureFile =
   | MeFixture
   | VersionFixture
   | WorldSizeFixture
-  | MapStatsFixture;
+  | MapStatsFixture
+  | UsersFixture;
 
 /** 一个 fixture 文件的推荐文件名（相对录制输出目录）。 */
 export function fixtureFileName(meta: {

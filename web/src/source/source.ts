@@ -152,6 +152,14 @@ export interface UserInfo {
   readonly rooms: Readonly<Record<string, readonly string[]>>;
 }
 
+/** 按 id 查到的玩家资料（`user/find`，匿名） */
+export interface PlayerProfile {
+  readonly id: string;
+  readonly username: string;
+  /** GCL 点数（不是等级；等级见 pvp/gcl.ts 的 gclLevel）；拿不到时为 undefined */
+  readonly gcl?: number;
+}
+
 /** 一个 Shard 的世界尺寸，以房间计（`game/world-size`）。 */
 export interface WorldSize {
   readonly width: number;
@@ -277,6 +285,11 @@ export interface Source {
   getMe(): Promise<UserInfo>;
   /** 按用户 id 查玩家名（`user/find`，匿名即可）；查不到时拒绝。 */
   getUsername(id: string): Promise<string>;
+  /**
+   * 按用户 id 查玩家资料（`user/find`，匿名即可）；查不到时拒绝。
+   * 同一 Source 内缓存：同一玩家只请求一次（失败的不缓存）；getUsername 共用这份缓存。
+   */
+  getPlayer(id: string): Promise<PlayerProfile>;
   /** base 必须按 chunk 大小对齐；历史不存在时得到 null。 */
   getHistoryChunk(shard: string, room: string, base: number): Promise<HistoryChunk | null>;
 
