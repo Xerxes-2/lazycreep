@@ -9,7 +9,7 @@ import { cameraKey, saveCamera } from "../room/room-camera-store.ts";
 import { createSettings } from "../settings/settings.ts";
 import { createColorScheme } from "./color-scheme.ts";
 import { createKeybindings } from "./keybindings.ts";
-import { exportSettings, importSettings, SETTINGS_KEYS, SETTINGS_PREFIXES } from "./settings-transfer.ts";
+import { exportSettings, importSettings, STORED_KEYS } from "./settings-transfer.ts";
 import { createUiTheme } from "./ui-theme.ts";
 
 const fakeNotifications = {
@@ -123,7 +123,8 @@ describe("设置导出 / 导入（#5）", () => {
     expect(localStorage.getItem("msc.allies")).toBe('["Keep"]');
   });
 
-  it("源码里出现的每个 msc.* 存储键都在导出范围内", () => {
+  /** 源码（不含测试）里所有以引号或反引号开头的 `msc.*` 字面量 */
+  function keyLiterals(): Set<string> {
     const sources = import.meta.glob<string>(["../**/*.ts", "../**/*.tsx", "!../**/*.test.ts", "!../**/*.test.tsx"], {
       query: "?raw",
       import: "default",
@@ -133,10 +134,23 @@ describe("设置导出 / 导入（#5）", () => {
     for (const text of Object.values(sources)) {
       for (const match of text.matchAll(/["'`](msc\.[A-Za-z0-9.]+)/g)) found.add(match[1]!);
     }
+    return found;
+  }
+
+  it("源码里出现的每个 msc.* 存储键都已汇总到 STORED_KEYS", () => {
+    // 各模块只在自己的文件里写键的字面量；漏汇总的键在这里变红
+    const found = keyLiterals();
     expect(found.size).toBeGreaterThan(5);
     for (const key of found) {
-      const covered = (SETTINGS_KEYS as readonly string[]).includes(key) || SETTINGS_PREFIXES.some((p) => key.startsWith(p));
+      const covered = STORED_KEYS.some((s) => key === s.key || (s.prefix === true && key.startsWith(s.key)));
       expect(covered, key).toBe(true);
     }
+  });
+
+  it("STORED_KEYS 里的每个声明都对应源码里的一个字面量（没有重复、没有凭空登记）", () => {
+    const found = keyLiterals();
+    const keys = STORED_KEYS.map((s) => s.key);
+    expect(new Set(keys).size).toBe(keys.length);
+    for (const key of keys) expect(found.has(key), key).toBe(true);
   });
 });

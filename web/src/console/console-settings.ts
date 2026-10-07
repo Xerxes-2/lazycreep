@@ -3,10 +3,11 @@
  * 存在浏览器本地；存储不可用时只在内存里生效。
  */
 import { createSignal, type Accessor } from "solid-js";
-import { isRecord, readJson, writeJson, type KeyValueStorage } from "../storage/local-store.ts";
+import { isRecord, readJson, writeJson, type KeyValueStorage, type StoredKey } from "../storage/local-store.ts";
 import { DEFAULT_CONSOLE_LIMIT } from "./console-log.ts";
 
 const STORAGE_KEY = "msc.console";
+export const CONSOLE_SETTINGS_STORAGE: StoredKey = { key: STORAGE_KEY, kind: "json-object", role: "settings" };
 export const MAX_CONSOLE_LIMIT = 5000;
 
 interface Stored {

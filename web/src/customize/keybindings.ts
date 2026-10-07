@@ -8,9 +8,10 @@
  */
 import { createMemo, createSignal, onCleanup, type Accessor } from "solid-js";
 import type { MessageKey } from "../i18n";
-import { isRecord, readJson, writeJson, type KeyValueStorage } from "../storage/local-store.ts";
+import { isRecord, readJson, writeJson, type KeyValueStorage, type StoredKey } from "../storage/local-store.ts";
 
 export const KEYBINDINGS_KEY = "msc.keys";
+export const KEYBINDINGS_STORAGE: StoredKey = { key: KEYBINDINGS_KEY, kind: "json-object", role: "settings" };
 
 /** 动作目录（显示顺序）；面板动作的 panel 是 PanelController.focus 的 id */
 export const SHORTCUT_ACTIONS = [

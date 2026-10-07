@@ -4,9 +4,10 @@
  * 只管页面 UI；Scene 的调色板另由 color-scheme.ts 管理。偏好存在 `msc.uiTheme`。
  */
 import { createRenderEffect, createSignal, onCleanup, type Accessor } from "solid-js";
-import { readJson, writeJson, type KeyValueStorage } from "../storage/local-store.ts";
+import { readJson, writeJson, type KeyValueStorage, type StoredKey } from "../storage/local-store.ts";
 
 export const UI_THEME_KEY = "msc.uiTheme";
+export const UI_THEME_STORAGE: StoredKey = { key: UI_THEME_KEY, kind: "json-string", role: "settings" };
 export const UI_THEME_PREFERENCES = ["system", "light", "dark"] as const;
 export type UiThemePreference = (typeof UI_THEME_PREFERENCES)[number];
 export type UiTheme = "light" | "dark";

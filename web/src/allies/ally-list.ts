@@ -4,9 +4,10 @@
  * 后续 PvP 归类也用它。
  */
 import { createSignal, type Accessor } from "solid-js";
-import { readJson, writeJson, type KeyValueStorage } from "../storage/local-store.ts";
+import { readJson, writeJson, type KeyValueStorage, type StoredKey } from "../storage/local-store.ts";
 
 const STORAGE_KEY = "msc.allies";
+export const ALLY_LIST_STORAGE: StoredKey = { key: STORAGE_KEY, kind: "json-array", role: "settings" };
 
 export interface AllyList {
   /** 按添加顺序 */

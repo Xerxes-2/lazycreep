@@ -1,45 +1,54 @@
 /**
  * 设置导出 / 导入（#5）：把浏览器本地的全部 `msc.*` 设置打包成一个 JSON 文件，在另一个浏览器还原。
  *
- * - 覆盖范围是下面的登记表（SETTINGS_KEYS / SETTINGS_PREFIXES）；新增存储键时在这里加一行，
- *   测试会扫描源码里的 `msc.*` 字面量，漏登记时报错。
+ * - 每个功能在自己的模块里声明并导出存储键（StoredKey，见 storage/local-store.ts），这里只汇总到
+ *   STORED_KEYS。role 为 settings 的进导出范围；runtime（运行状态）不导出、导入时也不动。
+ *   新增存储键时：在功能模块里声明，再把声明加进 STORED_KEYS；测试扫描源码里的 `msc.*` 字面量，
+ *   没汇总进来的键会让测试变红。
  * - 不含 token：导出时从 `msc.settings` 去掉；导入时忽略文件里的 token，保留本机已有的 token。
  * - 导入是“还原”：登记范围内、文件里没有的本机键会被删掉；未知键与类型不对的值忽略并报告。
  *   每个功能读存储时自己再做一遍字段级校验，所以这里只校验到值的类型。
  * - 导入只写存储；让页面生效由调用方负责（App 重建整个界面，见 App.tsx）。
  */
 
+import { ALERT_SETTINGS_STORAGE } from "../alert/alert-settings.ts";
+import { ALLY_LIST_STORAGE } from "../allies/ally-list.ts";
+import { CONSOLE_SETTINGS_STORAGE } from "../console/console-settings.ts";
+import { LOCALE_STORAGE } from "../i18n/locale.ts";
+import { LAYOUT_STORAGE } from "../panels/layout-store.ts";
+import { REPLAY_SETTINGS_STORAGE } from "../replay/replay-settings.ts";
+import { ROOM_CAMERA_STORAGE } from "../room/room-camera-store.ts";
+import { CONNECTION_STORAGE } from "../settings/settings.ts";
+import type { StoredKey, StoredKind } from "../storage/local-store.ts";
+import { COLOR_SCHEME_STORAGE } from "./color-scheme.ts";
+import { KEYBINDINGS_STORAGE } from "./keybindings.ts";
+import { UI_THEME_STORAGE } from "./ui-theme.ts";
+
 export const SETTINGS_FORMAT = "my-screeps-client/settings";
 export const SETTINGS_VERSION = 1;
 
-/** 值的形态：json-* 存的是 JSON；raw 存的是原样字符串 */
-type Kind = "json-object" | "json-array" | "json-string" | "raw";
+/** 全部 `msc.*` 存储键（含不导出的运行状态），由各功能模块声明 */
+export const STORED_KEYS: readonly StoredKey[] = [
+  CONNECTION_STORAGE,
+  LOCALE_STORAGE,
+  UI_THEME_STORAGE,
+  COLOR_SCHEME_STORAGE,
+  KEYBINDINGS_STORAGE,
+  ALLY_LIST_STORAGE,
+  ALERT_SETTINGS_STORAGE,
+  REPLAY_SETTINGS_STORAGE,
+  ...LAYOUT_STORAGE,
+  CONSOLE_SETTINGS_STORAGE,
+  ROOM_CAMERA_STORAGE,
+];
 
-const KEYS = {
-  /** Server 列表、所选 Server、各 Server 的 Shard（token 另行处理） */
-  "msc.settings": "json-object",
-  "msc.locale": "raw",
-  "msc.uiTheme": "json-string",
-  "msc.colors": "json-object",
-  "msc.keys": "json-object",
-  "msc.allies": "json-array",
-  "msc.alerts": "json-object",
-  "msc.replay": "json-object",
-  "msc.layout.desktop": "json-object",
-  "msc.layout.monitor": "json-object",
-  /** Console 面板的跟随 Shard、过滤与上限（#6） */
-  "msc.console": "json-object",
-} as const satisfies Record<string, Kind>;
+const EXPORTED = STORED_KEYS.filter((s) => s.role === "settings");
 
-const PREFIXES = {
-  /** Room View 每个房间的视口 */
-  "msc.roomCamera.": "json-object",
-} as const satisfies Record<string, Kind>;
+/** 导出范围：整键与前缀 */
+export const SETTINGS_KEYS: readonly string[] = EXPORTED.filter((s) => !s.prefix).map((s) => s.key);
+export const SETTINGS_PREFIXES: readonly string[] = EXPORTED.filter((s) => s.prefix).map((s) => s.key);
 
-export const SETTINGS_KEYS = Object.keys(KEYS) as readonly (keyof typeof KEYS)[];
-export const SETTINGS_PREFIXES = Object.keys(PREFIXES) as readonly string[];
-
-const CONNECTION_KEY = "msc.settings";
+const CONNECTION_KEY = CONNECTION_STORAGE.key;
 
 export type TransferStorage = Pick<Storage, "getItem" | "setItem" | "removeItem" | "key" | "length">;
 
@@ -65,17 +74,22 @@ export class SettingsImportError extends Error {
   }
 }
 
-function kindOf(key: string): Kind | undefined {
-  if (key in KEYS) return KEYS[key as keyof typeof KEYS];
-  const prefix = SETTINGS_PREFIXES.find((p) => key.startsWith(p) && key.length > p.length);
-  return prefix === undefined ? undefined : PREFIXES[prefix as keyof typeof PREFIXES];
+/** 存储键对应的声明；不在任何声明范围内时为 undefined */
+export function storedKeyOf(key: string): StoredKey | undefined {
+  return STORED_KEYS.find((s) => (s.prefix ? key.startsWith(s.key) && key.length > s.key.length : key === s.key));
+}
+
+/** 导出范围内的键的值形态 */
+function kindOf(key: string): StoredKind | undefined {
+  const declared = storedKeyOf(key);
+  return declared?.role === "settings" ? declared.kind : undefined;
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function fits(kind: Kind, value: unknown): boolean {
+function fits(kind: StoredKind, value: unknown): boolean {
   switch (kind) {
     case "json-object":
       return isObject(value);

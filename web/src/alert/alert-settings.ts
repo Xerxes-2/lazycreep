@@ -3,10 +3,11 @@
  * 单独存一个键 `msc.alerts`；权限只在用户点“启用通知”时申请，从不在页面加载时弹出。
  */
 import { createSignal, type Accessor } from "solid-js";
-import { isRecord, readJson, writeJson, type KeyValueStorage } from "../storage/local-store.ts";
+import { isRecord, readJson, writeJson, type KeyValueStorage, type StoredKey } from "../storage/local-store.ts";
 import { DEFAULT_ALERT_CONFIG, type AlertConfig } from "./alert-detector.ts";
 
 const STORAGE_KEY = "msc.alerts";
+export const ALERT_SETTINGS_STORAGE: StoredKey = { key: STORAGE_KEY, kind: "json-object", role: "settings" };
 
 export type NotificationPermissionState = NotificationPermission | "unsupported";
 

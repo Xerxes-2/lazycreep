@@ -5,9 +5,12 @@
 import { createSignal, type Accessor } from "solid-js";
 import { SERVER_PRESETS } from "../source/servers.ts";
 import type { ServerConfig } from "../source/source.ts";
-import { isRecord, readJson, writeJson, type KeyValueStorage } from "../storage/local-store.ts";
+import { isRecord, readJson, writeJson, type KeyValueStorage, type StoredKey } from "../storage/local-store.ts";
 
 const STORAGE_KEY = "msc.settings";
+
+/** Server 列表、所选 Server、token、各 Server 的 Shard；导出时去掉 token（见 settings-transfer.ts） */
+export const CONNECTION_STORAGE: StoredKey = { key: STORAGE_KEY, kind: "json-object", role: "settings" };
 
 interface Stored {
   readonly serverId: string;

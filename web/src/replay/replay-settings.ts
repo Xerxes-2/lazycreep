@@ -3,10 +3,11 @@
  * 还有全页共用的一个历史缓存实例（按需打开，IndexedDB 不可用时为 undefined）。
  */
 import { createSignal, type Accessor } from "solid-js";
-import { browserStorage, isRecord, readJson, writeJson, type KeyValueStorage } from "../storage/local-store.ts";
+import { browserStorage, isRecord, readJson, writeJson, type KeyValueStorage, type StoredKey } from "../storage/local-store.ts";
 import { DEFAULT_CACHE_LIMIT_MB, openHistoryCache, type HistoryCache } from "./history-cache.ts";
 
 const STORAGE_KEY = "msc.replay";
+export const REPLAY_SETTINGS_STORAGE: StoredKey = { key: STORAGE_KEY, kind: "json-object", role: "settings" };
 const MB = 1024 * 1024;
 
 export interface ReplaySettings {

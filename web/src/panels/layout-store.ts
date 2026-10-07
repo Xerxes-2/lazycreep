@@ -3,7 +3,7 @@
  * 互不影响。读写都包 try/catch：存储不可用时照常工作，只在本次会话内生效。
  */
 import { createSignal, type Accessor } from "solid-js";
-import { readText, writeJson, type KeyValueStorage } from "../storage/local-store.ts";
+import { readText, writeJson, type KeyValueStorage, type StoredKey } from "../storage/local-store.ts";
 import {
   addPanel,
   defaultDesktopLayout,
@@ -22,6 +22,10 @@ import {
 
 export const DESKTOP_LAYOUT_KEY = "msc.layout.desktop";
 export const MONITOR_LAYOUT_KEY = "msc.layout.monitor";
+export const LAYOUT_STORAGE: readonly StoredKey[] = [
+  { key: DESKTOP_LAYOUT_KEY, kind: "json-object", role: "settings" },
+  { key: MONITOR_LAYOUT_KEY, kind: "json-object", role: "settings" },
+];
 
 /** 默认打开的面板（桌面）与默认标签（Monitor Mode），按顺序 */
 export interface LayoutDefaults {

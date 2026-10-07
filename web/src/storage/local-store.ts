@@ -54,6 +54,22 @@ export function writeJson(storage: KeyValueStorage | undefined, key: string, val
   writeText(storage, key, JSON.stringify(value));
 }
 
+/** 存储值的形态：json-* 存的是 JSON；raw 存的是原样字符串 */
+export type StoredKind = "json-object" | "json-array" | "json-string" | "raw";
+
+/**
+ * 一个 `msc.*` 存储键的声明。各功能在自己的模块里声明并导出，
+ * 设置导出 / 导入（customize/settings-transfer.ts）汇总全部声明。
+ */
+export interface StoredKey {
+  readonly key: string;
+  readonly kind: StoredKind;
+  /** settings：用户设置，进导出 / 导入；runtime：运行状态，不导出、导入时也不动 */
+  readonly role: "settings" | "runtime";
+  /** true 时 key 是前缀，覆盖所有以它开头（且更长）的键 */
+  readonly prefix?: boolean;
+}
+
 /** 普通对象（不含数组与 null） */
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);

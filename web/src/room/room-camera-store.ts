@@ -3,10 +3,13 @@
  * 存储不可用或内容损坏时当作没有记录。
  */
 import type { Camera } from "../scene/scene-camera.ts";
-import { isRecord, readJson, writeJson, type KeyValueStorage } from "../storage/local-store.ts";
+import { isRecord, readJson, writeJson, type KeyValueStorage, type StoredKey } from "../storage/local-store.ts";
+
+/** 每个房间一个键：前缀 + Server/Shard/房间 */
+export const ROOM_CAMERA_STORAGE: StoredKey = { key: "msc.roomCamera.", kind: "json-object", role: "settings", prefix: true };
 
 export function cameraKey(serverId: string, shard: string, room: string): string {
-  return `msc.roomCamera.${serverId}/${shard}/${room}`;
+  return `${ROOM_CAMERA_STORAGE.key}${serverId}/${shard}/${room}`;
 }
 
 function decode(value: unknown): Camera | undefined {

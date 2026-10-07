@@ -1,8 +1,9 @@
 import { createSignal, type Accessor } from "solid-js";
-import { readText, writeText, type KeyValueStorage } from "../storage/local-store.ts";
+import { readText, writeText, type KeyValueStorage, type StoredKey } from "../storage/local-store.ts";
 import { DEFAULT_LOCALE, LOCALES, type Locale } from "./translator";
 
 const STORAGE_KEY = "msc.locale";
+export const LOCALE_STORAGE: StoredKey = { key: STORAGE_KEY, kind: "raw", role: "settings" };
 
 export interface LocaleStore {
   locale: Accessor<Locale>;

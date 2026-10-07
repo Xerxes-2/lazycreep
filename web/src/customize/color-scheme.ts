@@ -6,9 +6,10 @@
 import { createMemo, createSignal, type Accessor } from "solid-js";
 import type { Color } from "../scene/scene.ts";
 import { DEFAULT_THEME, type StrangerColoring, type Theme } from "../scene/theme.ts";
-import { isRecord, readJson, writeText, type KeyValueStorage } from "../storage/local-store.ts";
+import { isRecord, readJson, writeText, type KeyValueStorage, type StoredKey } from "../storage/local-store.ts";
 
 export const COLOR_SCHEME_KEY = "msc.colors";
+export const COLOR_SCHEME_STORAGE: StoredKey = { key: COLOR_SCHEME_KEY, kind: "json-object", role: "settings" };
 
 /** 可单独编辑的颜色（strangers 是一组，单独编辑） */
 export const PALETTE_KEYS = [
