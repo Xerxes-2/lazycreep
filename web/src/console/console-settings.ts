@@ -3,7 +3,7 @@
  * 存在浏览器本地；存储不可用时只在内存里生效。
  */
 import { createSignal, type Accessor } from "solid-js";
-import type { SettingsStorage } from "../settings/settings.ts";
+import { isRecord, readJson, writeJson, type KeyValueStorage } from "../storage/local-store.ts";
 import { DEFAULT_CONSOLE_LIMIT } from "./console-log.ts";
 
 const STORAGE_KEY = "msc.console";
@@ -28,30 +28,22 @@ function clampLimit(value: unknown): number {
   return Math.min(MAX_CONSOLE_LIMIT, Math.max(1, n));
 }
 
-function read(storage: SettingsStorage | undefined): Stored {
-  try {
-    const raw = storage?.getItem(STORAGE_KEY);
-    const parsed = raw ? (JSON.parse(raw) as Partial<Record<keyof Stored, unknown>>) : {};
-    const pinned =
-      typeof parsed.pinned === "object" && parsed.pinned !== null
-        ? Object.fromEntries(Object.entries(parsed.pinned).filter(([, v]) => typeof v === "string"))
-        : {};
-    return { limit: clampLimit(parsed.limit), pinned: pinned as Record<string, string> };
-  } catch {
-    return { limit: DEFAULT_CONSOLE_LIMIT, pinned: {} };
-  }
+function decode(value: unknown): Stored | undefined {
+  if (!isRecord(value)) return undefined;
+  const pinned = isRecord(value["pinned"])
+    ? Object.fromEntries(Object.entries(value["pinned"]).filter(([, v]) => typeof v === "string"))
+    : {};
+  return { limit: clampLimit(value["limit"]), pinned: pinned as Record<string, string> };
 }
 
-export function createConsoleSettings(storage: SettingsStorage | undefined): ConsoleSettings {
-  const [stored, setStored] = createSignal<Stored>(read(storage));
+const DEFAULTS: Stored = { limit: DEFAULT_CONSOLE_LIMIT, pinned: {} };
+
+export function createConsoleSettings(storage: KeyValueStorage | undefined): ConsoleSettings {
+  const [stored, setStored] = createSignal<Stored>(readJson(storage, STORAGE_KEY, decode, DEFAULTS));
   const update = (change: Partial<Stored>) => {
     const next = { ...stored(), ...change };
     setStored(next);
-    try {
-      storage?.setItem(STORAGE_KEY, JSON.stringify(next));
-    } catch {
-      // 存储不可用：只在内存里生效
-    }
+    writeJson(storage, STORAGE_KEY, next);
   };
   return {
     limit: () => stored().limit,

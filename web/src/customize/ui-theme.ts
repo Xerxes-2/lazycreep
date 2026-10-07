@@ -4,7 +4,7 @@
  * 只管页面 UI；Scene 的调色板另由 color-scheme.ts 管理。偏好存在 `msc.uiTheme`。
  */
 import { createRenderEffect, createSignal, onCleanup, type Accessor } from "solid-js";
-import type { SettingsStorage } from "../settings/settings.ts";
+import { readJson, writeJson, type KeyValueStorage } from "../storage/local-store.ts";
 
 export const UI_THEME_KEY = "msc.uiTheme";
 export const UI_THEME_PREFERENCES = ["system", "light", "dark"] as const;
@@ -19,7 +19,7 @@ export interface DarkQuery {
 }
 
 export interface UiThemeOptions {
-  readonly storage: SettingsStorage | undefined;
+  readonly storage: KeyValueStorage | undefined;
   /** `(prefers-color-scheme: dark)`；undefined 表示不可用（按浅色） */
   readonly darkQuery: DarkQuery | undefined;
   /** 写 data-theme 的元素，默认 document.documentElement */
@@ -46,13 +46,8 @@ function isPreference(value: unknown): value is UiThemePreference {
 
 /** 需要在 Solid 的 owner 里调用（监听系统变化，随 owner 释放）。 */
 export function createUiTheme(options: UiThemeOptions): UiThemeStore {
-  let stored: unknown;
-  try {
-    stored = JSON.parse(options.storage?.getItem(UI_THEME_KEY) ?? "null");
-  } catch {
-    stored = undefined;
-  }
-  const [preference, setSignal] = createSignal<UiThemePreference>(isPreference(stored) ? stored : "system");
+  const stored = readJson<UiThemePreference>(options.storage, UI_THEME_KEY, (v) => (isPreference(v) ? v : undefined), "system");
+  const [preference, setSignal] = createSignal<UiThemePreference>(stored);
   const query = options.darkQuery;
   const [systemDark, setSystemDark] = createSignal(query?.matches ?? false);
   if (query) {
@@ -82,11 +77,7 @@ export function createUiTheme(options: UiThemeOptions): UiThemeStore {
     setPreference(next) {
       if (!isPreference(next)) return;
       setSignal(next);
-      try {
-        options.storage?.setItem(UI_THEME_KEY, JSON.stringify(next));
-      } catch {
-        // 存储不可用时本次会话内仍生效
-      }
+      writeJson(options.storage, UI_THEME_KEY, next);
     },
   };
 }

@@ -5,12 +5,12 @@ import { createResource, createSignal, Show } from "solid-js";
 import { useI18n } from "../i18n";
 import type { HistoryCache } from "./history-cache.ts";
 import {
-  browserReplayStorage,
   createReplaySettings,
   mbToBytes,
   sharedHistoryCache,
   type ReplaySettings,
 } from "./replay-settings.ts";
+import { browserStorage } from "../storage/local-store.ts";
 
 export interface HistoryCacheSettingsProps {
   readonly settings?: ReplaySettings;
@@ -19,7 +19,7 @@ export interface HistoryCacheSettingsProps {
 
 export function HistoryCacheSettings(props: HistoryCacheSettingsProps) {
   const { t } = useI18n();
-  const settings = props.settings ?? createReplaySettings(browserReplayStorage());
+  const settings = props.settings ?? createReplaySettings(browserStorage());
   const cache = props.cache ?? sharedHistoryCache;
   const [revision, setRevision] = createSignal(0);
   const [usage] = createResource(revision, async () => {

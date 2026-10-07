@@ -6,7 +6,7 @@
 import { createMemo, createSignal, type Accessor } from "solid-js";
 import type { Color } from "../scene/scene.ts";
 import { DEFAULT_THEME, type StrangerColoring, type Theme } from "../scene/theme.ts";
-import type { SettingsStorage } from "../settings/settings.ts";
+import { isRecord, readJson, writeText, type KeyValueStorage } from "../storage/local-store.ts";
 
 export const COLOR_SCHEME_KEY = "msc.colors";
 
@@ -56,17 +56,11 @@ export function hexToColor(text: unknown): Color | undefined {
 }
 
 function record(value: unknown): Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+  return isRecord(value) ? value : {};
 }
 
-function parse(raw: string | null | undefined): Overrides {
-  if (!raw) return EMPTY;
-  let parsed: Record<string, unknown>;
-  try {
-    parsed = record(JSON.parse(raw));
-  } catch {
-    return EMPTY;
-  }
+function decode(value: unknown): Overrides {
+  const parsed = record(value);
   const colors: Partial<Record<PaletteKey, Color>> = {};
   const storedColors = record(parsed["colors"]);
   for (const key of PALETTE_KEYS) {
@@ -126,23 +120,13 @@ export interface ColorScheme {
   reset(): void;
 }
 
-export function createColorScheme(storage: SettingsStorage | undefined): ColorScheme {
-  let initial = EMPTY;
-  try {
-    initial = parse(storage?.getItem(COLOR_SCHEME_KEY));
-  } catch {
-    // 存储不可用时用默认
-  }
-  const [overrides, setOverrides] = createSignal<Overrides>(initial);
+export function createColorScheme(storage: KeyValueStorage | undefined): ColorScheme {
+  const [overrides, setOverrides] = createSignal<Overrides>(readJson(storage, COLOR_SCHEME_KEY, decode, EMPTY));
   const theme = createMemo(() => themeFrom(overrides()));
 
   const update = (next: Overrides) => {
     setOverrides(next);
-    try {
-      storage?.setItem(COLOR_SCHEME_KEY, serialize(next));
-    } catch {
-      // 存储不可用时本次会话内仍生效
-    }
+    writeText(storage, COLOR_SCHEME_KEY, serialize(next));
   };
 
   return {

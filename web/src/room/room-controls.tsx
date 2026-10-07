@@ -19,7 +19,8 @@ import {
   type Camera,
 } from "../scene/scene-camera.ts";
 import type { RoomUser } from "../source/source.ts";
-import { loadCamera, saveCamera, type CameraStorage } from "./room-camera-store.ts";
+import type { KeyValueStorage } from "../storage/local-store.ts";
+import { loadCamera, saveCamera } from "./room-camera-store.ts";
 import { adjacentRoom, type Direction } from "./room-names.ts";
 import { describeObject } from "./object-details.ts";
 import type { RoomObject } from "./room-state.ts";
@@ -34,7 +35,7 @@ export interface RoomControlsOptions {
   readonly size: Accessor<CanvasSize>;
   /** 当前房间的视口存储键；换房间时恢复该房间的视口并清掉选中 */
   readonly cameraKey: Accessor<string | undefined>;
-  readonly storage: CameraStorage | undefined;
+  readonly storage: KeyValueStorage | undefined;
   /** 点选时查询的 Scene（不追踪） */
   readonly scene: Accessor<Scene | undefined>;
   /** 世界尺寸（格） */

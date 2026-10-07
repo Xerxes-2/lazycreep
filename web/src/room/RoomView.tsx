@@ -18,7 +18,8 @@ import type { Settings } from "../settings/settings.ts";
 import { FixtureSource, fixtureBundle } from "../source/fixture-source.ts";
 import { STATE_KEYS } from "../readings/RawReadings.tsx";
 import type { ConnectionState, Source, StreamError, Terrain } from "../source/source.ts";
-import { cameraKey, type CameraStorage } from "./room-camera-store.ts";
+import { browserStorage, type KeyValueStorage } from "../storage/local-store.ts";
+import { cameraKey } from "./room-camera-store.ts";
 import { RoomDetailsPanel, RoomEdgeArrows, createRoomControls } from "./room-controls.tsx";
 import { ROOM_SIZE, buildRoomScene } from "./room-scene.ts";
 import { reduceLiveTick, type RoomState } from "./room-state.ts";
@@ -60,7 +61,7 @@ export interface RoomViewProps {
   /** Ally List（用户名），着色用；默认空 */
   readonly allies?: ReadonlySet<string>;
   /** 每个房间视口的存储；默认浏览器 localStorage */
-  readonly cameraStorage?: CameraStorage;
+  readonly cameraStorage?: KeyValueStorage;
   /** 从外部（World Map，#16）打开的房间：每次给新对象就切过去 */
   readonly open?: Target | undefined;
   /** 给了就显示“返回地图”按钮（#16） */
@@ -71,14 +72,6 @@ export interface RoomViewProps {
   readonly theme?: Theme | undefined;
   /** 快捷键（#5）：Room View 登记 Live / Replay 切换与播放控制 */
   readonly shortcuts?: ShortcutCommands | undefined;
-}
-
-function browserCameraStorage(): CameraStorage | undefined {
-  try {
-    return globalThis.localStorage;
-  } catch {
-    return undefined;
-  }
 }
 
 export function RoomView(props: RoomViewProps) {
@@ -239,7 +232,7 @@ export function RoomView(props: RoomViewProps) {
       const current = target();
       return current && cameraKey(source()?.server.id ?? settings.server().id, current.shard, current.room);
     },
-    storage: props.cameraStorage ?? browserCameraStorage(),
+    storage: props.cameraStorage ?? browserStorage(),
     scene: () => scene(),
     world: { width: ROOM_SIZE, height: ROOM_SIZE },
   });

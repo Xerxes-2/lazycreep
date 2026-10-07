@@ -8,7 +8,8 @@
 import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from "solid-js";
 import { useI18n } from "../i18n";
 import { errorMessage, type SourceFactory } from "../settings/SettingsPage.tsx";
-import type { Settings, SettingsStorage } from "../settings/settings.ts";
+import type { Settings } from "../settings/settings.ts";
+import { browserStorage, type KeyValueStorage } from "../storage/local-store.ts";
 import { appendConsole, emptyConsoleLog, filterConsole, type ConsoleLog } from "./console-log.ts";
 import { createConsoleSettings, MAX_CONSOLE_LIMIT } from "./console-settings.ts";
 
@@ -17,15 +18,7 @@ export interface ConsolePanelProps {
   /** 应是全页共享的 Source（见 source/shared-source.ts） */
   readonly sourceFor: SourceFactory;
   /** 面板偏好的存储；默认浏览器 localStorage */
-  readonly storage?: SettingsStorage;
-}
-
-function browserStorage(): SettingsStorage | undefined {
-  try {
-    return globalThis.localStorage;
-  } catch {
-    return undefined;
-  }
+  readonly storage?: KeyValueStorage;
 }
 
 type SendStatus =

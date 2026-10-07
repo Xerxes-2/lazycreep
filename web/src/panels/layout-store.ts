@@ -3,7 +3,7 @@
  * 互不影响。读写都包 try/catch：存储不可用时照常工作，只在本次会话内生效。
  */
 import { createSignal, type Accessor } from "solid-js";
-import type { SettingsStorage } from "../settings/settings.ts";
+import { readText, writeJson, type KeyValueStorage } from "../storage/local-store.ts";
 import {
   addPanel,
   defaultDesktopLayout,
@@ -41,24 +41,8 @@ export interface LayoutStore {
   toggleTab(id: PanelId): void;
 }
 
-function load(storage: SettingsStorage | undefined, key: string): string | null {
-  try {
-    return storage?.getItem(key) ?? null;
-  } catch {
-    return null;
-  }
-}
-
-function save(storage: SettingsStorage | undefined, key: string, value: unknown) {
-  try {
-    storage?.setItem(key, JSON.stringify(value));
-  } catch {
-    // 存储不可用：本次会话内仍生效
-  }
-}
-
 export function createLayoutStore(
-  storage: SettingsStorage | undefined,
+  storage: KeyValueStorage | undefined,
   catalog: PanelCatalog,
   defaults: LayoutDefaults,
 ): LayoutStore {
@@ -71,10 +55,10 @@ export function createLayoutStore(
   };
 
   const [desktop, setDesktop] = createSignal<DesktopLayout>(
-    parseDesktopLayout(load(storage, DESKTOP_LAYOUT_KEY), catalog) ?? initialDesktop(),
+    parseDesktopLayout(readText(storage, DESKTOP_LAYOUT_KEY), catalog) ?? initialDesktop(),
   );
   const [monitor, setMonitor] = createSignal<MonitorLayout>(
-    parseMonitorLayout(load(storage, MONITOR_LAYOUT_KEY), catalog) ?? initialMonitor(),
+    parseMonitorLayout(readText(storage, MONITOR_LAYOUT_KEY), catalog) ?? initialMonitor(),
   );
 
   const changeDesktop = (change: (layout: DesktopLayout) => DesktopLayout) => {
@@ -82,14 +66,14 @@ export function createLayoutStore(
     const next = change(before);
     if (next === before) return;
     setDesktop(next);
-    save(storage, DESKTOP_LAYOUT_KEY, next);
+    writeJson(storage, DESKTOP_LAYOUT_KEY, next);
   };
   const changeMonitor = (change: (layout: MonitorLayout) => MonitorLayout) => {
     const before = monitor();
     const next = change(before);
     if (next === before) return;
     setMonitor(next);
-    save(storage, MONITOR_LAYOUT_KEY, next);
+    writeJson(storage, MONITOR_LAYOUT_KEY, next);
   };
 
   return {

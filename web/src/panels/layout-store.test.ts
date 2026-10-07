@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createRoot } from "solid-js";
 import { createLayoutStore, DESKTOP_LAYOUT_KEY, MONITOR_LAYOUT_KEY, type LayoutDefaults } from "./layout-store.ts";
 import type { PanelCatalog } from "./layout.ts";
-import type { SettingsStorage } from "../settings/settings.ts";
+import type { KeyValueStorage } from "../storage/local-store.ts";
 
 const catalog: PanelCatalog = {
   ids: ["map", "room", "pvp", "settings"],
@@ -10,7 +10,7 @@ const catalog: PanelCatalog = {
 };
 const defaults: LayoutDefaults = { desktop: ["map", "room"], monitor: ["map", "room", "pvp"] };
 
-function memoryStorage(): SettingsStorage & { data: Map<string, string> } {
+function memoryStorage(): KeyValueStorage & { data: Map<string, string> } {
   const data = new Map<string, string>();
   return {
     data,
@@ -19,7 +19,7 @@ function memoryStorage(): SettingsStorage & { data: Map<string, string> } {
   };
 }
 
-const open = (storage: SettingsStorage | undefined) => createRoot(() => createLayoutStore(storage, catalog, defaults));
+const open = (storage: KeyValueStorage | undefined) => createRoot(() => createLayoutStore(storage, catalog, defaults));
 
 describe("布局持久化与恢复", () => {
   it("没有存储时用默认布局", () => {
@@ -77,7 +77,7 @@ describe("布局持久化与恢复", () => {
   });
 
   it("存储读写抛异常时照常工作（只在本次会话内生效）", () => {
-    const throwing: SettingsStorage = {
+    const throwing: KeyValueStorage = {
       getItem: () => {
         throw new Error("denied");
       },

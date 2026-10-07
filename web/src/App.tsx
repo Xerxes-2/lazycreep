@@ -12,7 +12,7 @@ import type { ImportReport } from "./customize/settings-transfer.ts";
 import { SettingsTransfer } from "./customize/SettingsTransfer.tsx";
 import { ShortcutSettings } from "./customize/ShortcutSettings.tsx";
 import { browserDarkQuery, createUiTheme } from "./customize/ui-theme.ts";
-import { browserReplayStorage, createReplaySettings, mbToBytes, sharedHistoryCache } from "./replay/replay-settings.ts";
+import { createReplaySettings, mbToBytes, sharedHistoryCache } from "./replay/replay-settings.ts";
 import { I18nProvider, useI18n } from "./i18n";
 import { MapAndRoom } from "./map/MapAndRoom.tsx";
 import type { PanelController, PanelDef } from "./panels/Workspace.tsx";
@@ -22,20 +22,13 @@ import { SettingsPage, type SourceFactory } from "./settings/SettingsPage.tsx";
 import { createSettings } from "./settings/settings.ts";
 import { LiveSource } from "./source/live-source.ts";
 import { sharedSources } from "./source/shared-source.ts";
+import { browserStorage } from "./storage/local-store.ts";
 
 /** MapAndRoom 自带的核心面板（快捷键可切换到的面板） */
 const CORE_PANELS = ["map", "room", "pvp", "details"];
 
 const liveSource: SourceFactory = (server, token) =>
   new LiveSource(server, { ...(token === undefined ? {} : { token }), visibility: pageVisibility() });
-
-function browserStorage(): Storage | undefined {
-  try {
-    return globalThis.localStorage;
-  } catch {
-    return undefined;
-  }
-}
 
 interface ShellProps {
   readonly sourceFor: SourceFactory;
@@ -146,7 +139,7 @@ export function App(props: Partial<ShellProps>) {
   const [lastImport, setLastImport] = createSignal<ImportReport>();
   const onImported = (report: ImportReport) => {
     // 已打开的历史缓存按新上限淘汰
-    const limit = createReplaySettings(browserReplayStorage()).cacheLimitMb();
+    const limit = createReplaySettings(browserStorage()).cacheLimitMb();
     void sharedHistoryCache()
       .then((cache) => cache?.setLimit(mbToBytes(limit)))
       .catch(() => {});

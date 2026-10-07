@@ -3,32 +3,24 @@
  * 存储不可用或内容损坏时当作没有记录。
  */
 import type { Camera } from "../scene/scene-camera.ts";
-
-export type CameraStorage = Pick<Storage, "getItem" | "setItem">;
+import { isRecord, readJson, writeJson, type KeyValueStorage } from "../storage/local-store.ts";
 
 export function cameraKey(serverId: string, shard: string, room: string): string {
   return `msc.roomCamera.${serverId}/${shard}/${room}`;
 }
 
-export function loadCamera(storage: CameraStorage | undefined, key: string): Camera | undefined {
-  try {
-    const raw = storage?.getItem(key);
-    if (!raw) return undefined;
-    const value: unknown = JSON.parse(raw);
-    if (typeof value !== "object" || value === null) return undefined;
-    const { cx, cy, span } = value as Record<string, unknown>;
-    const finite = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
-    if (!finite(cx) || !finite(cy) || !finite(span) || span <= 0) return undefined;
-    return { cx, cy, span };
-  } catch {
-    return undefined;
-  }
+function decode(value: unknown): Camera | undefined {
+  if (!isRecord(value)) return undefined;
+  const { cx, cy, span } = value;
+  const finite = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+  if (!finite(cx) || !finite(cy) || !finite(span) || span <= 0) return undefined;
+  return { cx, cy, span };
 }
 
-export function saveCamera(storage: CameraStorage | undefined, key: string, camera: Camera): void {
-  try {
-    storage?.setItem(key, JSON.stringify({ cx: camera.cx, cy: camera.cy, span: camera.span }));
-  } catch {
-    // 存储满了或被禁用：视口只在本次会话有效
-  }
+export function loadCamera(storage: KeyValueStorage | undefined, key: string): Camera | undefined {
+  return readJson<Camera | undefined>(storage, key, decode, undefined);
+}
+
+export function saveCamera(storage: KeyValueStorage | undefined, key: string, camera: Camera): void {
+  writeJson(storage, key, { cx: camera.cx, cy: camera.cy, span: camera.span });
 }

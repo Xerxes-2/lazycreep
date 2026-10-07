@@ -3,11 +3,10 @@
  * 单独存一个键 `msc.alerts`；权限只在用户点“启用通知”时申请，从不在页面加载时弹出。
  */
 import { createSignal, type Accessor } from "solid-js";
+import { isRecord, readJson, writeJson, type KeyValueStorage } from "../storage/local-store.ts";
 import { DEFAULT_ALERT_CONFIG, type AlertConfig } from "./alert-detector.ts";
 
 const STORAGE_KEY = "msc.alerts";
-
-export type AlertSettingsStorage = Pick<Storage, "getItem" | "setItem">;
 
 export type NotificationPermissionState = NotificationPermission | "unsupported";
 
@@ -60,31 +59,20 @@ function sanitize(base: AlertConfig, patch: Partial<Record<keyof AlertConfig, un
   };
 }
 
-function read(storage: AlertSettingsStorage | undefined): AlertConfig {
-  try {
-    const parsed: unknown = JSON.parse(storage?.getItem(STORAGE_KEY) ?? "{}");
-    return typeof parsed === "object" && parsed !== null ? sanitize(DEFAULT_ALERT_CONFIG, parsed) : DEFAULT_ALERT_CONFIG;
-  } catch {
-    return DEFAULT_ALERT_CONFIG;
-  }
-}
-
 export function createAlertSettings(
-  storage: AlertSettingsStorage | undefined,
+  storage: KeyValueStorage | undefined,
   notifications: NotificationApi = browserNotifications(),
 ): AlertSettings {
-  const [config, setConfig] = createSignal(read(storage));
+  const [config, setConfig] = createSignal(
+    readJson(storage, STORAGE_KEY, (v) => (isRecord(v) ? sanitize(DEFAULT_ALERT_CONFIG, v) : undefined), DEFAULT_ALERT_CONFIG),
+  );
   const [permission, setPermission] = createSignal(notifications.permission());
   return {
     config,
     update(patch) {
       const next = sanitize(config(), patch);
       setConfig(next);
-      try {
-        storage?.setItem(STORAGE_KEY, JSON.stringify(next));
-      } catch {
-        // 存储不可用时本次会话内仍生效
-      }
+      writeJson(storage, STORAGE_KEY, next);
     },
     permission,
     async requestPermission() {

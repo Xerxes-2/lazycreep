@@ -3,12 +3,11 @@
  * 还有全页共用的一个历史缓存实例（按需打开，IndexedDB 不可用时为 undefined）。
  */
 import { createSignal, type Accessor } from "solid-js";
+import { browserStorage, isRecord, readJson, writeJson, type KeyValueStorage } from "../storage/local-store.ts";
 import { DEFAULT_CACHE_LIMIT_MB, openHistoryCache, type HistoryCache } from "./history-cache.ts";
 
 const STORAGE_KEY = "msc.replay";
 const MB = 1024 * 1024;
-
-export type ReplaySettingsStorage = Pick<Storage, "getItem" | "setItem">;
 
 export interface ReplaySettings {
   readonly cacheLimitMb: Accessor<number>;
@@ -20,38 +19,24 @@ export function mbToBytes(mb: number): number {
   return Math.round(mb * MB);
 }
 
-function readLimit(storage: ReplaySettingsStorage | undefined): number {
-  try {
-    const parsed = JSON.parse(storage?.getItem(STORAGE_KEY) ?? "{}") as { cacheLimitMb?: unknown };
-    const mb = parsed.cacheLimitMb;
-    return typeof mb === "number" && mb > 0 ? mb : DEFAULT_CACHE_LIMIT_MB;
-  } catch {
-    return DEFAULT_CACHE_LIMIT_MB;
-  }
+function readLimit(storage: KeyValueStorage | undefined): number {
+  const decode = (value: unknown) => {
+    const mb = isRecord(value) ? value["cacheLimitMb"] : undefined;
+    return typeof mb === "number" && mb > 0 ? mb : undefined;
+  };
+  return readJson(storage, STORAGE_KEY, decode, DEFAULT_CACHE_LIMIT_MB);
 }
 
-export function createReplaySettings(storage: ReplaySettingsStorage | undefined): ReplaySettings {
+export function createReplaySettings(storage: KeyValueStorage | undefined): ReplaySettings {
   const [cacheLimitMb, setLimit] = createSignal(readLimit(storage));
   return {
     cacheLimitMb,
     setCacheLimitMb(mb) {
       if (!Number.isFinite(mb) || mb <= 0) return;
       setLimit(mb);
-      try {
-        storage?.setItem(STORAGE_KEY, JSON.stringify({ cacheLimitMb: mb }));
-      } catch {
-        // 存储不可用时本次会话内仍生效。
-      }
+      writeJson(storage, STORAGE_KEY, { cacheLimitMb: mb });
     },
   };
-}
-
-export function browserReplayStorage(): ReplaySettingsStorage | undefined {
-  try {
-    return globalThis.localStorage;
-  } catch {
-    return undefined;
-  }
 }
 
 let shared: Promise<HistoryCache | undefined> | undefined;
@@ -65,7 +50,7 @@ export function sharedHistoryCache(): Promise<HistoryCache | undefined> {
     } catch {
       factory = undefined;
     }
-    const limitBytes = mbToBytes(readLimit(browserReplayStorage()));
+    const limitBytes = mbToBytes(readLimit(browserStorage()));
     return openHistoryCache({ indexedDB: factory, limitBytes }).catch(() => undefined);
   })();
   return shared;

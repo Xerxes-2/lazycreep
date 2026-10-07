@@ -26,7 +26,8 @@ import { createOwnershipHub } from "./ownership-hub.ts";
 import type { SceneView, SceneViewOptions } from "../scene/pixi-scene-view.ts";
 import type { Theme } from "../scene/theme.ts";
 import type { SourceFactory } from "../settings/SettingsPage.tsx";
-import type { Settings, SettingsStorage } from "../settings/settings.ts";
+import type { Settings } from "../settings/settings.ts";
+import { browserStorage, type KeyValueStorage } from "../storage/local-store.ts";
 import { RoomView, type RoomViewProps } from "../room/RoomView.tsx";
 import { MapView, type MapTarget } from "./MapView.tsx";
 import { openReplay, parseReplayHref } from "../replay/replay-controller.ts";
@@ -48,21 +49,13 @@ export interface MapAndRoomProps {
   /** 核心面板之外的面板（设置等），排在核心面板之后 */
   readonly panels?: readonly PanelDef[];
   /** 布局的存储；默认浏览器 localStorage */
-  readonly layoutStorage?: SettingsStorage;
+  readonly layoutStorage?: KeyValueStorage;
   /** 是否窄屏（Monitor Mode）；默认跟随 NARROW_QUERY 媒体查询 */
   readonly narrow?: Accessor<boolean>;
   /** 拿到面板控制器（例如外部快捷键切换面板） */
   readonly onController?: (controller: PanelController) => void;
   /** Scene 调色板与着色规则（#5），同时作用于地图与 Room View；默认 DEFAULT_THEME */
   readonly theme?: Theme | undefined;
-}
-
-function browserStorage(): SettingsStorage | undefined {
-  try {
-    return globalThis.localStorage;
-  } catch {
-    return undefined;
-  }
 }
 
 export function MapAndRoom(props: MapAndRoomProps) {

@@ -5,10 +5,9 @@
 import { createSignal, type Accessor } from "solid-js";
 import { SERVER_PRESETS } from "../source/servers.ts";
 import type { ServerConfig } from "../source/source.ts";
+import { isRecord, readJson, writeJson, type KeyValueStorage } from "../storage/local-store.ts";
 
 const STORAGE_KEY = "msc.settings";
-
-export type SettingsStorage = Pick<Storage, "getItem" | "setItem">;
 
 interface Stored {
   readonly serverId: string;
@@ -52,37 +51,27 @@ function isServerConfig(value: unknown): value is ServerConfig {
   );
 }
 
-function read(storage: SettingsStorage | undefined): Stored {
-  try {
-    const raw = storage?.getItem(STORAGE_KEY);
-    if (!raw) return DEFAULTS;
-    const parsed = JSON.parse(raw) as Partial<Record<keyof Stored, unknown>>;
-    const shards =
-      typeof parsed.shards === "object" && parsed.shards !== null
-        ? Object.fromEntries(Object.entries(parsed.shards).filter(([, v]) => typeof v === "string"))
-        : {};
-    return {
-      serverId: typeof parsed.serverId === "string" ? parsed.serverId : DEFAULTS.serverId,
-      customServers: Array.isArray(parsed.customServers) ? parsed.customServers.filter(isServerConfig) : [],
-      token: typeof parsed.token === "string" ? parsed.token : "",
-      shards: shards as Record<string, string>,
-    };
-  } catch {
-    return DEFAULTS;
-  }
+function decode(value: unknown): Stored | undefined {
+  if (!isRecord(value)) return undefined;
+  const shards = isRecord(value["shards"])
+    ? Object.fromEntries(Object.entries(value["shards"]).filter(([, v]) => typeof v === "string"))
+    : {};
+  const customServers = value["customServers"];
+  return {
+    serverId: typeof value["serverId"] === "string" ? value["serverId"] : DEFAULTS.serverId,
+    customServers: Array.isArray(customServers) ? customServers.filter(isServerConfig) : [],
+    token: typeof value["token"] === "string" ? value["token"] : "",
+    shards: shards as Record<string, string>,
+  };
 }
 
-export function createSettings(storage: SettingsStorage | undefined): Settings {
-  const [stored, setStored] = createSignal<Stored>(read(storage));
+export function createSettings(storage: KeyValueStorage | undefined): Settings {
+  const [stored, setStored] = createSignal<Stored>(readJson(storage, STORAGE_KEY, decode, DEFAULTS));
 
   const update = (change: Partial<Stored>) => {
     const next = { ...stored(), ...change };
     setStored(next);
-    try {
-      storage?.setItem(STORAGE_KEY, JSON.stringify(next));
-    } catch {
-      // 隐私模式等场景下存储不可用，本次会话内仍生效。
-    }
+    writeJson(storage, STORAGE_KEY, next);
   };
 
   const servers = () => [...PRESETS, ...stored().customServers];

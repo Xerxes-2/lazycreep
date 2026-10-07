@@ -4,7 +4,7 @@
  * 后续 PvP 归类也用它。
  */
 import { createSignal, type Accessor } from "solid-js";
-import type { SettingsStorage } from "../settings/settings.ts";
+import { readJson, writeJson, type KeyValueStorage } from "../storage/local-store.ts";
 
 const STORAGE_KEY = "msc.allies";
 
@@ -18,25 +18,16 @@ export interface AllyList {
   remove(name: string): void;
 }
 
-function read(storage: SettingsStorage | undefined): string[] {
-  try {
-    const parsed: unknown = JSON.parse(storage?.getItem(STORAGE_KEY) ?? "[]");
-    return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === "string" && v.trim() !== "") : [];
-  } catch {
-    return [];
-  }
+function decode(value: unknown): string[] | undefined {
+  return Array.isArray(value) ? value.filter((v): v is string => typeof v === "string" && v.trim() !== "") : undefined;
 }
 
-export function createAllyList(storage: SettingsStorage | undefined): AllyList {
-  const [names, setNames] = createSignal<readonly string[]>(read(storage));
+export function createAllyList(storage: KeyValueStorage | undefined): AllyList {
+  const [names, setNames] = createSignal<readonly string[]>(readJson(storage, STORAGE_KEY, decode, []));
 
   const save = (next: readonly string[]) => {
     setNames(next);
-    try {
-      storage?.setItem(STORAGE_KEY, JSON.stringify(next));
-    } catch {
-      // 存储不可用时本次会话内仍生效
-    }
+    writeJson(storage, STORAGE_KEY, next);
   };
 
   let cached: { readonly from: readonly string[]; readonly set: ReadonlySet<string> } | undefined;

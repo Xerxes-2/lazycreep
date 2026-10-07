@@ -1,7 +1,8 @@
 import { createContext, createEffect, createMemo, useContext, type Accessor, type ParentProps } from "solid-js";
 import { en } from "./dict/en";
 import { zhCN, type MessageKey } from "./dict/zh-CN";
-import { createLocale, type LocaleStorage } from "./locale";
+import { browserStorage, type KeyValueStorage } from "../storage/local-store.ts";
+import { createLocale } from "./locale";
 import { createTranslator, type Dictionaries, type Locale, type Translate } from "./translator";
 
 export type { Locale, MessageKey };
@@ -17,16 +18,8 @@ interface I18n {
 
 const I18nContext = createContext<I18n>();
 
-function browserStorage(): LocaleStorage | undefined {
-  try {
-    return globalThis.localStorage;
-  } catch {
-    return undefined;
-  }
-}
-
 /** 提供界面语言与翻译函数；同步 `<html lang>`。 */
-export function I18nProvider(props: ParentProps<{ storage?: LocaleStorage }>) {
+export function I18nProvider(props: ParentProps<{ storage?: KeyValueStorage }>) {
   const { locale, setLocale } = createLocale(props.storage ?? browserStorage());
   const translator = createMemo(() => createTranslator(dictionaries, locale()));
   const t: Translate<MessageKey> = (key, params) => translator()(key, params);

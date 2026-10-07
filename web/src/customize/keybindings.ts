@@ -8,7 +8,7 @@
  */
 import { createMemo, createSignal, onCleanup, type Accessor } from "solid-js";
 import type { MessageKey } from "../i18n";
-import type { SettingsStorage } from "../settings/settings.ts";
+import { isRecord, readJson, writeJson, type KeyValueStorage } from "../storage/local-store.ts";
 
 export const KEYBINDINGS_KEY = "msc.keys";
 
@@ -84,24 +84,21 @@ export interface Keybindings {
   resetAll(): void;
 }
 
-function readOverrides(storage: SettingsStorage | undefined): Partial<Record<ShortcutAction, string | null>> {
-  try {
-    const parsed: unknown = JSON.parse(storage?.getItem(KEYBINDINGS_KEY) ?? "{}");
-    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return {};
-    const result: Partial<Record<ShortcutAction, string | null>> = {};
-    for (const [action, key] of Object.entries(parsed)) {
-      if (!ACTION_IDS.has(action)) continue;
-      if (key === null || (typeof key === "string" && key.trim() !== "")) result[action as ShortcutAction] = key;
-    }
-    return result;
-  } catch {
-    return {};
+type Overrides = Partial<Record<ShortcutAction, string | null>>;
+
+function decodeOverrides(value: unknown): Overrides | undefined {
+  if (!isRecord(value)) return undefined;
+  const result: Overrides = {};
+  for (const [action, key] of Object.entries(value)) {
+    if (!ACTION_IDS.has(action)) continue;
+    if (key === null || (typeof key === "string" && key.trim() !== "")) result[action as ShortcutAction] = key;
   }
+  return result;
 }
 
-export function createKeybindings(storage: SettingsStorage | undefined): Keybindings {
+export function createKeybindings(storage: KeyValueStorage | undefined): Keybindings {
   /** 与默认不同的部分；null 表示解绑 */
-  const [overrides, setOverrides] = createSignal(readOverrides(storage));
+  const [overrides, setOverrides] = createSignal<Overrides>(readJson(storage, KEYBINDINGS_KEY, decodeOverrides, {}));
 
   const keys = createMemo<Bindings>(() => {
     const o = overrides();
@@ -123,13 +120,9 @@ export function createKeybindings(storage: SettingsStorage | undefined): Keybind
   });
   const conflicts = createMemo(() => new Map([...byKey()].filter(([, actions]) => actions.length > 1)));
 
-  const save = (next: Partial<Record<ShortcutAction, string | null>>) => {
+  const save = (next: Overrides) => {
     setOverrides(next);
-    try {
-      storage?.setItem(KEYBINDINGS_KEY, JSON.stringify(next));
-    } catch {
-      // 存储不可用时本次会话内仍生效
-    }
+    writeJson(storage, KEYBINDINGS_KEY, next);
   };
   const without = (action: ShortcutAction) => {
     const { [action]: _dropped, ...rest } = overrides();
