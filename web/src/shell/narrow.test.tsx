@@ -84,9 +84,10 @@ describe("窄屏结构（#29）", () => {
     expect(shownSections()).toEqual([SIDEBAR_SECTIONS.map[0]!.id]);
 
     press("m");
-    expect(tabs()).toEqual(["room.selected", "test.fake"]);
-    expect(selectedTab()).toBe("room.selected");
-    expect(shownSections()).toEqual(["room.selected"]);
+    expect(tabs()).toEqual(SIDEBAR_SECTIONS.room.map((s) => s.id));
+    expect(tabs().at(-1)).toBe("test.fake");
+    expect(selectedTab()).toBe(SIDEBAR_SECTIONS.room[0]!.id);
+    expect(shownSections()).toEqual([SIDEBAR_SECTIONS.room[0]!.id]);
     expect(q("[data-testid=fake-section]")!.dataset["shown"]).toBe("false");
 
     q<HTMLButtonElement>('.sidebar [role=tab][data-tab="test.fake"]')!.click();
@@ -150,7 +151,7 @@ describe("窄屏结构（#29）", () => {
 
     setNarrow(true);
     expect(q("main.shell")!.dataset["layout"]).toBe("narrow");
-    expect(tabs()).toEqual(["room.selected", "test.fake"]);
+    expect(tabs()).toEqual(SIDEBAR_SECTIONS.room.map((s) => s.id));
     expect(q(".room-view")).toBe(roomView);
     expect(q(".world-map")).toBe(mapView);
     expect(q<HTMLInputElement>("[name=room-view-room]")!.value).toBe("W13S28");

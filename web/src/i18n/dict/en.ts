@@ -105,10 +105,6 @@ export const en: Partial<Record<MessageKey, string>> = {
   "roomDetails.field.fatigue": "Fatigue",
   "roomDetails.field.decay": "Ticks to decay",
   "roomDetails.field.cooldown": "Cooldown (ticks)",
-  "roomDetails.go.north": "Go to the room north: {room}",
-  "roomDetails.go.south": "Go to the room south: {room}",
-  "roomDetails.go.east": "Go to the room east: {room}",
-  "roomDetails.go.west": "Go to the room west: {room}",
 
   "worldMap.title": "World Map",
   "worldMap.shard": "Shard",
@@ -194,6 +190,10 @@ export const en: Partial<Record<MessageKey, string>> = {
   "alert.settings.strangerTicks": "Ticks a stranger must stay before alerting",
 
   // 固定外壳（#24）
+  "minimap.title": "Minimap",
+  "minimap.label": "3×3 rooms around {room}; click a neighbouring room to go there",
+  "minimap.noRoom": "No room open yet.",
+
   "shell.menu": "Menu",
   "shell.menu.open": "Open menu",
   "shell.menu.close": "Close menu",

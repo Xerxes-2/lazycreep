@@ -103,10 +103,6 @@ export const zhCN = {
   "roomDetails.field.fatigue": "疲劳",
   "roomDetails.field.decay": "距衰减（Tick）",
   "roomDetails.field.cooldown": "冷却（Tick）",
-  "roomDetails.go.north": "去北边的房间 {room}",
-  "roomDetails.go.south": "去南边的房间 {room}",
-  "roomDetails.go.east": "去东边的房间 {room}",
-  "roomDetails.go.west": "去西边的房间 {room}",
 
   "worldMap.title": "世界地图",
   "worldMap.shard": "Shard",
@@ -192,6 +188,10 @@ export const zhCN = {
   "alert.settings.strangerTicks": "陌生人停留多少 Tick 才通知",
 
   // 固定外壳（#24）
+  "minimap.title": "小地图",
+  "minimap.label": "以 {room} 为中心的 3×3 房间，点相邻房间切换过去",
+  "minimap.noRoom": "还没有打开房间。",
+
   "shell.menu": "菜单",
   "shell.menu.open": "打开菜单",
   "shell.menu.close": "关闭菜单",

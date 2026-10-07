@@ -15,7 +15,11 @@ import type { MapLayerPrefs } from "../map/map-layer-toggles.ts";
 import type { OwnershipHub } from "../map/ownership-hub.ts";
 import type { WorldMapLink } from "../map/world-map-link.ts";
 import { MapLayersSection, PointedRoomSection, RoomSearchSection } from "../map/WorldMapSections.tsx";
+import { Minimap } from "../minimap/Minimap.tsx";
+import type { VisibilitySignal } from "../power/visibility.ts";
 import type { PvpFeed } from "../pvp/pvp-feed.ts";
+import type { SceneView, SceneViewOptions } from "../scene/pixi-scene-view.ts";
+import type { Theme } from "../scene/theme.ts";
 import { PvpOverview } from "../pvp/PvpOverview.tsx";
 import type { SourceFactory } from "../settings/SettingsPage.tsx";
 import type { Settings } from "../settings/settings.ts";
@@ -39,6 +43,14 @@ export interface SectionContext {
   readonly worldMap: WorldMapLink;
   /** World Map 的图层开关（#28） */
   readonly mapLayers: MapLayerPrefs;
+  /** 页面可见性（#14） */
+  readonly visibility: VisibilitySignal;
+  /** 画 Scene 的区块用（#27 Minimap）：测试里换成假的 SceneView；不给时用 Pixi 适配层 */
+  readonly createView: ((options: SceneViewOptions) => Promise<SceneView>) | undefined;
+  /** Scene 调色板（#5）；undefined 时用 DEFAULT_THEME */
+  readonly theme: Accessor<Theme | undefined>;
+  /** Ally List（#17） */
+  readonly allies: Accessor<ReadonlySet<string> | undefined>;
 }
 
 export interface SectionRender {
@@ -64,7 +76,8 @@ function DetailsSection(props: { ctx: SectionContext }) {
 
 export const SIDEBAR_SECTIONS: Readonly<Record<MainViewMode, readonly SidebarSectionDef[]>> = {
   room: [
-    // #26：房间信息；#27：Minimap（排在选中对象之前）；#26：显示选项（排在选中对象之后）
+    // #26：房间信息（排在 Minimap 之前）；#26：显示选项（排在选中对象之后）
+    { id: "room.minimap", title: "minimap.title", render: (ctx, { shown }) => <Minimap ctx={ctx} shown={shown} /> },
     { id: "room.selected", title: "roomDetails.title", render: (ctx) => <DetailsSection ctx={ctx} /> },
   ],
   map: [

@@ -20,7 +20,7 @@ import { STATE_KEYS } from "../readings/RawReadings.tsx";
 import type { ConnectionState, Source, StreamError, Terrain } from "../source/source.ts";
 import { browserStorage, type KeyValueStorage } from "../storage/local-store.ts";
 import { cameraKey } from "./room-camera-store.ts";
-import { RoomDetailsPanel, RoomEdgeArrows, createRoomControls } from "./room-controls.tsx";
+import { RoomDetailsPanel, createRoomControls } from "./room-controls.tsx";
 import { ROOM_SIZE, buildRoomScene } from "./room-scene.ts";
 import { reduceLiveTick, type RoomState } from "./room-state.ts";
 import type { HistoryCache } from "../replay/history-cache.ts";
@@ -309,14 +309,6 @@ export function RoomView(props: RoomViewProps) {
     if (v && s) v.show(s);
   });
 
-  const goTo = (room: string) => {
-    const current = target();
-    if (!current) return;
-    replay.close();
-    setRoomInput(room);
-    setTarget({ shard: current.shard, room });
-  };
-
   const submit = (event: SubmitEvent) => {
     event.preventDefault();
     const room = roomInput().trim().toUpperCase();
@@ -431,7 +423,6 @@ export function RoomView(props: RoomViewProps) {
       <div class="room-view__stage">
         <div class="room-view__frame">
           <div class="room-view__canvas" ref={host} />
-          <RoomEdgeArrows room={target()?.room} onGo={goTo} />
         </div>
         <Show when={props.detailsMount} keyed fallback={details()}>
           {(mount) => <Portal mount={mount}>{details()}</Portal>}

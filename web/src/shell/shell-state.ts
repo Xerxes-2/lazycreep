@@ -10,7 +10,7 @@
  * 写 `navigate(to)`。地图点房间、PvP、告警、Minimap、快捷键、Top Bar 按钮都调用 navigate，
  * 不各自 set；之后 URL 路由只需把地址接成 navigate 的来源、把 location 写回地址。
  * Shard 仍存在连接设置里（settings.shard），navigate 代为切换；Replay 仍走 `#/replay?…` 路由。
- * Room View 自己换房间（输入框、边缘箭头、Replay 路由）时用 reportRoom 回报，location 随之更新。
+ * Room View 自己换房间（输入框、Replay 路由）时用 reportRoom 回报，location 随之更新。
  *
  * 新功能需要新的外壳状态时，在这里加字段（持久化的放进 ShellPrefs 并在 decodePrefs 里校验）。
  */

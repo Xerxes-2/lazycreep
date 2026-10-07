@@ -100,6 +100,10 @@ export function MapAndRoom(props: MapAndRoomProps) {
     setDetailsHost,
     worldMap,
     mapLayers: layerPrefs,
+    visibility: page,
+    createView: props.createView,
+    theme: () => props.theme,
+    allies: () => props.allies,
   };
 
   const mapShown = () => shell.mainView() === "map";

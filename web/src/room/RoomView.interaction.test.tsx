@@ -241,20 +241,4 @@ describe("Room View 交互", () => {
     watch("W13S28");
     await settle(() => expect(lastViewport()).toEqual(zoomed));
   });
-
-  it("边缘箭头切到相邻房间：订阅切到新房间，旧房间退订", async () => {
-    mount();
-    await openRoom("W13S28");
-    expect(subscriptions.map((s) => s.room)).toEqual(["W13S28"]);
-
-    field<HTMLButtonElement>("[data-action=room-east]").click();
-    await settle(() => expect(subscriptions.map((s) => s.room)).toEqual(["W13S28", "W12S28"]));
-    expect(subscriptions[0]!.closed).toBe(true);
-    expect(subscriptions[1]!.closed).toBe(false);
-    expect(field<HTMLInputElement>("[name=room-view-room]").value).toBe("W12S28");
-
-    field<HTMLButtonElement>("[data-action=room-north]").click();
-    await settle(() => expect(subscriptions.at(-1)!.room).toBe("W12S27"));
-    expect(subscriptions[1]!.closed).toBe(true);
-  });
 });

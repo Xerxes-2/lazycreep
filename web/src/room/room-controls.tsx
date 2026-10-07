@@ -1,6 +1,6 @@
 /**
  * Room View 的交互（#12）：画布手势（缩放、平移、点选）、每个房间的视口持久化、
- * 详情卡与相邻房间箭头。RoomView 只负责把这些接到数据流上。
+ * 详情卡。RoomView 只负责把这些接到数据流上。
  */
 import { createEffect, createSignal, For, on, onCleanup, Show, type Accessor } from "solid-js";
 import { useI18n, type MessageKey } from "../i18n";
@@ -21,7 +21,6 @@ import {
 import type { RoomUser } from "../source/source.ts";
 import type { KeyValueStorage } from "../storage/local-store.ts";
 import { loadCamera, saveCamera } from "./room-camera-store.ts";
-import { adjacentRoom, type Direction } from "./room-names.ts";
 import { describeObject } from "./object-details.ts";
 import type { RoomObject } from "./room-state.ts";
 
@@ -151,36 +150,5 @@ export function RoomDetailsPanel(props: RoomDetailsPanelProps) {
         </aside>
       )}
     </Show>
-  );
-}
-
-const DIRECTIONS: readonly Direction[] = ["north", "west", "east", "south"];
-const ARROWS: Record<Direction, string> = { north: "▲", south: "▼", east: "▶", west: "◀" };
-
-/** 画布四边的箭头：切到相邻房间。 */
-export function RoomEdgeArrows(props: { readonly room: string | undefined; readonly onGo: (room: string) => void }) {
-  const { t } = useI18n();
-  return (
-    <For each={DIRECTIONS}>
-      {(direction) => {
-        const next = () => (props.room ? adjacentRoom(props.room, direction) : undefined);
-        return (
-          <Show when={next()}>
-            {(room) => (
-              <button
-                type="button"
-                class={`room-view__edge room-view__edge--${direction}`}
-                data-action={`room-${direction}`}
-                aria-label={t(`roomDetails.go.${direction}`, { room: room() })}
-                title={room()}
-                onClick={() => props.onGo(room())}
-              >
-                {ARROWS[direction]}
-              </button>
-            )}
-          </Show>
-        );
-      }}
-    </For>
   );
 }

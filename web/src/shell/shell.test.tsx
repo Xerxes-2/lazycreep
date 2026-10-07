@@ -71,7 +71,7 @@ describe("固定外壳（#24）", () => {
     expect(shownSections()).toEqual(["map.search", "map.layers", "map.pvp", "map.pointed"]);
     expect(q("[data-section='map.pvp'] .pvp-overview")).not.toBeNull();
     press("m");
-    expect(shownSections()).toEqual(["room.selected"]);
+    expect(shownSections()).toEqual(["room.minimap", "room.selected"]);
   });
 
   it("区块单独折叠、Sidebar 整条收起，重新挂载后都恢复", () => {
@@ -89,7 +89,7 @@ describe("固定外壳（#24）", () => {
     expect(shownView()).toEqual(["room"]);
     expect(shownSections()).toEqual([]);
     q<HTMLButtonElement>("[data-action=toggle-sidebar]")!.click();
-    expect(shownSections()).toEqual(["room.selected"]);
+    expect(shownSections()).toEqual(["room.minimap", "room.selected"]);
     press("m");
     expect(sectionBody("map.pvp").hidden).toBe(true);
   });

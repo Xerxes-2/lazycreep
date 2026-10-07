@@ -249,6 +249,23 @@ body {
   padding: 8px 10px;
 }
 
+/* Minimap（#27）：正方形画布，宽度随 Sidebar */
+.minimap__canvas {
+  width: 100%;
+  aspect-ratio: 1;
+}
+
+.minimap__canvas[hidden] {
+  display: none;
+}
+
+.minimap__canvas canvas {
+  display: block;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+}
+
 .details-section:has(.room-details) .details-section__hint {
   display: none;
 }
@@ -822,7 +839,7 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* ---- Room View 交互（#12）：边缘箭头、详情卡 ---- */
+/* ---- Room View 交互（#12）：详情卡 ---- */
 
 .room-view__stage {
   flex: 1;
@@ -843,25 +860,6 @@ body {
   user-select: none;
   -webkit-user-select: none;
 }
-
-.room-view .room-view__edge {
-  position: absolute;
-  min-width: 36px;
-  min-height: 36px;
-  padding: 0;
-  opacity: 0.55;
-  background: color-mix(in srgb, var(--bg) 80%, transparent);
-}
-
-.room-view .room-view__edge:hover,
-.room-view .room-view__edge:focus-visible {
-  opacity: 1;
-}
-
-.room-view__edge--north { top: 4px; left: 50%; transform: translateX(-50%); }
-.room-view__edge--south { bottom: 4px; left: 50%; transform: translateX(-50%); }
-.room-view__edge--west { left: 4px; top: 50%; transform: translateY(-50%); }
-.room-view__edge--east { right: 4px; top: 50%; transform: translateY(-50%); }
 
 /* 窄屏：详情是贴底的卡片 */
 .room-details {
