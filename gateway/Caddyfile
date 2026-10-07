@@ -1,0 +1,70 @@
+# Gateway（ADR 0001、ADR 0003）：托管前端，把 HTTP API、room-history 与地图瓦片同源反代到官方。
+# 无状态、不缓存、不持有 token；X-Token 由浏览器带来，原样转发。
+#
+# 由环境变量配置（Nix 包 `gateway` 的启动脚本会填好默认值）：
+#   MSC_ADDRESS         监听地址，默认 127.0.0.1
+#   MSC_PORT            监听端口，默认 8080
+#   MSC_WEB_ROOT        前端构建产物目录（必填）
+#   MSC_API_UPSTREAM    API 与 room-history 上游，默认 https://screeps.com
+#   MSC_TILES_UPSTREAM  地图瓦片 CDN，默认 https://d3os7yery2usni.cloudfront.net
+#   MSC_POST_ALLOWLIST  允许转发的 POST 完整路径，空格分隔（必填，由 gateway/routes.json 展开）
+{
+	admin off
+	auto_https off
+	persist_config off
+}
+
+(upstream_headers) {
+	# Host 与 SNI 用上游域名
+	header_up Host {http.reverse_proxy.upstream.hostport}
+	# 不把浏览器与 Cloudflare 的东西带给官方：Access 的 cookie / JWT、Cloudflare 的回环标记会让上游拒绝或泄露身份
+	header_up -Cookie
+	header_up -Cdn-Loop
+	header_up -Cf-*
+	header_up -X-HTTP-Method-Override
+	header_up -X-HTTP-Method
+	header_up -X-Method-Override
+}
+
+http://:{$MSC_PORT:8080} {
+	bind {$MSC_ADDRESS:127.0.0.1}
+
+	# ADR 0003：读操作全部放行，写操作只放行允许名单内的 POST。
+	# 允许名单精确匹配路径；加新条目必须改 gateway/routes.json 并说明理由。
+	@write_not_allowed {
+		not method GET HEAD
+		not {
+			method POST
+			path {$MSC_POST_ALLOWLIST}
+		}
+	}
+
+	@api path /api/* /season/api/* /ptr/api/*
+	handle @api {
+		respond @write_not_allowed "gateway: write not allowed" 403
+		reverse_proxy {$MSC_API_UPSTREAM:https://screeps.com} {
+			import upstream_headers
+		}
+	}
+
+	handle /room-history/* {
+		respond @write_not_allowed "gateway: write not allowed" 403
+		reverse_proxy {$MSC_API_UPSTREAM:https://screeps.com} {
+			import upstream_headers
+		}
+	}
+
+	handle_path /map-tiles/* {
+		respond @write_not_allowed "gateway: write not allowed" 403
+		rewrite * /map{path}
+		reverse_proxy {$MSC_TILES_UPSTREAM:https://d3os7yery2usni.cloudfront.net} {
+			import upstream_headers
+		}
+	}
+
+	handle {
+		root * {$MSC_WEB_ROOT}
+		try_files {path} /index.html
+		file_server
+	}
+}
