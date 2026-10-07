@@ -40,6 +40,22 @@ export const en: Partial<Record<MessageKey, string>> = {
   "settings.identity.noToken": "No token yet.",
   "settings.loading": "Loading…",
 
+  "connection.connecting": "Connecting",
+  "connection.authenticated": "Authenticated",
+  "connection.disconnected": "Disconnected",
+  "connection.reconnecting": "Reconnecting",
+  "connection.unauthorized": "Authentication failed",
+
+  "readings.title": "Raw readings",
+  "readings.shard": "Shard",
+  "readings.room": "Room",
+  "readings.watch": "Watch",
+  "readings.state": "Connection",
+  "readings.gameTime": "gameTime",
+  "readings.frames": "Frames this session",
+  "readings.error.replaced": "This room subscription was replaced by another room.",
+  "readings.error.server": "Server reported a subscription error: {message}",
+
   "error.unauthorized": "The token is invalid or expired. Generate a new full-access token in your Screeps account settings.",
   "error.forbidden": "Request refused (HTTP 403).",
   "error.rateLimited": "Rate limit reached, try again later.",

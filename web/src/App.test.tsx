@@ -61,6 +61,12 @@ describe("App", () => {
     expect(heading()).toBe("Screeps Client");
   });
 
+  it("shows the raw readings page with the connection state", () => {
+    mount();
+    expect(container.querySelector("#readings-title")?.textContent).toBe("原始读数");
+    expect(container.querySelector("[data-testid=readings-state]")?.textContent).toBe("已认证");
+  });
+
   it("shows the settings page, translated with the interface language", () => {
     mount();
     expect(container.querySelector("h2")?.textContent).toBe("设置");

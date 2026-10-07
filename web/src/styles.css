@@ -147,3 +147,47 @@ body {
 .settings__error {
   color: #d64545;
 }
+
+.readings h2 {
+  font-size: 1.25rem;
+}
+
+.readings__form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+}
+
+.readings__form label {
+  display: grid;
+  gap: 4px;
+}
+
+.readings input,
+.readings button {
+  font: inherit;
+  min-height: 36px;
+  padding: 6px 8px;
+  border: 1px solid color-mix(in srgb, var(--muted) 60%, transparent);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.readings button {
+  border-color: var(--accent);
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.readings__values {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 16px;
+}
+
+.readings__values dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}

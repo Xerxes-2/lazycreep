@@ -38,6 +38,22 @@ export const zhCN = {
   "settings.identity.noToken": "尚未填写 token。",
   "settings.loading": "加载中…",
 
+  "connection.connecting": "连接中",
+  "connection.authenticated": "已认证",
+  "connection.disconnected": "断开",
+  "connection.reconnecting": "重连中",
+  "connection.unauthorized": "认证失败",
+
+  "readings.title": "原始读数",
+  "readings.shard": "Shard",
+  "readings.room": "房间",
+  "readings.watch": "订阅",
+  "readings.state": "连接状态",
+  "readings.gameTime": "gameTime",
+  "readings.frames": "本次会话帧数",
+  "readings.error.replaced": "这条房间订阅已被另一个房间顶替。",
+  "readings.error.server": "服务器报告订阅错误：{message}",
+
   "error.unauthorized": "token 无效或已失效。请在 Screeps 账户设置里生成新的全权限 token。",
   "error.forbidden": "请求被拒绝（HTTP 403）。",
   "error.rateLimited": "触发了速率限制，请稍后再试。",
