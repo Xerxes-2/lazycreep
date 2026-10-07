@@ -17,6 +17,7 @@ import {
   type PrimitiveDraft,
 } from "./room-paint.ts";
 import type { RoomObject } from "./room-state.ts";
+import { SEASON_PAINTERS, withThorium } from "./season-painters.ts";
 
 const OUTLINE = 0.06;
 
@@ -251,17 +252,18 @@ export const ROOM_OBJECT_PAINTERS: ObjectPainters = {
   extractor,
   controller,
   source,
-  mineral,
+  mineral: withThorium(mineral),
   creep,
   powerCreep: creep,
   tombstone: remains,
   ruin: remains,
-  energy: droppedResource,
-  resource: droppedResource,
+  energy: withThorium(droppedResource),
+  resource: withThorium(droppedResource),
   constructionSite,
   keeperLair,
   portal,
   powerBank,
   invaderCore,
   deposit,
+  ...SEASON_PAINTERS,
 };
