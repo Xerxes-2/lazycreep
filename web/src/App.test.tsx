@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { render } from "solid-js/web";
 import { App } from "./App";
+import { FixtureSource, fixtureBundle } from "./source/fixture-source.ts";
+
+const bundle = fixtureBundle(
+  Object.values(import.meta.glob<unknown>("../../fixtures/season/*.json", { eager: true, import: "default" })),
+);
 
 let container: HTMLDivElement;
 let dispose: (() => void) | undefined;
@@ -8,7 +13,7 @@ let dispose: (() => void) | undefined;
 function mount() {
   dispose?.();
   container.innerHTML = "";
-  dispose = render(() => <App />, container);
+  dispose = render(() => <App sourceFor={() => new FixtureSource(bundle)} />, container);
 }
 
 function heading() {
@@ -54,5 +59,12 @@ describe("App", () => {
     languageButton().click();
     mount();
     expect(heading()).toBe("Screeps Client");
+  });
+
+  it("shows the settings page, translated with the interface language", () => {
+    mount();
+    expect(container.querySelector("h2")?.textContent).toBe("设置");
+    languageButton().click();
+    expect(container.querySelector("h2")?.textContent).toBe("Settings");
   });
 });
