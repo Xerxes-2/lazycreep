@@ -183,6 +183,23 @@ export const zhCN = {
   "panels.tabs": "面板",
   "panels.manageTabs": "选择标签栏里的面板",
   "panels.details.hint": "在房间视图里点选对象，详情显示在这里。",
+  // Console 面板（#6）
+  "console.title": "Console",
+  "console.shard": "Shard",
+  "console.follow": "跟随当前 Shard（{shard}）",
+  "console.filter": "过滤",
+  "console.filterPlaceholder": "关键字",
+  "console.limit": "每个 Shard 保留条数",
+  "console.clear": "清空",
+  "console.hiddenHint": "页面隐藏期间不接收日志，那段时间的输出不会保留。",
+  "console.noToken": "填写 token 后才能查看 Console 输出与发送命令。",
+  "console.streamError": "Console 频道出错：{message}",
+  "console.empty": "还没有输出。",
+  "console.expression": "输入命令，例如 Game.time",
+  "console.send": "发送",
+  "console.sending": "正在发送…",
+  "console.sent": "已发送，结果会出现在上方输出里。",
+  "console.sendFailed": "发送失败：{message}",
 } as const satisfies Record<string, string>;
 
 export type MessageKey = keyof typeof zhCN;

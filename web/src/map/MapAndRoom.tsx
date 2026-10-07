@@ -164,8 +164,8 @@ export function MapAndRoom(props: MapAndRoomProps) {
     props.layoutStorage ?? browserStorage(),
     { ids: panels.map((p) => p.id), size: (id) => panels.find((p) => p.id === id)?.size ?? { w: 6, h: 8 } },
     {
-      desktop: panels.map((p) => p.id),
-      monitor: panels.map((p) => p.id).filter((id) => id !== "details" && id !== "readings"),
+      desktop: panels.map((p) => p.id).filter((id) => id !== "console"),
+      monitor: panels.map((p) => p.id).filter((id) => id !== "details" && id !== "readings" && id !== "console"),
     },
   );
   const controller = createPanelController(store, props.narrow ?? mediaQuery(NARROW_QUERY));

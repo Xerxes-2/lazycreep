@@ -763,3 +763,100 @@ body {
   gap: 10px;
   min-height: 44px;
 }
+
+/* Console 面板（#6） */
+.console-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  height: 100%;
+  min-height: 0;
+}
+
+.console-panel__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.console-panel__bar label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.console-panel__bar input[type="number"] {
+  width: 6em;
+}
+
+.console-panel__hint {
+  margin: 0;
+  font-size: 0.85em;
+}
+
+.console-panel__output {
+  flex: 1;
+  min-height: 8em;
+  overflow: auto;
+  padding: 4px 6px;
+  border: 1px solid color-mix(in srgb, var(--muted) 40%, transparent);
+  border-radius: 6px;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 0.85rem;
+}
+
+.console-panel__entry {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.console-panel__entry[data-kind="result"] {
+  color: var(--accent);
+}
+
+.console-panel__entry[data-kind="error"],
+.console-panel__status[data-state="error"] {
+  color: #d64545;
+}
+
+.console-panel__send {
+  display: flex;
+  gap: 6px;
+}
+
+.console-panel__send input {
+  flex: 1;
+  min-width: 0;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+
+.console-panel__send input,
+.console-panel__send button {
+  min-height: 36px;
+  font-size: 1rem;
+}
+
+.console-panel__status {
+  margin: 0;
+  min-height: 1.2em;
+  font-size: 0.85em;
+}
+
+/* Monitor Mode：输出区限高，发送栏贴在标签栏上方；16px 字号避免手机输入时自动放大 */
+.workspace[data-layout="monitor"] .console-panel__output {
+  max-height: 55vh;
+}
+
+.workspace[data-layout="monitor"] .console-panel__send {
+  position: sticky;
+  bottom: var(--tabbar-h);
+  padding: 6px 0;
+  background: var(--bg);
+}
+
+.workspace[data-layout="monitor"] .console-panel__send input,
+.workspace[data-layout="monitor"] .console-panel__send button {
+  min-height: 44px;
+  font-size: 16px;
+}

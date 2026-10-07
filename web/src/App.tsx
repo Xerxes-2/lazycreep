@@ -3,6 +3,7 @@ import { createAllyList } from "./allies/ally-list.ts";
 import { AlertSettingsPanel } from "./alert/AlertSettingsPanel.tsx";
 import { createAlertSettings } from "./alert/alert-settings.ts";
 import { AllyListSettings } from "./allies/AllyListSettings.tsx";
+import { ConsolePanel } from "./console/ConsolePanel.tsx";
 import { I18nProvider, useI18n } from "./i18n";
 import { MapAndRoom } from "./map/MapAndRoom.tsx";
 import type { PanelController, PanelDef } from "./panels/Workspace.tsx";
@@ -56,6 +57,13 @@ function Shell(props: ShellProps) {
           <AlertSettingsPanel settings={alerts} />
         </>
       ),
+    },
+    // Console（#6）：默认不打开，从工具栏 / 标签管理里加入
+    {
+      id: "console",
+      title: "console.title",
+      size: { w: 7, h: 10 },
+      render: () => <ConsolePanel settings={settings} sourceFor={sourceFor} />,
     },
     // 开发用原始读数：生产构建不打包
     ...(import.meta.env.DEV
