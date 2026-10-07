@@ -1,0 +1,180 @@
+/**
+ * buildMapScene：MapState → Scene（World Map）。世界单位 1 = 一个房间，Scene 覆盖整个世界。
+ * 只为与可见区域相交的房间产出图元；缩放级别决定用单房间瓦片还是 zoom2 块瓦片。
+ *
+ * 由若干“层”组成（MAP_LAYERS），每层是 `(ctx) => Primitive[]`。#17 的 RCL、矿物、Power Bank、
+ * 新手区 / 禁区、我方与盟友高亮，以及 #3 的 PvP 热点，各加一层即可：层级常量在 MAP_LAYER 里预留，
+ * 按缩放降密在层内看 ctx.zoom 决定，房间遍历用 ctx.visibleRooms。
+ */
+import type { Color, Primitive, Scene } from "../scene/scene.ts";
+import type { Theme } from "../scene/theme.ts";
+import { ownerColorRule } from "../room/room-detail-rules.ts";
+import { roomName, worldOffset, type MapState } from "./map-state.ts";
+
+/** 越大越靠上 */
+export const MAP_LAYER = {
+  tile: 0,
+  ownership: 10,
+  /** 留给 #17：新手区 / 禁区等整格覆盖 */
+  zone: 20,
+  /** 留给 #17：RCL、矿物、Power Bank 等标注 */
+  info: 30,
+  /** 留给 #17 / #3：我方、盟友高亮，PvP 热点 */
+  highlight: 40,
+} as const;
+
+/** 每个房间至少这么多 CSS 像素时用单房间瓦片（150px），否则用 zoom2 块瓦片（每房间 50px）。 */
+export const ROOM_TILE_MIN_ZOOM = 48;
+
+/** 一张 zoom2 块瓦片覆盖的房间数（每边） */
+export const BLOCK_ROOMS = 4;
+
+/** 世界坐标的矩形 [x0, x1) × [y0, y1) */
+export interface WorldRect {
+  readonly x0: number;
+  readonly y0: number;
+  readonly x1: number;
+  readonly y1: number;
+}
+
+export interface MapView {
+  readonly theme: Theme;
+  /** 每个房间占多少 CSS 像素 */
+  readonly zoom: number;
+  /** 当前可见的世界区域 */
+  readonly visible: WorldRect;
+  /** 所有者着色规则；默认见 defaultOwnerColor */
+  readonly ownerColor?: (userId: string, state: MapState) => Color;
+}
+
+/** 一个可见房间 */
+export interface VisibleRoom {
+  readonly name: string;
+  /** 世界坐标（房间格左上角） */
+  readonly x: number;
+  readonly y: number;
+}
+
+export interface MapPaintContext {
+  readonly state: MapState;
+  readonly view: MapView;
+  readonly theme: Theme;
+  readonly zoom: number;
+  readonly ownerColor: (userId: string) => Color;
+  /** 与可见区域相交、且在世界之内的房间 */
+  readonly visibleRooms: readonly VisibleRoom[];
+}
+
+export type MapLayerPainter = (ctx: MapPaintContext) => readonly Primitive[];
+
+/**
+ * 默认着色：与 Room View 同一条规则（#12 的 ownerColorRule），同一玩家在地图与房间里颜色一致。
+ * 自己用 theme.owned，其他玩家按 id 稳定地取 theme.strangers 之一；
+ * Ally List 进 MapState 后（#17）在这里把 allies 传进规则即可。
+ */
+export function defaultOwnerColor(theme: Theme): (userId: string, state: MapState) => Color {
+  return (userId, state) => ownerColorRule(theme, state.users, { me: state.me })(userId);
+}
+
+/** 与 rect 相交的整数格 [from, to]（含），再夹到 [0, limit) */
+function cells(from: number, to: number, limit: number): [number, number] {
+  return [Math.max(0, Math.floor(from)), Math.min(limit, Math.ceil(to)) - 1];
+}
+
+function visibleRooms(state: MapState, rect: WorldRect): VisibleRoom[] {
+  const [x0, x1] = cells(rect.x0, rect.x1, state.size.width);
+  const [y0, y1] = cells(rect.y0, rect.y1, state.size.height);
+  const offset = worldOffset(state.size);
+  const rooms: VisibleRoom[] = [];
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) rooms.push({ name: roomName({ x: x - offset.x, y: y - offset.y }), x, y });
+  }
+  return rooms;
+}
+
+export const paintTiles: MapLayerPainter = (ctx) => {
+  const { state } = ctx;
+  if (ctx.zoom >= ROOM_TILE_MIN_ZOOM) {
+    return ctx.visibleRooms.map((room) => ({
+      kind: "image",
+      key: `tile:${room.name}`,
+      layer: MAP_LAYER.tile,
+      x: room.x,
+      y: room.y,
+      width: 1,
+      height: 1,
+      url: state.tiles.room(room.name),
+    }));
+  }
+  // 块角是有符号坐标为 4 的倍数的房间
+  const offset = worldOffset(state.size);
+  const corners = new Map<string, { x: number; y: number }>();
+  for (const room of ctx.visibleRooms) {
+    const sx = Math.floor((room.x - offset.x) / BLOCK_ROOMS) * BLOCK_ROOMS;
+    const sy = Math.floor((room.y - offset.y) / BLOCK_ROOMS) * BLOCK_ROOMS;
+    const name = roomName({ x: sx, y: sy });
+    if (!corners.has(name)) corners.set(name, { x: sx + offset.x, y: sy + offset.y });
+  }
+  return [...corners].map(([name, at]) => ({
+    kind: "image",
+    key: `block:${name}`,
+    layer: MAP_LAYER.tile,
+    x: at.x,
+    y: at.y,
+    width: BLOCK_ROOMS,
+    height: BLOCK_ROOMS,
+    url: state.tiles.block(name),
+  }));
+};
+
+const OWNED_ALPHA = 0.45;
+const RESERVED_ALPHA = 0.2;
+const OWNED_BORDER = 0.08;
+
+/** 占有（RCL ≥ 1）的房间：半透明填充加边框；预定（level 0）：更淡的填充，无边框。 */
+export const paintOwnership: MapLayerPainter = (ctx) => {
+  const out: Primitive[] = [];
+  for (const room of ctx.visibleRooms) {
+    const owner = ctx.state.rooms[room.name]?.owner;
+    if (!owner) continue;
+    const color = ctx.ownerColor(owner.user);
+    const reserved = owner.level === 0;
+    out.push({
+      kind: "rect",
+      key: `own:${room.name}`,
+      layer: MAP_LAYER.ownership,
+      x: room.x,
+      y: room.y,
+      width: 1,
+      height: 1,
+      fill: color,
+      alpha: reserved ? RESERVED_ALPHA : OWNED_ALPHA,
+      ...(reserved ? {} : { stroke: { color, width: OWNED_BORDER } }),
+    });
+  }
+  return out;
+};
+
+export const MAP_LAYERS: readonly MapLayerPainter[] = [paintTiles, paintOwnership];
+
+export function buildMapScene(
+  state: MapState,
+  view: MapView,
+  layers: readonly MapLayerPainter[] = MAP_LAYERS,
+): Scene {
+  const ownerColor = view.ownerColor ?? defaultOwnerColor(view.theme);
+  const ctx: MapPaintContext = {
+    state,
+    view,
+    theme: view.theme,
+    zoom: view.zoom,
+    ownerColor: (userId) => ownerColor(userId, state),
+    visibleRooms: visibleRooms(state, view.visible),
+  };
+  return {
+    width: state.size.width,
+    height: state.size.height,
+    background: view.theme.background,
+    primitives: layers.flatMap((layer) => layer(ctx)),
+  };
+}
