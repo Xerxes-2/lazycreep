@@ -55,3 +55,8 @@ export function sceneRect(rect: WorldRect): WorldRect {
 export function sceneZoom(scale: number): number {
   return 2 ** (Math.floor(Math.log2(scale) * 4) / 4);
 }
+
+/** 把世界点 (wx, wy) 放到画布中央，缩放为 scale */
+export function centerOn(wx: number, wy: number, width: number, height: number, scale: number): Viewport {
+  return { x: width / 2 - wx * scale, y: height / 2 - wy * scale, scale };
+}

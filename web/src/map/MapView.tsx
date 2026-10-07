@@ -16,14 +16,17 @@ import { DEFAULT_THEME } from "../scene/theme.ts";
 import { errorMessage, type SourceFactory } from "../settings/SettingsPage.tsx";
 import type { Settings } from "../settings/settings.ts";
 import type { ShardInfo, Source } from "../source/source.ts";
-import { fitCamera, panBy, sceneRect, sceneZoom, screenToWorld, visibleRect, zoomAt } from "./map-camera.ts";
+import { centerOn, fitCamera, panBy, sceneRect, sceneZoom, screenToWorld, visibleRect, zoomAt } from "./map-camera.ts";
 import { buildMapScene, MAP_LAYERS, type MapLayerPainter } from "./map-scene.ts";
 import { applyMapStats, mapStateFrom, roomAtWorld, type MapState } from "./map-state.ts";
 import { createOwnershipLoader } from "./ownership-loader.ts";
 import type { OwnershipHub } from "./ownership-hub.ts";
+import { findRoom, useMapInfo } from "./use-map-info.ts";
 
 /** 每个房间至少这么多 CSS 像素时，点击房间进入 Room View */
 export const ENTER_ZOOM = 32;
+/** 搜索房间后至少放大到这么多 CSS 像素每房间（够显示矿物与 Power Bank） */
+const SEARCH_ZOOM = 64;
 /** 指针移动超过这么多像素就算拖动，不算点击 */
 const CLICK_SLOP = 5;
 const DEFAULT_WIDTH = 600;
@@ -50,6 +53,10 @@ export interface MapViewProps {
   readonly ownership?: OwnershipHub;
   /** 叠加在默认图层之上的额外图层（例如 PvP 热点）；按 Shard 给出，变化时重建 Scene */
   readonly overlays?: (shard: string) => readonly MapLayerPainter[];
+  /** Ally List（#17）：玩家用户名，不分大小写 */
+  readonly allies?: ReadonlySet<string>;
+  /** 地图是否在前台；false 时（例如 Room View 打开）不订阅 roomMap2。默认 true */
+  readonly active?: boolean;
 }
 
 export function MapView(props: MapViewProps) {
@@ -215,6 +222,15 @@ export function MapView(props: MapViewProps) {
     },
   );
 
+  useMapInfo({
+    source,
+    mapState,
+    setMapState,
+    allies: () => props.allies,
+    focus: sceneInput,
+    enabled: () => !!settings.token() && visible() && props.active !== false,
+  });
+
   // 页面不可见时不构建新 Scene（#14）
   const scene = createMemo<Scene | undefined>((previous) => {
     if (!visible()) return previous;
@@ -316,6 +332,22 @@ export function MapView(props: MapViewProps) {
     if (room) props.onOpenRoom({ shard: state.shard, room });
   };
 
+  // 房间名搜索：居中到该房间，并至少放大到能看清图标
+  const [searchText, setSearchText] = createSignal("");
+  const [searchMiss, setSearchMiss] = createSignal<string>();
+  const onSearch = (event: Event) => {
+    event.preventDefault();
+    const state = mapState();
+    const cam = camera();
+    if (!state || !cam) return;
+    const text = searchText().trim();
+    const at = findRoom(state, text);
+    setSearchMiss(at ? undefined : text);
+    if (!at) return;
+    const { width, height } = canvasSize();
+    setCamera(centerOn(at.x, at.y, width, height, Math.max(cam.scale, SEARCH_ZOOM)));
+  };
+
   const onWheel = (event: WheelEvent) => {
     event.preventDefault();
     const pixels = event.deltaMode === 1 ? event.deltaY * 16 : event.deltaMode === 2 ? event.deltaY * 400 : event.deltaY;
@@ -386,8 +418,26 @@ export function MapView(props: MapViewProps) {
             </select>
           </label>
         </Show>
+        <form class="world-map__search" role="search" onSubmit={onSearch}>
+          <input
+            name="world-map-search"
+            aria-label={t("mapInfo.search")}
+            placeholder={t("mapInfo.search.placeholder")}
+            autocomplete="off"
+            size={8}
+            value={searchText()}
+            onInput={(e) => setSearchText(e.currentTarget.value)}
+          />
+        </form>
         <span class="world-map__hint">{t("worldMap.hint")}</span>
       </div>
+      <Show when={searchMiss()}>
+        {(room) => (
+          <p class="settings__error" role="alert">
+            {t("mapInfo.search.notFound", { room: room() })}
+          </p>
+        )}
+      </Show>
       <Show when={!mapState() && !loadError()}>
         <p class="settings__muted">{t("worldMap.loading")}</p>
       </Show>

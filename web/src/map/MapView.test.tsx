@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createSignal } from "solid-js";
 import { render } from "solid-js/web";
 import { I18nProvider } from "../i18n";
 import type { ImagePrimitive, Scene } from "../scene/scene.ts";
@@ -6,6 +7,8 @@ import type { SceneView, SceneViewOptions, Viewport } from "../scene/pixi-scene-
 import { DEFAULT_THEME } from "../scene/theme.ts";
 import { createSettings } from "../settings/settings.ts";
 import { FixtureSource, fixtureBundle } from "../source/fixture-source.ts";
+import type { RoomMapUpdate } from "../source/source.ts";
+import { ICON_MIN_ZOOM } from "./map-info-layers.ts";
 import { MapView, type MapViewProps } from "./MapView.tsx";
 
 const bundle = fixtureBundle(
@@ -19,6 +22,8 @@ let viewports: (Viewport | undefined)[];
 let canvas: HTMLCanvasElement;
 let opened: { shard: string; room: string }[];
 let statsCalls: string[][];
+/** 当前订阅着的 roomMap2：房间 → 监听者 */
+let roomMaps: Map<string, (update: RoomMapUpdate) => void>;
 
 /** 记录 Scene 与视口，不真的画。 */
 async function fakeView(options: SceneViewOptions): Promise<SceneView> {
@@ -57,6 +62,10 @@ function mount(props: Partial<MapViewProps> = {}) {
               statsCalls.push([...rooms]);
               return getMapStats(shard, rooms);
             };
+            source.subscribeRoomMap = (_shard, room, listener) => {
+              roomMaps.set(room, listener);
+              return () => roomMaps.delete(room);
+            };
             return source;
           }}
           createView={fakeView}
@@ -89,6 +98,14 @@ function wheel(at: { clientX: number; clientY: number }, deltaY: number) {
   canvas.dispatchEvent(new WheelEvent("wheel", { ...at, deltaY, bubbles: true, cancelable: true }));
 }
 
+/** 在搜索框里输入并回车 */
+function search(text: string) {
+  const input = container.querySelector<HTMLInputElement>("input[name=world-map-search]")!;
+  input.value = text;
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  input.closest("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+}
+
 /** W13S28 的房间中心（世界坐标） */
 const W13S28 = { x: 37.5, y: 79.5 };
 
@@ -99,6 +116,7 @@ describe("World Map 页面", () => {
     viewports = [];
     opened = [];
     statsCalls = [];
+    roomMaps = new Map();
     container = document.createElement("div");
     document.body.append(container);
   });
@@ -200,5 +218,82 @@ describe("World Map 页面", () => {
     select.value = "shardSeason";
     select.dispatchEvent(new Event("change", { bubbles: true }));
     expect(settings.shard()).toBe("shardSeason");
+  });
+
+  describe("房间名搜索", () => {
+    it("回车后地图居中到该房间（不分大小写），并放大到能看清房间", async () => {
+      mount();
+      await settle(() => expect(shown.length).toBeGreaterThan(0));
+      search(" w13s28 ");
+      const center = screenOf(W13S28.x, W13S28.y);
+      expect(center.clientX).toBeCloseTo(canvas.width / 2);
+      expect(center.clientY).toBeCloseTo(canvas.height / 2);
+      expect(lastViewport()!.scale).toBeGreaterThanOrEqual(ICON_MIN_ZOOM);
+      expect(container.querySelector("[role=alert]")).toBeNull();
+    });
+
+    it("已经放得更大时保持缩放，只居中", async () => {
+      mount();
+      await settle(() => expect(shown.length).toBeGreaterThan(0));
+      for (let i = 0; i < 20; i++) wheel(screenOf(10, 10), -200);
+      const scale = lastViewport()!.scale;
+      expect(scale).toBeGreaterThan(ICON_MIN_ZOOM * 2);
+      search("W13S28");
+      expect(lastViewport()!.scale).toBe(scale);
+      expect(screenOf(W13S28.x, W13S28.y).clientX).toBeCloseTo(canvas.width / 2);
+    });
+
+    it("不是房间名或在世界之外时提示，视口不动", async () => {
+      mount();
+      await settle(() => expect(shown.length).toBeGreaterThan(0));
+      const before = lastViewport();
+      search("hello");
+      expect(container.querySelector("[role=alert]")!.textContent).toContain("hello");
+      search("W99S99");
+      expect(container.querySelector("[role=alert]")!.textContent).toContain("W99S99");
+      expect(lastViewport()).toEqual(before);
+      search("W13S28");
+      expect(container.querySelector("[role=alert]")).toBeNull();
+    });
+  });
+
+  describe("信息层的数据", () => {
+    it("Ally List 里的玩家（不分大小写）按盟友着色", async () => {
+      mount({ allies: new Set(["odiodin"]) });
+      await settle(() =>
+        expect(lastScene().primitives.find((p) => p.key === "own:W12S23")).toMatchObject({ fill: DEFAULT_THEME.ally }),
+      );
+    });
+
+    it("放大到图标级别才订阅可见房间的 roomMap2，Power Bank 画上地图；缩小后全部退订", async () => {
+      mount();
+      await settle(() => expect(shown.length).toBeGreaterThan(0));
+      expect(roomMaps.size).toBe(0);
+      search("W13S28");
+      await settle(() => expect(roomMaps.has("W13S28")).toBe(true));
+      expect(roomMaps.size).toBeLessThanOrEqual(100);
+      roomMaps.get("W13S28")!({ pb: [[25, 25]] });
+      await settle(() =>
+        expect(lastScene().primitives.find((p) => p.key === "pb:W13S28:0")).toMatchObject({ kind: "circle" }),
+      );
+      for (let i = 0; i < 10; i++) wheel(screenOf(W13S28.x, W13S28.y), 200);
+      await settle(() => expect(roomMaps.size).toBe(0));
+    });
+
+    it("地图不活跃时（Room View 打开）不订阅 roomMap2", async () => {
+      const [active, setActive] = createSignal(true);
+      mount({
+        get active() {
+          return active();
+        },
+      });
+      await settle(() => expect(shown.length).toBeGreaterThan(0));
+      search("W13S28");
+      await settle(() => expect(roomMaps.size).toBeGreaterThan(0));
+      setActive(false);
+      await settle(() => expect(roomMaps.size).toBe(0));
+      setActive(true);
+      await settle(() => expect(roomMaps.size).toBeGreaterThan(0));
+    });
   });
 });

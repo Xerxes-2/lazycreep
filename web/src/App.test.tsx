@@ -79,4 +79,15 @@ describe("App", () => {
     languageButton().click();
     expect(container.querySelector("h2")?.textContent).toBe("Settings");
   });
+
+  it("shows the Ally List in the settings, kept across reloads", () => {
+    mount();
+    expect(container.querySelector("#allies-title")?.textContent).toBe("Ally List");
+    const input = container.querySelector<HTMLInputElement>("input[name=ally-name]")!;
+    input.value = "Alice";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.closest("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    mount();
+    expect(container.querySelector('[data-ally="Alice"]')).not.toBeNull();
+  });
 });

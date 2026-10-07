@@ -22,6 +22,8 @@ export interface MapAndRoomProps {
   readonly sourceFor: SourceFactory;
   /** 测试里换成假的 SceneView */
   readonly createView?: (options: SceneViewOptions) => Promise<SceneView>;
+  /** Ally List（#17）：同时驱动地图与 Room View 的着色 */
+  readonly allies?: ReadonlySet<string>;
   /** 透传给 Room View 的其余选项（测试用） */
   readonly roomView?: Partial<RoomViewProps>;
   /** PvP 轮询用的页面可见性；默认 pageVisibility()（测试用） */
@@ -68,6 +70,8 @@ export function MapAndRoom(props: MapAndRoomProps) {
           {...(props.createView ? { createView: props.createView } : {})}
           ownership={ownership()}
           overlays={(shard) => pvpMapLayers(pvp.groups()?.find((g) => g.shard === shard))}
+          {...(props.allies ? { allies: props.allies } : {})}
+          active={opened() === undefined}
           onOpenRoom={(target) => {
             setOpened({ ...target });
             scrollTo("room-view-title");
@@ -78,6 +82,7 @@ export function MapAndRoom(props: MapAndRoomProps) {
         settings={props.settings}
         sourceFor={props.sourceFor}
         {...(props.createView ? { createView: props.createView } : {})}
+        {...(props.allies ? { allies: props.allies } : {})}
         {...props.roomView}
         open={opened()}
         onBack={

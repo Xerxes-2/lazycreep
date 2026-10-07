@@ -1,4 +1,6 @@
 import { createEffect } from "solid-js";
+import { createAllyList } from "./allies/ally-list.ts";
+import { AllyListSettings } from "./allies/AllyListSettings.tsx";
 import { I18nProvider, useI18n } from "./i18n";
 import { MapAndRoom } from "./map/MapAndRoom.tsx";
 import { pageVisibility } from "./power/visibility.ts";
@@ -21,6 +23,7 @@ function browserStorage(): SettingsStorage | undefined {
 function Shell(props: { sourceFor: SourceFactory }) {
   const { locale, setLocale, t } = useI18n();
   const settings = createSettings(browserStorage());
+  const allies = createAllyList(browserStorage());
 
   createEffect(() => {
     document.title = t("app.title");
@@ -43,7 +46,8 @@ function Shell(props: { sourceFor: SourceFactory }) {
       </header>
       <p class="shell__tagline">{t("app.tagline")}</p>
       <SettingsPage settings={settings} sourceFor={props.sourceFor} />
-      <MapAndRoom settings={settings} sourceFor={props.sourceFor} />
+      <AllyListSettings allies={allies} />
+      <MapAndRoom settings={settings} sourceFor={props.sourceFor} allies={allies.set()} />
       <RawReadings settings={settings} sourceFor={props.sourceFor} />
     </main>
   );
