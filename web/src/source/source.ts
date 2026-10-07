@@ -20,7 +20,35 @@ export interface ServerConfig {
 
 export type Unsubscribe = () => void;
 
-export type ConnectionState = "connecting" | "authenticated" | "disconnected" | "reconnecting";
+/**
+ * 流的连接状态：
+ * - disconnected：没有连接（尚无流订阅，或已 close）
+ * - connecting：首次连接，尚未认证
+ * - authenticated：已认证，订阅生效
+ * - reconnecting：连接断开，正在按指数退避重连；恢复后自动重订阅
+ * - unauthorized：token 缺失或被服务器拒绝；不会自动重连，换 token 需要新建 Source
+ */
+export type ConnectionState = "connecting" | "authenticated" | "disconnected" | "reconnecting" | "unauthorized";
+
+/**
+ * 一条流订阅上的错误，经 subscribe* 的 `onError` 送达：
+ * - replaced：被另一个房间的订阅顶替（任何时刻最多一条房间订阅，ADR 0002），之后不再收到帧
+ * - server：服务器针对该频道的错误帧（如 `subscribe limit reached`），订阅保留，之后可能恢复
+ * - failed：订阅没能建立（如取不到当前用户 id），之后不会收到帧
+ */
+export interface StreamError {
+  readonly kind: "replaced" | "server" | "failed";
+  readonly message: string;
+}
+
+export type StreamErrorListener = (error: StreamError) => void;
+
+/** 当前用户的 CPU 与内存用量，每 Tick 一帧。 */
+export interface CpuUpdate {
+  readonly cpu: number;
+  /** Memory 序列化后的字节数 */
+  readonly memory: number;
+}
 
 /** 一个房间对象：首帧为全量（含 `type`、`x`、`y` 等），后续为只含变化属性的增量。 */
 export type RoomObjectPatch = Readonly<Record<string, unknown>>;
@@ -160,11 +188,26 @@ export interface Source {
   /** 连接状态流；订阅时立即收到当前状态。 */
   onConnection(listener: (state: ConnectionState) => void): Unsubscribe;
 
-  /** 房间逐 Tick 流：首帧全量，后续增量。 */
-  subscribeRoom(shard: string, room: string, listener: (tick: RoomTick) => void): Unsubscribe;
-  subscribeRoomMap(shard: string, room: string, listener: (update: RoomMapUpdate) => void): Unsubscribe;
+  /**
+   * 房间逐 Tick 流：首帧全量，后续增量。
+   * 任何时刻最多一条房间订阅：订阅另一个房间会先退订旧房间，旧订阅收到 `replaced`。
+   */
+  subscribeRoom(
+    shard: string,
+    room: string,
+    listener: (tick: RoomTick) => void,
+    onError?: StreamErrorListener,
+  ): Unsubscribe;
+  subscribeRoomMap(
+    shard: string,
+    room: string,
+    listener: (update: RoomMapUpdate) => void,
+    onError?: StreamErrorListener,
+  ): Unsubscribe;
   /** 当前用户的 Console 输出（所有 Shard；事件里带 Shard）。 */
-  subscribeConsole(listener: (event: ConsoleEvent) => void): Unsubscribe;
+  subscribeConsole(listener: (event: ConsoleEvent) => void, onError?: StreamErrorListener): Unsubscribe;
+  /** 当前用户的 CPU 与内存用量。 */
+  subscribeCpu(listener: (update: CpuUpdate) => void, onError?: StreamErrorListener): Unsubscribe;
   sendConsole(shard: string, expression: string): Promise<void>;
 
   /** 最近 interval 个 Tick 内有战斗的房间，按 Shard 分组。 */

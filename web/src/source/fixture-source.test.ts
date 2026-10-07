@@ -8,6 +8,7 @@ import {
   type RoomMapUpdate,
   type RoomObjectPatch,
   type RoomTick,
+  type StreamError,
 } from "./source.ts";
 
 const files = Object.values(
@@ -93,6 +94,19 @@ describe("FixtureSource 回放时序", () => {
     unsubscribe();
     await vi.runAllTimersAsync();
     expect(ticks).toHaveLength(1);
+  });
+
+  it("任何时刻最多一条房间订阅：订阅另一个房间时旧订阅收到 replaced 并停止", async () => {
+    const source = new FixtureSource(bundle, { speed: 1 });
+    const oldTicks: RoomTick[] = [];
+    const errors: StreamError[] = [];
+    source.subscribeRoom(SHARD, OWN_ROOM, (tick) => oldTicks.push(tick), (e) => errors.push(e));
+    await vi.advanceTimersByTimeAsync(0);
+    const newTicks = collectRoom(source, SHARD, "E13N21");
+    await vi.runAllTimersAsync();
+    expect(oldTicks).toHaveLength(1);
+    expect(errors.map((e) => e.kind)).toEqual(["replaced"]);
+    expect(newTicks.length).toBeGreaterThan(10);
   });
 
   it("roomMap2 流按录制回放，带用户坐标", async () => {

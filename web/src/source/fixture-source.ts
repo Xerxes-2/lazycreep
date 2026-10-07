@@ -23,6 +23,7 @@ import {
   SourceError,
   type ConnectionState,
   type ConsoleEvent,
+  type CpuUpdate,
   type HistoryChunk,
   type Nuke,
   type PvpShard,
@@ -32,6 +33,7 @@ import {
   type ServerVersion,
   type ShardInfo,
   type Source,
+  type StreamErrorListener,
   type Terrain,
   type Unsubscribe,
   type UserInfo,
@@ -104,6 +106,13 @@ export class FixtureSource implements Source {
   /** 回放没有真实连接：从一开始就视为已认证，close 后断开。 */
   private state: ConnectionState = "authenticated";
   private readonly sent: { shard: string; expression: string }[] = [];
+  /** 与 LiveSource 相同的约束：任何时刻最多一条房间订阅。 */
+  private room:
+    | {
+        readonly key: string;
+        readonly members: Set<{ readonly cancel: Unsubscribe; readonly onError: StreamErrorListener | undefined }>;
+      }
+    | undefined;
 
   constructor(bundle: FixtureBundle, options: FixtureSourceOptions = {}) {
     this.server = bundle.server;
@@ -148,22 +157,54 @@ export class FixtureSource implements Source {
     return () => this.connectionListeners.delete(listener);
   }
 
-  subscribeRoom(shard: string, room: string, listener: (tick: RoomTick) => void): Unsubscribe {
+  subscribeRoom(
+    shard: string,
+    room: string,
+    listener: (tick: RoomTick) => void,
+    onError?: StreamErrorListener,
+  ): Unsubscribe {
+    const key = `${shard}/${room}`;
+    if (this.room && this.room.key !== key) {
+      const replaced = this.room;
+      this.room = undefined;
+      for (const member of replaced.members) {
+        member.cancel();
+        member.onError?.({ kind: "replaced", message: replaced.key });
+      }
+    }
+    this.room ??= { key, members: new Set() };
     const fixture = this.find<RoomFixture>("room", (f) => f.meta.shard === shard && f.meta.room === room);
-    if (!fixture) return () => {};
-    return this.play(fixture.frames, (data) => listener(roomTickFromWire(data)));
+    const cancel = fixture ? this.play(fixture.frames, (data) => listener(roomTickFromWire(data))) : () => {};
+    const current = this.room;
+    const member = { cancel, onError };
+    current.members.add(member);
+    return () => {
+      current.members.delete(member);
+      cancel();
+      if (current.members.size === 0 && this.room === current) this.room = undefined;
+    };
   }
 
-  subscribeRoomMap(shard: string, room: string, listener: (update: RoomMapUpdate) => void): Unsubscribe {
+  subscribeRoomMap(
+    shard: string,
+    room: string,
+    listener: (update: RoomMapUpdate) => void,
+    _onError?: StreamErrorListener,
+  ): Unsubscribe {
     const fixture = this.find<RoomMapFixture>("roomMap2", (f) => f.meta.shard === shard && f.meta.room === room);
     if (!fixture) return () => {};
     return this.play(fixture.frames, listener);
   }
 
-  subscribeConsole(listener: (event: ConsoleEvent) => void): Unsubscribe {
+  subscribeConsole(listener: (event: ConsoleEvent) => void, _onError?: StreamErrorListener): Unsubscribe {
     const fixture = this.find<ConsoleFixture>("console");
     if (!fixture) return () => {};
     return this.play(fixture.frames, (data) => listener(consoleEventFromWire(data)));
+  }
+
+  /** 录制格式没有 CPU 流：不投递任何帧。 */
+  subscribeCpu(_listener: (update: CpuUpdate) => void, _onError?: StreamErrorListener): Unsubscribe {
+    return () => {};
   }
 
   /** 不触网，只把命令记进 sentConsoleCommands。 */

@@ -1,12 +1,15 @@
 /**
  * LiveSource：连接真实 Server 的 Source。
  * HTTP 走同源 Gateway 路径（ADR 0001），token 放在 X-Token 请求头里转发；
- * WebSocket 流直连官方，在 #10 实现，目前调用会抛错。
+ * WebSocket 流直连官方（Server 配置的 socketUrl），一个 LiveSource 至多一条连接，
+ * 第一次订阅流时建立；任何时刻最多一条房间订阅（ADR 0002）由这里保证。
  */
 import type {
+  WireConsole,
   WireHistoryChunk,
   WireNukes,
   WirePvp,
+  WireRoomPayload,
   WireShards,
   WireTerrain,
   WireTime,
@@ -16,6 +19,7 @@ import {
   SourceError,
   type ConnectionState,
   type ConsoleEvent,
+  type CpuUpdate,
   type HistoryChunk,
   type Nuke,
   type PvpShard,
@@ -25,19 +29,25 @@ import {
   type ServerVersion,
   type ShardInfo,
   type Source,
+  type StreamErrorListener,
   type Terrain,
   type Unsubscribe,
   type UserInfo,
 } from "./source.ts";
+import { browserSocket, ChannelSocket, type ReconnectOptions, type SocketFactory } from "./socket.ts";
 import {
+  consoleEventFromWire,
   historyChunkFromWire,
   meFromWire,
   nukesFromWire,
   pvpFromWire,
+  roomTickFromWire,
   shardsFromWire,
   terrainFromWire,
   versionFromWire,
 } from "./wire.ts";
+
+export type { ReconnectOptions, SocketFactory, SocketHandlers, RawSocket } from "./socket.ts";
 
 export interface LiveSourceOptions {
   /** 全权限 token（ADR 0003）；不给时只能用匿名接口。 */
@@ -45,13 +55,18 @@ export interface LiveSourceOptions {
   /** 解析相对路径的基准；浏览器里省略即同源，Node 里指向 Gateway。 */
   readonly baseUrl?: string;
   readonly fetch?: typeof fetch;
+  /** 建立 WebSocket；测试里换成假 socket。 */
+  readonly socket?: SocketFactory;
+  readonly reconnect?: ReconnectOptions;
+}
+
+/** 当前那条房间订阅：同一房间可有多个监听者。 */
+interface RoomSubscription {
+  readonly channel: string;
+  readonly members: Set<{ readonly off: Unsubscribe; readonly onError: StreamErrorListener | undefined }>;
 }
 
 type Query = Readonly<Record<string, string>>;
-
-function notYet(what: string): never {
-  throw new Error(`LiveSource 尚未实现 ${what}（WebSocket，见 #10）`);
-}
 
 export class LiveSource implements Source {
   readonly server: ServerConfig;
@@ -59,12 +74,16 @@ export class LiveSource implements Source {
   private readonly baseUrl: string | undefined;
   private readonly fetchImpl: typeof fetch;
   private readonly aborter = new AbortController();
+  private readonly socket: ChannelSocket;
+  private room: RoomSubscription | undefined;
+  private userId: Promise<string> | undefined;
 
   constructor(server: ServerConfig, options: LiveSourceOptions = {}) {
     this.server = server;
     this.token = options.token === "" ? undefined : options.token;
     this.baseUrl = options.baseUrl;
     this.fetchImpl = options.fetch ?? globalThis.fetch.bind(globalThis);
+    this.socket = new ChannelSocket(server.socketUrl, this.token, options.socket ?? browserSocket, options.reconnect);
   }
 
   private url(path: string, query: Query = {}): string {
@@ -106,24 +125,95 @@ export class LiveSource implements Source {
     return this.json<T>(response, path);
   }
 
-  onConnection(_listener: (state: ConnectionState) => void): Unsubscribe {
-    return notYet("连接状态");
+  onConnection(listener: (state: ConnectionState) => void): Unsubscribe {
+    return this.socket.onState(listener);
   }
 
-  subscribeRoom(_shard: string, _room: string, _listener: (tick: RoomTick) => void): Unsubscribe {
-    return notYet("房间流");
+  /** 分 Shard 的 Server 频道名带 `<shard>/`。 */
+  private roomChannel(kind: "room" | "roomMap2", shard: string, room: string): string {
+    return `${kind}:${this.server.sharded ? `${shard}/` : ""}${room}`;
   }
 
-  subscribeRoomMap(_shard: string, _room: string, _listener: (update: RoomMapUpdate) => void): Unsubscribe {
-    return notYet("roomMap2 流");
+  private stream<T>(channel: string, listener: (data: T) => void, onError?: StreamErrorListener): Unsubscribe {
+    return this.socket.subscribe(channel, {
+      data: (payload) => listener(payload as T),
+      error: (message) => onError?.({ kind: "server", message }),
+    });
   }
 
-  subscribeConsole(_listener: (event: ConsoleEvent) => void): Unsubscribe {
-    return notYet("Console 流");
+  subscribeRoom(
+    shard: string,
+    room: string,
+    listener: (tick: RoomTick) => void,
+    onError?: StreamErrorListener,
+  ): Unsubscribe {
+    const channel = this.roomChannel("room", shard, room);
+    if (this.room && this.room.channel !== channel) {
+      // 先退订旧房间，再订阅新房间
+      const replaced = this.room;
+      this.room = undefined;
+      for (const member of replaced.members) member.off();
+      for (const member of replaced.members) member.onError?.({ kind: "replaced", message: replaced.channel });
+      replaced.members.clear();
+    }
+    this.room ??= { channel, members: new Set() };
+    const current = this.room;
+    const member = {
+      off: this.stream<WireRoomPayload>(channel, (data) => listener(roomTickFromWire(data)), onError),
+      onError,
+    };
+    current.members.add(member);
+    return () => {
+      if (!current.members.delete(member)) return;
+      member.off();
+      if (current.members.size === 0 && this.room === current) this.room = undefined;
+    };
   }
 
+  subscribeRoomMap(
+    shard: string,
+    room: string,
+    listener: (update: RoomMapUpdate) => void,
+    onError?: StreamErrorListener,
+  ): Unsubscribe {
+    return this.stream(this.roomChannel("roomMap2", shard, room), listener, onError);
+  }
+
+  /** `user:<id>/<topic>`：id 取自 token 所属用户，取到之前先不订阅。 */
+  private userStream<T>(topic: string, listener: (data: T) => void, onError?: StreamErrorListener): Unsubscribe {
+    let off: Unsubscribe | undefined;
+    let cancelled = false;
+    const userId = (this.userId ??= this.api<{ _id: string }>("/auth/me").then((me) => me._id));
+    userId.then(
+      (id) => {
+        if (!cancelled) off = this.stream(`user:${id}/${topic}`, listener, onError);
+      },
+      (error: unknown) => {
+        if (this.userId === userId) this.userId = undefined;
+        if (!cancelled) onError?.({ kind: "failed", message: error instanceof Error ? error.message : String(error) });
+      },
+    );
+    return () => {
+      cancelled = true;
+      off?.();
+    };
+  }
+
+  subscribeConsole(listener: (event: ConsoleEvent) => void, onError?: StreamErrorListener): Unsubscribe {
+    return this.userStream<WireConsole>("console", (data) => listener(consoleEventFromWire(data)), onError);
+  }
+
+  subscribeCpu(listener: (update: CpuUpdate) => void, onError?: StreamErrorListener): Unsubscribe {
+    return this.userStream<{ cpu: number; memory: number }>(
+      "cpu",
+      (data) => listener({ cpu: data.cpu, memory: data.memory }),
+      onError,
+    );
+  }
+
+  /** Console 命令走 HTTP POST，见 #6。 */
   async sendConsole(_shard: string, _expression: string): Promise<void> {
-    notYet("Console 命令");
+    throw new Error("LiveSource 尚未实现 Console 命令（见 #6）");
   }
 
   async getVersion(): Promise<ServerVersion> {
@@ -171,8 +261,10 @@ export class LiveSource implements Source {
     return historyChunkFromWire(shard, await this.json<WireHistoryChunk>(response, path));
   }
 
-  /** 中止进行中的请求。 */
+  /** 中止进行中的请求，断开 WebSocket 并停止重连。 */
   close(): void {
     this.aborter.abort();
+    this.socket.close();
+    this.room = undefined;
   }
 }
