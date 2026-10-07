@@ -17,6 +17,8 @@ let
       ../package.json
       ../pnpm-workspace.yaml
       ../pnpm-lock.yaml
+      # 开发服务器的 Gateway 代理读取路径与 POST 允许名单
+      ../gateway/routes.json
       # 测试回放录制好的 fixture
       ../fixtures
       (lib.fileset.difference ../web (
@@ -44,7 +46,7 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     inherit pnpm;
     fetcherVersion = 4;
     # pnpm-lock.yaml 变动后：改成 lib.fakeHash，`nix build .#web` 报错里取新值。
-    hash = "sha256-s2CFLjAy+uj09e0eLiOIC+lcnEcNaEsQ2r9J8tMJlvw=";
+    hash = "sha256-puiTfV0S7ef9aTq0IPhTa9EepAtUiOeqSbtSMBiqa6s=";
   };
 
   buildPhase = ''

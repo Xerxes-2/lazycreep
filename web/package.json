@@ -8,12 +8,13 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json"
   },
   "dependencies": {
     "solid-js": "^1.9.15"
   },
   "devDependencies": {
+    "@types/node": "^22.20.5",
     "jsdom": "^30.1.2",
     "typescript": "^7.0.2",
     "vite": "^8.3.3",
