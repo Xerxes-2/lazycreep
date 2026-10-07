@@ -140,6 +140,16 @@ export const en: Partial<Record<MessageKey, string>> = {
   "pvp.nuke": "({x}, {y}) from {from}, lands at tick {tick}",
   "pvp.landsIn": "{ticks} ticks left",
 
+  "mapInfo.allies.title": "Ally List",
+  "mapInfo.allies.hint": "Allied player names, case-insensitive; the World Map and Room View color their rooms as allies.",
+  "mapInfo.allies.empty": "The list is empty.",
+  "mapInfo.allies.placeholder": "Player name",
+  "mapInfo.allies.add": "Add",
+  "mapInfo.allies.remove": "Remove {name} from the Ally List",
+  "mapInfo.search": "Room",
+  "mapInfo.search.placeholder": "e.g. W13S28",
+  "mapInfo.search.notFound": "No room named {room}.",
+
   "error.unauthorized": "The token is invalid or expired. Generate a new full-access token in your Screeps account settings.",
   "error.forbidden": "Request refused (HTTP 403).",
   "error.rateLimited": "Rate limit reached, try again later.",

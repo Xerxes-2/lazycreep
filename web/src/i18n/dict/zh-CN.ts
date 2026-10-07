@@ -138,6 +138,16 @@ export const zhCN = {
   "pvp.nuke": "({x}, {y})，来自 {from}，Tick {tick} 落地",
   "pvp.landsIn": "还有 {ticks} Tick",
 
+  "mapInfo.allies.title": "Ally List",
+  "mapInfo.allies.hint": "盟友玩家名，不分大小写；世界地图与房间视图都按它给盟友着色。",
+  "mapInfo.allies.empty": "名单为空。",
+  "mapInfo.allies.placeholder": "玩家名",
+  "mapInfo.allies.add": "添加",
+  "mapInfo.allies.remove": "从 Ally List 删除 {name}",
+  "mapInfo.search": "房间名",
+  "mapInfo.search.placeholder": "例如 W13S28",
+  "mapInfo.search.notFound": "找不到房间 {room}。",
+
   "error.unauthorized": "token 无效或已失效。请在 Screeps 账户设置里生成新的全权限 token。",
   "error.forbidden": "请求被拒绝（HTTP 403）。",
   "error.rateLimited": "触发了速率限制，请稍后再试。",
