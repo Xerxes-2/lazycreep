@@ -120,7 +120,7 @@ describe("Minimap（#27）", () => {
     mount();
     shell.navigate({ shard: SHARD, room: "W13S28" });
     const sections = [...container.querySelectorAll<HTMLElement>("[data-section]")].filter((el) => !el.hidden);
-    expect(sections.map((el) => el.dataset["section"])).toEqual(["room.minimap", "room.selected"]);
+    expect(sections.map((el) => el.dataset["section"])).toEqual(["room.info", "room.minimap", "room.selected", "room.display"]);
     await settle(() => expect(scenes.get(minimapCanvas()!)).toBeDefined());
     const tiles = scenes
       .get(minimapCanvas()!)!

@@ -842,6 +842,7 @@ body {
 /* ---- Room View 交互（#12）：详情卡 ---- */
 
 .room-view__stage {
+  position: relative;
   flex: 1;
   min-height: 0;
   display: grid;
@@ -1186,4 +1187,67 @@ body {
   background: var(--bg);
   color: var(--fg);
   overflow-wrap: anywhere;
+}
+
+/* ---- Room View 的左侧按钮列、浮动 Replay 控制条与 Sidebar 区块（#26） ---- */
+
+.room-view .room-view__tools {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.room-view .room-view__tools button {
+  min-width: 40px;
+  min-height: 40px;
+  background: color-mix(in srgb, var(--bg) 85%, transparent);
+}
+
+/* 浮在 Room View 底部；Console Panel 在 Main View 之外占自己的高度，展开时它自然在控制条下方 */
+.room-view__replay {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  z-index: 3;
+  padding: 8px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+}
+
+.room-view__replay .replay {
+  margin: 0 auto;
+}
+
+.room-info {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 10px;
+  margin: 0;
+}
+
+.room-info dt {
+  color: var(--muted);
+}
+
+.room-info dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
+.display-options {
+  display: grid;
+  gap: 6px;
+}
+
+.display-options__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
 }

@@ -8,7 +8,7 @@
  * 两个模式的区块都常驻挂载：不属于当前模式、Sidebar 收起或区块折叠时只是隐藏，
  * `section.shown()` 为 false（想暂停渲染的区块据此停下）。
  */
-import type { Accessor, JSX } from "solid-js";
+import { Show, type Accessor, type JSX } from "solid-js";
 import type { MessageKey } from "../i18n";
 import { useI18n } from "../i18n";
 import type { MapLayerPrefs } from "../map/map-layer-toggles.ts";
@@ -21,6 +21,9 @@ import type { PvpFeed } from "../pvp/pvp-feed.ts";
 import type { SceneView, SceneViewOptions } from "../scene/pixi-scene-view.ts";
 import type { Theme } from "../scene/theme.ts";
 import { PvpOverview } from "../pvp/PvpOverview.tsx";
+import type { RoomDisplayOptions } from "../room/display-options.ts";
+import type { RoomState } from "../room/room-state.ts";
+import { DisplayOptionsSection, RoomInfoSection } from "../room/RoomSidebarSections.tsx";
 import type { SourceFactory } from "../settings/SettingsPage.tsx";
 import type { Settings } from "../settings/settings.ts";
 import type { Source } from "../source/source.ts";
@@ -51,6 +54,12 @@ export interface SectionContext {
   readonly theme: Accessor<Theme | undefined>;
   /** Ally List（#17） */
   readonly allies: Accessor<ReadonlySet<string> | undefined>;
+  /** Room View 此刻选中的对象 id（#26） */
+  readonly selectedId: Accessor<string | undefined>;
+  /** Room View 画面上的房间状态（#26） */
+  readonly roomState: Accessor<RoomState | undefined>;
+  /** Room View 的显示选项（#26） */
+  readonly display: RoomDisplayOptions;
 }
 
 export interface SectionRender {
@@ -68,7 +77,9 @@ function DetailsSection(props: { ctx: SectionContext }) {
   const { t } = useI18n();
   return (
     <div class="details-section">
-      <p class="details-section__hint settings__muted">{t("shell.details.hint")}</p>
+      <Show when={props.ctx.selectedId() === undefined}>
+        <p class="details-section__hint settings__muted">{t("shell.details.hint")}</p>
+      </Show>
       <div class="details-section__mount" ref={(el) => props.ctx.setDetailsHost(el)} />
     </div>
   );
@@ -76,9 +87,16 @@ function DetailsSection(props: { ctx: SectionContext }) {
 
 export const SIDEBAR_SECTIONS: Readonly<Record<MainViewMode, readonly SidebarSectionDef[]>> = {
   room: [
-    // #26：房间信息（排在 Minimap 之前）；#26：显示选项（排在选中对象之后）
+    {
+      id: "room.info",
+      title: "roomSidebar.info.title",
+      render: (ctx) => (
+        <RoomInfoSection location={ctx.shell.location} roomState={ctx.roomState} ownership={ctx.ownership} />
+      ),
+    },
     { id: "room.minimap", title: "minimap.title", render: (ctx, { shown }) => <Minimap ctx={ctx} shown={shown} /> },
     { id: "room.selected", title: "roomDetails.title", render: (ctx) => <DetailsSection ctx={ctx} /> },
+    { id: "room.display", title: "roomSidebar.display.title", render: (ctx) => <DisplayOptionsSection options={ctx.display} /> },
   ],
   map: [
     { id: "map.search", title: "worldMapSidebar.search.title", render: (ctx) => <RoomSearchSection link={ctx.worldMap} /> },

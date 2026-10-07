@@ -30,6 +30,8 @@ import type { SourceFactory } from "../settings/SettingsPage.tsx";
 import type { Settings } from "../settings/settings.ts";
 import { browserStorage } from "../storage/local-store.ts";
 import { RoomView, type RoomViewProps } from "../room/RoomView.tsx";
+import { createRoomDisplayOptions } from "../room/display-options.ts";
+import type { RoomState } from "../room/room-state.ts";
 import { MapView } from "./MapView.tsx";
 
 export interface MapAndRoomProps {
@@ -90,6 +92,10 @@ export function MapAndRoom(props: MapAndRoomProps) {
   const tabs = createSheetTabs();
   const worldMap = createWorldMapLink();
   const layerPrefs = createMapLayerPrefs(browserStorage());
+  // Room View 的区块（#26）：选中对象、房间状态、显示选项
+  const [selectedId, setSelectedId] = createSignal<string>();
+  const [roomState, setRoomState] = createSignal<RoomState>();
+  const display = createRoomDisplayOptions(browserStorage());
   const sectionContext: SectionContext = {
     shell,
     settings: props.settings,
@@ -104,6 +110,9 @@ export function MapAndRoom(props: MapAndRoomProps) {
     createView: props.createView,
     theme: () => props.theme,
     allies: () => props.allies,
+    selectedId,
+    roomState,
+    display,
   };
 
   const mapShown = () => shell.mainView() === "map";
@@ -152,8 +161,17 @@ export function MapAndRoom(props: MapAndRoomProps) {
               open={shell.roomRequest()}
               onTarget={shell.reportRoom}
               detailsMount={shell.sidebarOpen() && (narrow() || !shell.sectionCollapsed("room.selected")) ? detailsHost() : undefined}
-              onSelect={revealSelection(shell, tabs, narrow)}
+              onSelect={(id) => {
+                setSelectedId(id);
+                if (id !== undefined) shell.setSectionCollapsed("room.selected", false);
+                revealSelection(shell, tabs, narrow)(id);
+              }}
               onBack={() => shell.navigate({ view: "map" })}
+              display={display.display()}
+              onShownState={setRoomState}
+              onEnterReplay={(target, tick) =>
+                shell.navigate({ shard: target.shard, room: target.room, replay: { tick, latest: true } })
+              }
             />
           </div>
         </div>

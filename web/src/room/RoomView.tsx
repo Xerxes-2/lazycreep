@@ -25,10 +25,12 @@ import { ROOM_SIZE, buildRoomScene } from "./room-scene.ts";
 import { reduceLiveTick, type RoomState } from "./room-state.ts";
 import type { HistoryCache } from "../replay/history-cache.ts";
 import { createReplayController } from "../replay/replay-controller.ts";
-import { ReplayControls, ReplayEntry } from "../replay/ReplayControls.tsx";
+import { ReplayControls } from "../replay/ReplayControls.tsx";
 import { sharedHistoryCache } from "../replay/replay-settings.ts";
 import type { ShortcutCommands } from "../customize/keybindings.ts";
 import { registerRoomShortcuts } from "../customize/room-shortcuts.ts";
+import type { RoomDisplay } from "./display-options.ts";
+import { RoomToolbar } from "./RoomToolbar.tsx";
 
 /** 数据来源：服务器（经共享 Source），或开发构建里的录制数据（FixtureSource） */
 type DataSource = "server" | "recording";
@@ -84,6 +86,12 @@ export interface RoomViewProps {
   readonly theme?: Theme | undefined;
   /** 快捷键（#5）：Room View 登记 Live / Replay 切换与播放控制 */
   readonly shortcuts?: ShortcutCommands | undefined;
+  /** 显示选项（#26）；默认全开 */
+  readonly display?: RoomDisplay | undefined;
+  /** 画面上的房间状态变化时回报（#26：房间信息区块） */
+  readonly onShownState?: ((state: RoomState | undefined) => void) | undefined;
+  /** 给了就由它进入 Replay（外壳经 navigate 打开 `#/replay?…`，#26）；不给时 Room View 自己打开 */
+  readonly onEnterReplay?: ((target: Target, tick: number) => void) | undefined;
 }
 
 export function RoomView(props: RoomViewProps) {
@@ -270,9 +278,37 @@ export function RoomView(props: RoomViewProps) {
     }
     return buildRoomScene(
       { state, terrain: terrain() },
-      { theme, zoom: controls.zoom(), selectedId: controls.selectedId(), me: me(), allies: props.allies },
+      {
+        theme,
+        zoom: controls.zoom(),
+        selectedId: controls.selectedId(),
+        me: me(),
+        allies: props.allies,
+        display: props.display,
+      },
     );
   });
+
+  createEffect(() => props.onShownState?.(shownState()));
+
+  const [enterError, setEnterError] = createSignal<unknown>();
+  createEffect(on(target, () => setEnterError(undefined)));
+  /** 左侧按钮列的“进入 Replay”：从 Live 当前 Tick（未知时问服务器）开始 */
+  const enterReplay = () => {
+    const current = target();
+    const handoff = props.onEnterReplay;
+    if (!current) return;
+    if (!handoff) return replay.enterFromLive(current.shard, current.room, roomState()?.gameTime);
+    const live = roomState()?.gameTime;
+    if (live !== undefined) return handoff(current, live);
+    const src = source();
+    if (!src) return;
+    setEnterError(undefined);
+    src.getTime(current.shard).then(
+      (tick) => handoff(current, tick),
+      (error: unknown) => setEnterError(error),
+    );
+  };
 
   let host!: HTMLDivElement;
   const [viewError, setViewError] = createSignal<string>();
@@ -342,11 +378,6 @@ export function RoomView(props: RoomViewProps) {
   return (
     <section class="room-view" aria-labelledby="room-view-title">
       <h2 id="room-view-title">{t("roomView.title")}</h2>
-      <Show when={props.onBack}>
-        <button type="button" data-action="back-to-map" onClick={() => props.onBack?.()}>
-          {t("worldMap.back")}
-        </button>
-      </Show>
       <form class="room-view__form" data-testid="room-view-form" onSubmit={submit}>
         <Show when={loadFixtures}>
           <label>
@@ -392,26 +423,11 @@ export function RoomView(props: RoomViewProps) {
           {tickMs() === undefined ? "—" : t("power.msPerTick", { ms: Math.round(tickMs()!) })}
         </span>
       </p>
-      <Show when={target()}>
-        {(current) => (
-          <Show
-            when={replay.snapshot()}
-            fallback={
-              <ReplayEntry
-                error={replay.entryError()}
-                onEnter={() => replay.enterFromLive(current().shard, current().room, roomState()?.gameTime)}
-              />
-            }
-          >
-            {(snapshot) => (
-              <ReplayControls
-                snapshot={snapshot()}
-                engine={replay.engine()!}
-                latest={replay.request()?.latest ?? false}
-                onBackToLive={replay.close}
-              />
-            )}
-          </Show>
+      <Show when={replay.entryError() ?? enterError()}>
+        {(error) => (
+          <p class="settings__error" role="alert">
+            {errorMessage(t, error())}
+          </p>
         )}
       </Show>
       <Show when={sourceError() ?? terrainError() ?? viewError()}>
@@ -433,7 +449,24 @@ export function RoomView(props: RoomViewProps) {
       <div class="room-view__stage">
         <div class="room-view__frame">
           <div class="room-view__canvas" ref={host} />
+          <RoomToolbar
+            onBack={props.onBack}
+            onEnterReplay={target() && !replay.active() ? enterReplay : undefined}
+            onZoom={controls.zoomBy}
+          />
         </div>
+        <Show when={target() && replay.snapshot()}>
+          {(snapshot) => (
+            <div class="room-view__replay">
+              <ReplayControls
+                snapshot={snapshot()}
+                engine={replay.engine()!}
+                latest={replay.request()?.latest ?? false}
+                onBackToLive={replay.close}
+              />
+            </div>
+          )}
+        </Show>
         <Show when={props.detailsMount} keyed fallback={details()}>
           {(mount) => <Portal mount={mount}>{details()}</Portal>}
         </Show>

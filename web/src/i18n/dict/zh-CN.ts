@@ -317,6 +317,31 @@ export const zhCN = {
 
   "route.invalid": "无法识别的地址 {hash}（未知的 Server 或不合法的房间名），已回到世界地图。",
   "route.dismiss": "关闭提示",
+
+  "roomSidebar.info.title": "房间信息",
+  "roomSidebar.info.empty": "打开一个房间后显示它的信息。",
+  "roomSidebar.info.room": "房间",
+  "roomSidebar.info.owner": "所有者",
+  "roomSidebar.info.reservedBy": "预定者",
+  "roomSidebar.info.level": "RCL",
+  "roomSidebar.info.novice": "新手区",
+  "roomSidebar.info.respawnArea": "重生区",
+  "roomSidebar.info.safeMode": "安全模式",
+  "roomSidebar.info.sign": "控制器签名",
+  "roomSidebar.info.unknown": "—",
+  "roomSidebar.info.no": "否",
+  "roomSidebar.info.yes": "是",
+  "roomSidebar.info.until": "至 {date}",
+  "roomSidebar.info.safeModeTicks": "剩余 {ticks} Tick",
+  "roomSidebar.info.signedBy": "{text}（{user}）",
+  "roomSidebar.display.title": "显示选项",
+  "roomSidebar.display.say": "creep 的 say 气泡",
+  "roomSidebar.display.visual": "RoomVisual",
+  "roomSidebar.display.bars": "血条",
+  "roomSidebar.display.names": "玩家名",
+  "roomSidebar.tools": "房间工具",
+  "roomSidebar.zoomIn": "放大",
+  "roomSidebar.zoomOut": "缩小",
 } as const satisfies Record<string, string>;
 
 export type MessageKey = keyof typeof zhCN;

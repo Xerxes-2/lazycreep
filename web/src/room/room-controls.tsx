@@ -46,6 +46,8 @@ export interface RoomControls {
   readonly zoom: Accessor<number>;
   readonly selectedId: Accessor<string | undefined>;
   select(id: string | undefined): void;
+  /** 以画布中心为基点缩放（左侧按钮列，#26）；factor > 1 放大 */
+  zoomBy(factor: number): void;
 }
 
 export function createRoomControls(options: RoomControlsOptions): RoomControls {
@@ -72,20 +74,22 @@ export function createRoomControls(options: RoomControlsOptions): RoomControls {
     if (v) v.setViewport(viewport());
   });
 
+  const update = (next: ReturnType<typeof viewport>) => {
+    const { width, height } = options.size();
+    setCamera(clampCamera(fromViewport(next, width, height), world));
+  };
+  const save = () => {
+    const key = options.cameraKey();
+    if (key) saveCamera(options.storage, key, camera());
+  };
+
   createEffect(() => {
     const v = options.view();
     if (!v) return;
-    const update = (next: ReturnType<typeof viewport>) => {
-      const { width, height } = options.size();
-      setCamera(clampCamera(fromViewport(next, width, height), world));
-    };
     const detach = attachGestures(v.canvas, {
       pan: (dx, dy) => update(panBy(viewport(), dx, dy)),
       zoom: (x, y, factor) => update(zoomAround(viewport(), x, y, factor)),
-      end: () => {
-        const key = options.cameraKey();
-        if (key) saveCamera(options.storage, key, camera());
-      },
+      end: save,
       tap: (x, y) => {
         const scene = options.scene();
         if (!scene) return;
@@ -98,7 +102,16 @@ export function createRoomControls(options: RoomControlsOptions): RoomControls {
     onCleanup(detach);
   });
 
-  return { zoom, selectedId, select: setSelectedId };
+  return {
+    zoom,
+    selectedId,
+    select: setSelectedId,
+    zoomBy(factor) {
+      const { width, height } = options.size();
+      update(zoomAround(viewport(), width / 2, height / 2, factor));
+      save();
+    },
+  };
 }
 
 export interface RoomDetailsPanelProps {
