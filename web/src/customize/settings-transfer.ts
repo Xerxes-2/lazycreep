@@ -19,6 +19,7 @@ import { LOCALE_STORAGE } from "../i18n/locale.ts";
 import { MAP_LAYERS_STORAGE } from "../map/map-layer-toggles.ts";
 import { REPLAY_SETTINGS_STORAGE } from "../replay/replay-settings.ts";
 import { ROOM_CAMERA_STORAGE } from "../room/room-camera-store.ts";
+import { ROOM_DISPLAY_STORAGE } from "../room/display-options.ts";
 import { CONNECTION_STORAGE } from "../settings/settings.ts";
 import { MAIN_VIEW_STORAGE, SHELL_STORAGE } from "../shell/shell-state.ts";
 import type { StoredKey, StoredKind } from "../storage/local-store.ts";
@@ -43,6 +44,7 @@ export const STORED_KEYS: readonly StoredKey[] = [
   CONSOLE_SETTINGS_STORAGE,
   ROOM_CAMERA_STORAGE,
   MAP_LAYERS_STORAGE,
+  ROOM_DISPLAY_STORAGE,
   /** 不导出的运行状态 */
   ALERT_MEMORY_STORAGE,
   MAIN_VIEW_STORAGE,
