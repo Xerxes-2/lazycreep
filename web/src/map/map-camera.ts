@@ -1,8 +1,10 @@
 /**
- * World Map 的视口运算：屏幕（画布 CSS 像素）与世界（房间）坐标之间的换算、缩放与平移。
+ * World Map 特有的视口运算：适配世界、缩放上下限、Scene 用的可见区域与缩放分档。
+ * 通用的换算、缩放与平移在 scene/scene-camera.ts（与 Room View 共用）。
  * 视口形状与 Pixi 适配层相同：screen = world * scale + (x, y)。
  */
 import type { Viewport } from "../scene/pixi-scene-view.ts";
+import { screenToWorld, zoomAround } from "../scene/scene-camera.ts";
 import type { WorldSize } from "../source/source.ts";
 import type { WorldRect } from "./map-scene.ts";
 
@@ -18,16 +20,7 @@ export function fitCamera(size: WorldSize, width: number, height: number): Viewp
 /** 以屏幕点 (px, py) 为中心缩放 factor 倍；scale 夹在 [minScale, MAX_ZOOM]。 */
 export function zoomAt(camera: Viewport, px: number, py: number, factor: number, minScale: number): Viewport {
   const scale = Math.max(minScale, Math.min(MAX_ZOOM, camera.scale * factor));
-  const k = scale / camera.scale;
-  return { x: px - (px - camera.x) * k, y: py - (py - camera.y) * k, scale };
-}
-
-export function panBy(camera: Viewport, dx: number, dy: number): Viewport {
-  return { x: camera.x + dx, y: camera.y + dy, scale: camera.scale };
-}
-
-export function screenToWorld(camera: Viewport, px: number, py: number): { x: number; y: number } {
-  return { x: (px - camera.x) / camera.scale, y: (py - camera.y) / camera.scale };
+  return { ...zoomAround(camera, px, py, scale / camera.scale), scale };
 }
 
 /** 画布里可见的世界区域 */
