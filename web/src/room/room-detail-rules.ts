@@ -43,8 +43,15 @@ export function ownerColorRule(
   users: Readonly<Record<string, RoomUser>>,
   rules: OwnerRules,
 ): (user: unknown) => Color {
+  const custom = theme.playerColors ?? {};
+  const hasCustom = Object.keys(custom).length > 0;
   return (user) => {
-    switch (relationOf(user, users, rules)) {
+    const relation = relationOf(user, users, rules);
+    if (hasCustom && (relation === "ally" || relation === "stranger")) {
+      const picked = custom[users[user as string]?.username?.toLowerCase() ?? ""];
+      if (picked !== undefined) return picked;
+    }
+    switch (relation) {
       case "me":
         return theme.owned;
       case "ally":
@@ -52,6 +59,7 @@ export function ownerColorRule(
       case "none":
         return theme.neutral;
       case "stranger":
+        if (theme.strangerColoring === "faction") return theme.strangers[0] ?? theme.neutral;
         return theme.strangers[hash(String(user)) % theme.strangers.length] ?? theme.neutral;
     }
   };

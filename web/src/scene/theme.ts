@@ -1,6 +1,7 @@
 /**
- * Theme：Scene 构建用的调色板。只有颜色，没有规则；按玩家 / 阵营着色等规则
- * 由构建函数（例如 Room View 的 PaintContext.ownerColor）决定用哪种颜色。
+ * Theme：Scene 构建用的调色板，外加两条可编辑的着色规则（#5）：陌生玩家按玩家还是按阵营着色、
+ * 按玩家指定的颜色。规则的套用在 ownerColorRule（room-detail-rules.ts），Room View 与 World Map 共用。
+ * 用户编辑过的 Theme 由 customize/color-scheme.ts 管理。
  */
 import type { Color } from "./scene.ts";
 
@@ -35,7 +36,14 @@ export interface Theme {
   readonly placeholder: Color;
   /** 选中对象的高亮框 */
   readonly selection: Color;
+
+  /** 陌生玩家着色：perPlayer 按玩家 id 从 strangers 里稳定地挑；faction 一律用 strangers[0] */
+  readonly strangerColoring: StrangerColoring;
+  /** 按玩家指定的颜色：用户名（小写）→ 颜色；优先于盟友与陌生人着色，不作用于自己 */
+  readonly playerColors: Readonly<Record<string, Color>>;
 }
+
+export type StrangerColoring = "perPlayer" | "faction";
 
 /** 深色简约几何画风 */
 export const DEFAULT_THEME: Theme = {
@@ -64,4 +72,7 @@ export const DEFAULT_THEME: Theme = {
   labelOutline: 0x000000,
   placeholder: 0xff4fd8,
   selection: 0xffffff,
+
+  strangerColoring: "perPlayer",
+  playerColors: {},
 };

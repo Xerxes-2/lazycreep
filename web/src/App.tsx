@@ -1,23 +1,35 @@
-import { createEffect, type Accessor } from "solid-js";
+import { createEffect, createSignal, Show, type Accessor } from "solid-js";
 import { createAllyList } from "./allies/ally-list.ts";
 import { AlertSettingsPanel } from "./alert/AlertSettingsPanel.tsx";
 import { createAlertSettings } from "./alert/alert-settings.ts";
 import { AllyListSettings } from "./allies/AllyListSettings.tsx";
 import { ConsolePanel } from "./console/ConsolePanel.tsx";
+import { AppearanceSettings } from "./customize/AppearanceSettings.tsx";
+import { createColorScheme } from "./customize/color-scheme.ts";
+import { attachShortcuts, createKeybindings, createShortcutCommands } from "./customize/keybindings.ts";
+import { registerPanelShortcuts } from "./customize/panel-shortcuts.ts";
+import type { ImportReport } from "./customize/settings-transfer.ts";
+import { SettingsTransfer } from "./customize/SettingsTransfer.tsx";
+import { ShortcutSettings } from "./customize/ShortcutSettings.tsx";
+import { browserDarkQuery, createUiTheme } from "./customize/ui-theme.ts";
+import { browserReplayStorage, createReplaySettings, mbToBytes, sharedHistoryCache } from "./replay/replay-settings.ts";
 import { I18nProvider, useI18n } from "./i18n";
 import { MapAndRoom } from "./map/MapAndRoom.tsx";
 import type { PanelController, PanelDef } from "./panels/Workspace.tsx";
 import { pageVisibility } from "./power/visibility.ts";
 import { RawReadings } from "./readings/RawReadings.tsx";
 import { SettingsPage, type SourceFactory } from "./settings/SettingsPage.tsx";
-import { createSettings, type SettingsStorage } from "./settings/settings.ts";
+import { createSettings } from "./settings/settings.ts";
 import { LiveSource } from "./source/live-source.ts";
 import { sharedSources } from "./source/shared-source.ts";
+
+/** MapAndRoom 自带的核心面板（快捷键可切换到的面板） */
+const CORE_PANELS = ["map", "room", "pvp", "details"];
 
 const liveSource: SourceFactory = (server, token) =>
   new LiveSource(server, { ...(token === undefined ? {} : { token }), visibility: pageVisibility() });
 
-function browserStorage(): SettingsStorage | undefined {
+function browserStorage(): Storage | undefined {
   try {
     return globalThis.localStorage;
   } catch {
@@ -31,11 +43,23 @@ interface ShellProps {
   readonly onController?: (controller: PanelController) => void;
 }
 
-function Shell(props: ShellProps) {
+interface ShellOwnProps extends ShellProps {
+  /** 导入设置后由 App 重建整个界面 */
+  readonly onImported: (report: ImportReport) => void;
+  readonly lastImport: ImportReport | undefined;
+}
+
+function Shell(props: ShellOwnProps) {
   const { locale, setLocale, t } = useI18n();
   const settings = createSettings(browserStorage());
   const allies = createAllyList(browserStorage());
   const alerts = createAlertSettings(browserStorage());
+  // 外观与快捷键（#5）
+  const uiTheme = createUiTheme({ storage: browserStorage(), darkQuery: browserDarkQuery() });
+  const colors = createColorScheme(browserStorage());
+  const keybindings = createKeybindings(browserStorage());
+  const shortcuts = createShortcutCommands();
+  attachShortcuts(document, keybindings, shortcuts);
   // 全页共享数据源：每个 Server + token 组合只有一个 Source（一条 WebSocket），各面板与告警共用
   const sourceFor = sharedSources(props.sourceFor);
 
@@ -55,6 +79,9 @@ function Shell(props: ShellProps) {
           <SettingsPage settings={settings} sourceFor={sourceFor} />
           <AllyListSettings allies={allies} />
           <AlertSettingsPanel settings={alerts} />
+          <AppearanceSettings uiTheme={uiTheme} colors={colors} />
+          <ShortcutSettings bindings={keybindings} />
+          <SettingsTransfer storage={browserStorage()} onImported={props.onImported} lastImport={props.lastImport} />
         </>
       ),
     },
@@ -97,8 +124,13 @@ function Shell(props: ShellProps) {
         allies={allies.set()}
         alerts={alerts}
         panels={panels}
+        theme={colors.theme()}
+        roomView={{ shortcuts }}
         {...(props.narrow ? { narrow: props.narrow } : {})}
-        {...(props.onController ? { onController: props.onController } : {})}
+        onController={(controller) => {
+          registerPanelShortcuts(shortcuts, controller, [...CORE_PANELS, ...panels.map((p) => p.id)]);
+          props.onController?.(controller);
+        }}
       />
     </main>
   );
@@ -109,13 +141,31 @@ function Shell(props: ShellProps) {
  * `narrow` 默认跟随媒体查询（测试里强制 Monitor Mode）。
  */
 export function App(props: Partial<ShellProps>) {
+  // 导入设置（#5）后整个界面按新存储重建：各功能都在创建时读存储，重建即生效，无需刷新页面
+  const [generation, setGeneration] = createSignal(1);
+  const [lastImport, setLastImport] = createSignal<ImportReport>();
+  const onImported = (report: ImportReport) => {
+    // 已打开的历史缓存按新上限淘汰
+    const limit = createReplaySettings(browserReplayStorage()).cacheLimitMb();
+    void sharedHistoryCache()
+      .then((cache) => cache?.setLimit(mbToBytes(limit)))
+      .catch(() => {});
+    setLastImport(report);
+    setGeneration((n) => n + 1);
+  };
   return (
-    <I18nProvider>
-      <Shell
-        sourceFor={props.sourceFor ?? liveSource}
-        {...(props.narrow ? { narrow: props.narrow } : {})}
-        {...(props.onController ? { onController: props.onController } : {})}
-      />
-    </I18nProvider>
+    <Show when={generation()} keyed>
+      {(_generation) => (
+        <I18nProvider>
+          <Shell
+            sourceFor={props.sourceFor ?? liveSource}
+            {...(props.narrow ? { narrow: props.narrow } : {})}
+            {...(props.onController ? { onController: props.onController } : {})}
+            onImported={onImported}
+            lastImport={lastImport()}
+          />
+        </I18nProvider>
+      )}
+    </Show>
   );
 }

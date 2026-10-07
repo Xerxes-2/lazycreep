@@ -12,7 +12,7 @@ import { useVisible } from "../power/use-visible.ts";
 import type { VisibilitySignal } from "../power/visibility.ts";
 import { createSceneView, type SceneView, type SceneViewOptions, type Viewport } from "../scene/pixi-scene-view.ts";
 import type { Scene } from "../scene/scene.ts";
-import { DEFAULT_THEME } from "../scene/theme.ts";
+import { DEFAULT_THEME, type Theme } from "../scene/theme.ts";
 import { errorMessage, type SourceFactory } from "../settings/SettingsPage.tsx";
 import type { Settings } from "../settings/settings.ts";
 import type { ShardInfo, Source } from "../source/source.ts";
@@ -57,6 +57,8 @@ export interface MapViewProps {
   readonly allies?: ReadonlySet<string>;
   /** 地图是否在前台；false 时（例如 Room View 打开）不订阅 roomMap2。默认 true */
   readonly active?: boolean;
+  /** Scene 调色板与着色规则（#5）；变化时重建 Scene。默认 DEFAULT_THEME */
+  readonly theme?: Theme | undefined;
 }
 
 export function MapView(props: MapViewProps) {
@@ -238,7 +240,7 @@ export function MapView(props: MapViewProps) {
     const input = sceneInput();
     if (!state || !input) return undefined;
     const layers = props.overlays ? [...MAP_LAYERS, ...props.overlays(state.shard)] : MAP_LAYERS;
-    return buildMapScene(state, { theme: DEFAULT_THEME, zoom: input.zoom, visible: input.rect }, layers);
+    return buildMapScene(state, { theme: props.theme ?? DEFAULT_THEME, zoom: input.zoom, visible: input.rect }, layers);
   });
 
   createEffect(() => {

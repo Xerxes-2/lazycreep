@@ -7,13 +7,26 @@
   font-family: system-ui, -apple-system, "Segoe UI", "Noto Sans SC", sans-serif;
 }
 
+/* 明暗主题（#5）：<html data-theme> 由 customize/ui-theme.ts 写入；脚本运行前按系统偏好兜底 */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #1b1f24;
     --fg: #e6e8eb;
     --muted: #9aa3ad;
     --accent: #8fd16a;
   }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #1b1f24;
+  --fg: #e6e8eb;
+  --muted: #9aa3ad;
+  --accent: #8fd16a;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
 }
 
 * {
@@ -859,4 +872,62 @@ body {
 .workspace[data-layout="monitor"] .console-panel__send button {
   min-height: 44px;
   font-size: 16px;
+}
+
+/* 外观、快捷键与设置导入导出（#5） */
+.customize__palette {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-bottom: 8px;
+}
+
+.customize__palette label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.customize__palette input[type="color"],
+.customize__players input[type="color"] {
+  width: 2rem;
+  height: 1.6rem;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--muted) 60%, transparent);
+  background: none;
+}
+
+.customize__players {
+  list-style: none;
+  padding: 0;
+}
+
+.customize__shortcuts {
+  border-collapse: collapse;
+  margin-bottom: 8px;
+}
+
+.customize__shortcuts th,
+.customize__shortcuts td {
+  padding: 4px 8px 4px 0;
+  text-align: left;
+  font-weight: normal;
+}
+
+.customize__shortcuts tr[data-conflict] th {
+  color: #d64545;
+}
+
+.customize__shortcuts kbd {
+  display: inline-block;
+  min-width: 1.6em;
+  padding: 1px 6px;
+  border: 1px solid color-mix(in srgb, var(--muted) 60%, transparent);
+  border-radius: 4px;
+  text-align: center;
+  font-family: inherit;
+}
+
+.customize__file input[type="file"] {
+  margin-left: 6px;
 }

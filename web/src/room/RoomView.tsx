@@ -12,7 +12,7 @@ import { useVisible } from "../power/use-visible.ts";
 import type { VisibilitySignal } from "../power/visibility.ts";
 import { createSceneView, type SceneView, type SceneViewOptions } from "../scene/pixi-scene-view.ts";
 import type { Scene } from "../scene/scene.ts";
-import { DEFAULT_THEME } from "../scene/theme.ts";
+import { DEFAULT_THEME, type Theme } from "../scene/theme.ts";
 import { errorMessage, type SourceFactory } from "../settings/SettingsPage.tsx";
 import type { Settings } from "../settings/settings.ts";
 import { FixtureSource, fixtureBundle } from "../source/fixture-source.ts";
@@ -26,6 +26,8 @@ import type { HistoryCache } from "../replay/history-cache.ts";
 import { createReplayController } from "../replay/replay-controller.ts";
 import { ReplayControls, ReplayEntry } from "../replay/ReplayControls.tsx";
 import { sharedHistoryCache } from "../replay/replay-settings.ts";
+import type { ShortcutCommands } from "../customize/keybindings.ts";
+import { registerRoomShortcuts } from "../customize/room-shortcuts.ts";
 
 type Mode = "live" | "fixture";
 
@@ -65,6 +67,10 @@ export interface RoomViewProps {
   readonly onBack?: (() => void) | undefined;
   /** 选中对象的详情改画到这个元素里（面板系统的“对象详情”面板，#2）；不给时画在房间旁边 */
   readonly detailsMount?: HTMLElement | undefined;
+  /** Scene 调色板与着色规则（#5）；变化时重建 Scene。默认 DEFAULT_THEME */
+  readonly theme?: Theme | undefined;
+  /** 快捷键（#5）：Room View 登记 Live / Replay 切换与播放控制 */
+  readonly shortcuts?: ShortcutCommands | undefined;
 }
 
 function browserCameraStorage(): CameraStorage | undefined {
@@ -156,6 +162,8 @@ export function RoomView(props: RoomViewProps) {
     },
   });
 
+  registerRoomShortcuts(props.shortcuts, { replay, target, liveTick: () => roomState()?.gameTime });
+
   // World Map 点房间进来（#16）
   createEffect(
     on(
@@ -243,13 +251,14 @@ export function RoomView(props: RoomViewProps) {
   const scene = createMemo<Scene | undefined>((previous) => {
     if (!visible()) return previous;
     if (!target()) return undefined;
+    const theme = props.theme ?? DEFAULT_THEME;
     const state = shownState();
     if (!state) {
-      return { width: ROOM_SIZE, height: ROOM_SIZE, background: DEFAULT_THEME.background, primitives: [] };
+      return { width: ROOM_SIZE, height: ROOM_SIZE, background: theme.background, primitives: [] };
     }
     return buildRoomScene(
       { state, terrain: terrain() },
-      { theme: DEFAULT_THEME, zoom: controls.zoom(), selectedId: controls.selectedId(), me: me(), allies: props.allies },
+      { theme, zoom: controls.zoom(), selectedId: controls.selectedId(), me: me(), allies: props.allies },
     );
   });
 

@@ -24,6 +24,7 @@ import { pvpMapLayers } from "../pvp/pvp-map-layer.ts";
 import { PvpOverview } from "../pvp/PvpOverview.tsx";
 import { createOwnershipHub } from "./ownership-hub.ts";
 import type { SceneView, SceneViewOptions } from "../scene/pixi-scene-view.ts";
+import type { Theme } from "../scene/theme.ts";
 import type { SourceFactory } from "../settings/SettingsPage.tsx";
 import type { Settings, SettingsStorage } from "../settings/settings.ts";
 import { RoomView, type RoomViewProps } from "../room/RoomView.tsx";
@@ -52,6 +53,8 @@ export interface MapAndRoomProps {
   readonly narrow?: Accessor<boolean>;
   /** 拿到面板控制器（例如外部快捷键切换面板） */
   readonly onController?: (controller: PanelController) => void;
+  /** Scene 调色板与着色规则（#5），同时作用于地图与 Room View；默认 DEFAULT_THEME */
+  readonly theme?: Theme | undefined;
 }
 
 function browserStorage(): SettingsStorage | undefined {
@@ -109,6 +112,7 @@ export function MapAndRoom(props: MapAndRoomProps) {
           overlays={(shard) => pvpMapLayers(pvp.groups()?.find((g) => g.shard === shard))}
           {...(props.allies ? { allies: props.allies } : {})}
           active={panel.shown()}
+          theme={props.theme}
           onOpenRoom={(target) => openRoom(target)}
         />
       ),
@@ -124,6 +128,7 @@ export function MapAndRoom(props: MapAndRoomProps) {
           {...(props.createView ? { createView: props.createView } : {})}
           {...(props.allies ? { allies: props.allies } : {})}
           visibility={panelVisibility(page, panel.shown)}
+          theme={props.theme}
           {...props.roomView}
           open={opened()}
           detailsMount={controller.shown("details") ? detailsHost() : undefined}
