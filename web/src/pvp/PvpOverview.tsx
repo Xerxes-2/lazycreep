@@ -7,7 +7,6 @@
  */
 import { For, Show } from "solid-js";
 import { useI18n } from "../i18n";
-import { openReplay } from "../replay/replay-controller.ts";
 import { errorMessage } from "../settings/SettingsPage.tsx";
 import type { PvpFeed } from "./pvp-feed.ts";
 import { PVP_WINDOWS, battleReplayTick, type RoomOwner } from "./pvp-overview.ts";
@@ -16,8 +15,8 @@ export interface PvpOverviewProps {
   readonly feed: PvpFeed;
   /** 进入某房间的 Room View */
   readonly onOpenRoom: (target: { readonly shard: string; readonly room: string }) => void;
-  /** 打开 Replay；默认走 #15 的 hash 路由 openReplay */
-  readonly onReplay?: (target: { readonly shard: string; readonly room: string; readonly tick: number }) => void;
+  /** 打开 Replay（外壳里是 shell.navigate） */
+  readonly onReplay: (target: { readonly shard: string; readonly room: string; readonly tick: number }) => void;
 }
 
 export function PvpOverview(props: PvpOverviewProps) {
@@ -39,8 +38,7 @@ export function PvpOverview(props: PvpOverviewProps) {
 
   const replay = (shard: string, room: string, lastPvpTime: number) => {
     const target = { shard, room, tick: battleReplayTick(lastPvpTime) };
-    if (props.onReplay) props.onReplay(target);
-    else openReplay({ ...target, latest: true });
+    props.onReplay(target);
   };
 
   return (

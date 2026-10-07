@@ -8,14 +8,13 @@
  *
  * **位置（Main View 模式 + Shard + 房间 + Replay Tick）只经一个入口读写**：读 `location()`，
  * 写 `navigate(to)`。地图点房间、PvP、告警、Minimap、快捷键、Top Bar 按钮都调用 navigate，
- * 不各自 set；之后 URL 路由只需把地址接成 navigate 的来源、把 location 写回地址。
- * Shard 仍存在连接设置里（settings.shard），navigate 代为切换；Replay 仍走 `#/replay?…` 路由。
- * Room View 自己换房间（输入框、Replay 路由）时用 reportRoom 回报，location 随之更新。
+ * 不各自 set；URL 路由（url-router.ts，#32）把地址接成 navigate 的来源、把 location 写回地址。
+ * Shard 仍存在连接设置里（settings.shard），navigate 代为切换；Replay 随 roomRequest 交给 Room View。
+ * Room View 自己换房间（输入框、进出 Replay）时用 reportRoom 回报，location 随之更新。
  *
  * 新功能需要新的外壳状态时，在这里加字段（持久化的放进 ShellPrefs 并在 decodePrefs 里校验）。
  */
-import { createSignal, onCleanup, type Accessor } from "solid-js";
-import { openReplay, parseReplayHref } from "../replay/replay-controller.ts";
+import { batch, createSignal, type Accessor } from "solid-js";
 import type { Settings } from "../settings/settings.ts";
 import { isRecord, readJson, writeJson, type KeyValueStorage, type StoredKey } from "../storage/local-store.ts";
 
@@ -26,6 +25,17 @@ export interface RoomTarget {
   readonly room: string;
 }
 
+/** Replay 的起始 Tick；latest 表示它是进入时的 Live Tick（所在 chunk 可能还没生成） */
+export interface ReplayAt {
+  readonly tick: number;
+  readonly latest?: boolean;
+}
+
+/** navigate 交给 Room View 的请求：打开房间，给了 replay 就以该 Tick 进入 Replay */
+export interface RoomRequest extends RoomTarget {
+  readonly replay?: ReplayAt;
+}
+
 /** 此刻的位置：Main View 显示什么、在哪个 Shard、哪个房间、是否在 Replay 及其 Tick */
 export interface ShellLocation {
   readonly view: MainViewMode;
@@ -34,7 +44,7 @@ export interface ShellLocation {
   /** Room View 所看的房间（Main View 在地图上时也保留） */
   readonly room: string | undefined;
   /** 在 Replay 中时，Replay 的起始 Tick */
-  readonly replay: { readonly tick: number } | undefined;
+  readonly replay: ReplayAt | undefined;
 }
 
 /**
@@ -47,7 +57,7 @@ export interface NavigateTo {
   readonly view?: MainViewMode;
   readonly shard?: string;
   readonly room?: string;
-  readonly replay?: { readonly tick: number; readonly latest?: boolean };
+  readonly replay?: ReplayAt;
 }
 
 /** 外壳状态用到的连接设置（Shard 存在那里） */
@@ -113,9 +123,9 @@ export interface ShellState {
   /** location().view 的简写 */
   readonly mainView: Accessor<MainViewMode>;
   /** 每次 navigate 到房间产生的新请求（只给 Room View 用，据此切房间） */
-  readonly roomRequest: Accessor<RoomTarget | undefined>;
+  readonly roomRequest: Accessor<RoomRequest | undefined>;
   /** Room View 回报它此刻显示的房间与 Replay 起始 Tick（只给 Room View 用） */
-  reportRoom(target: RoomTarget | undefined, replayTick?: number): void;
+  reportRoom(target: RoomTarget | undefined, replayTick?: number, latest?: boolean): void;
 
   // ---- Sidebar ----
   readonly sidebarOpen: Accessor<boolean>;
@@ -141,7 +151,7 @@ export interface ShellState {
   closeMenu(): void;
 }
 
-/** storage 一般是 browserStorage()；需要在 Solid 的 owner 里调用（用到信号与 hashchange 监听）。 */
+/** storage 一般是 browserStorage()。 */
 export function createShellState(
   storage: (KeyValueStorage & Partial<Pick<Storage, "removeItem">>) | undefined,
   settings: ShardSettings,
@@ -162,31 +172,28 @@ export function createShellState(
   };
 
   const [room, setRoom] = createSignal<RoomTarget>();
-  const [replayTick, setReplayTick] = createSignal<number>();
-  const [roomRequest, setRoomRequest] = createSignal<RoomTarget>();
-
-  // `#/replay?…` 路由（粘贴的链接、PvP 的“回看”）：Main View 切到 Room View，由它进入 Replay
-  const onRoute = () => {
-    if (parseReplayHref(location.hash)) showMainView("room");
-  };
-  onRoute();
-  window.addEventListener("hashchange", onRoute);
-  onCleanup(() => window.removeEventListener("hashchange", onRoute));
+  const [replay, setReplay] = createSignal<ReplayAt | undefined>(undefined, {
+    equals: (a, b) => a?.tick === b?.tick && a?.latest === b?.latest,
+  });
+  const [roomRequest, setRoomRequest] = createSignal<RoomRequest>();
 
   const currentShard = () => (settings.server().sharded ? settings.shard() : undefined);
 
-  const navigate = (to: NavigateTo) => {
-    const shard = to.shard ?? currentShard();
-    if (to.shard !== undefined && settings.server().sharded && to.shard !== settings.shard()) settings.setShard(to.shard);
-    if (to.room !== undefined) {
-      const target = { shard: shard ?? "", room: to.room };
-      setRoom(target);
-      if (to.replay) openReplay({ ...target, tick: to.replay.tick, ...(to.replay.latest ? { latest: true } : {}) });
-      else setRoomRequest(target);
-    }
-    const view = to.view ?? (to.room !== undefined ? "room" : undefined);
-    if (view) showMainView(view);
-  };
+  // 一次 navigate 的各项改动合成一次位置变化（URL 路由据此只写一次地址）
+  const navigate = (to: NavigateTo) =>
+    batch(() => {
+      const shard = to.shard ?? currentShard();
+      if (to.shard !== undefined && settings.server().sharded && to.shard !== settings.shard()) settings.setShard(to.shard);
+      if (to.room !== undefined) {
+        const target = { shard: shard ?? "", room: to.room };
+        const replayAt = to.replay && { tick: to.replay.tick, ...(to.replay.latest ? { latest: true } : {}) };
+        setRoom(target);
+        setReplay(replayAt);
+        setRoomRequest(replayAt ? { ...target, replay: replayAt } : target);
+      }
+      const view = to.view ?? (to.room !== undefined ? "room" : undefined);
+      if (view) showMainView(view);
+    });
 
   const [menuOpen, setMenuOpen] = createSignal(false);
   const [menuItem, setMenuItem] = createSignal<string>();
@@ -203,15 +210,17 @@ export function createShellState(
       view: mainView(),
       shard: currentShard(),
       room: room()?.room,
-      replay: replayTick() === undefined ? undefined : { tick: replayTick()! },
+      replay: replay(),
     }),
     navigate,
     toggleMainView: () => navigate({ view: mainView() === "map" ? "room" : "map" }),
     mainView,
     roomRequest,
-    reportRoom(target, tick) {
-      setRoom(target && { shard: target.shard, room: target.room });
-      setReplayTick(target ? tick : undefined);
+    reportRoom(target, tick, latest) {
+      batch(() => {
+        setRoom(target && { shard: target.shard, room: target.room });
+        setReplay(target && tick !== undefined ? { tick, ...(latest ? { latest: true } : {}) } : undefined);
+      });
     },
 
     sidebarOpen: () => prefs().sidebarOpen,

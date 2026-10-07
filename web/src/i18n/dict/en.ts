@@ -316,4 +316,7 @@ export const en: Partial<Record<MessageKey, string>> = {
   "boot.retry": "Retry",
   "boot.enter": "Enter anyway",
   "boot.openSettings": "Open settings",
+
+  "route.invalid": "Unrecognized address {hash} (unknown Server or invalid room name); back to the World Map.",
+  "route.dismiss": "Dismiss",
 };

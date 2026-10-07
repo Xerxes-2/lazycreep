@@ -168,7 +168,8 @@ describe("Minimap（#27）", () => {
 
     tapCell(1, 0);
     await settle(() => expect(shell.location()).toMatchObject({ view: "room", room: "W13S27", replay: { tick: 1024950 } }));
-    expect(location.hash).toContain("W13S27");
-    expect(location.hash).toContain("1024950");
+    // Room View 跟着进入该房间的 Replay（地址由 URL 路由写回，#32，见 shell/url-routing.test.tsx）
+    await settle(() => expect(document.querySelector<HTMLInputElement>("[name=room-view-room]")?.value).toBe("W13S27"));
+    await settle(() => expect(document.querySelector(".room-view [data-testid=replay-controls]")).not.toBeNull());
   });
 });

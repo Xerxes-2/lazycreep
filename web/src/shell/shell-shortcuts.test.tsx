@@ -3,7 +3,6 @@ import { render } from "solid-js/web";
 import { App } from "../App";
 import { DEFAULT_KEYS, KEYBINDINGS_KEY } from "../customize/keybindings.ts";
 import { exportSettings, importSettings } from "../customize/settings-transfer.ts";
-import { replayHref } from "../replay/replay-controller.ts";
 import { FixtureSource, fixtureBundle } from "../source/fixture-source.ts";
 
 const bundle = fixtureBundle(
@@ -135,7 +134,7 @@ describe("快捷键目录（#30）", () => {
   });
 
   it("R 进出 Replay；空格播放暂停，逗号句号单步", async () => {
-    location.hash = replayHref({ shard: "shardSeason", room: "W13S28", tick: 1024937 });
+    location.hash = "#!/season/history/shardSeason/W13S28?t=1024937";
     mount();
     expect(mainView()).toBe("room");
     await settle(() => expect(q("[data-testid=replay-controls]")).not.toBeNull());

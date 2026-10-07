@@ -192,9 +192,12 @@ describe("启动画面", () => {
     expect(boot()!.querySelector("[data-action=boot-retry]")?.textContent).toBe("重试");
   });
 
-  it("URL 指向 Replay 时认证失败不阻止进入", async () => {
+  it.each([
+    ["新格式（#32）", "#!/season/history/shardSeason/W13S28?t=1000"],
+    ["旧格式 #/replay?…", "#/replay?shard=shardSeason&room=W13S28&tick=1000"],
+  ])("URL 指向 Replay（%s）时认证失败不阻止进入", async (_format, hash) => {
     withToken();
-    location.hash = "#/replay?shard=shardSeason&room=W13S28&tick=1000";
+    location.hash = hash;
     const source = controlledSource();
     const views = mount(source);
     source.releaseHttp();

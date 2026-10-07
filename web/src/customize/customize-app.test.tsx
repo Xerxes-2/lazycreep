@@ -43,6 +43,8 @@ async function chooseFile(input: HTMLInputElement, text: string) {
 describe("快捷键接到页面（#5）", () => {
   beforeEach(() => {
     localStorage.clear();
+    // 地址是 Main View 位置的来源（#32）：上一个测试留下的地址不能带进来
+    history.replaceState(null, "", "/");
     container = document.createElement("div");
     document.body.append(container);
   });
@@ -125,6 +127,8 @@ describe("快捷键接到页面（#5）", () => {
 describe("设置导入后无需刷新即生效（#5）", () => {
   beforeEach(() => {
     localStorage.clear();
+    // 地址是 Main View 位置的来源（#32）：上一个测试留下的地址不能带进来
+    history.replaceState(null, "", "/");
     container = document.createElement("div");
     document.body.append(container);
   });

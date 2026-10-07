@@ -6,7 +6,7 @@
  * 跨视图跳转都经外壳状态的唯一入口 shell.navigate（shell-state.ts）：
  * - 地图点房间、PvP Overview 点房间、告警 → navigate({ shard, room })（别的 Shard 上的房间同时切 Shard）；
  * - Room View 的“返回地图” → navigate({ view: "map" })；
- * - “回看” → navigate({ shard, room, replay })；`#/replay?…` 路由由外壳状态监听，切到 Room View。
+ * - “回看” → navigate({ shard, room, replay })；地址（URL 路由，shell/url-router.ts）也经 navigate 导航。
  * 地图、PvP Overview 与告警共用一个 OwnershipHub（同一份 map-stats 缓存与额度）与一个 PvP feed。
  */
 import { createMemo, createSignal, onCleanup, Show, type Accessor, type JSX } from "solid-js";

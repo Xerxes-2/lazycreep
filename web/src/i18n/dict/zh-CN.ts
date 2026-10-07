@@ -314,6 +314,9 @@ export const zhCN = {
   "boot.retry": "重试",
   "boot.enter": "仍要进入",
   "boot.openSettings": "打开设置",
+
+  "route.invalid": "无法识别的地址 {hash}（未知的 Server 或不合法的房间名），已回到世界地图。",
+  "route.dismiss": "关闭提示",
 } as const satisfies Record<string, string>;
 
 export type MessageKey = keyof typeof zhCN;

@@ -14,7 +14,6 @@ import { SettingsTransfer } from "./customize/SettingsTransfer.tsx";
 import { ShortcutSettings } from "./customize/ShortcutSettings.tsx";
 import { browserDarkQuery, createUiTheme } from "./customize/ui-theme.ts";
 import { HistoryCacheSettings } from "./replay/HistoryCacheSettings.tsx";
-import { parseReplayHref } from "./replay/replay-controller.ts";
 import { createSceneView } from "./scene/pixi-scene-view.ts";
 import { createReplaySettings, mbToBytes, sharedHistoryCache } from "./replay/replay-settings.ts";
 import { I18nProvider, useI18n } from "./i18n";
@@ -26,10 +25,12 @@ import { createSettings } from "./settings/settings.ts";
 import { mediaQuery, NARROW_QUERY } from "./shell/breakpoint.ts";
 import { ConsoleDock } from "./shell/ConsoleDock.tsx";
 import { Menu, type MenuItemDef } from "./shell/Menu.tsx";
+import { RouteNotice } from "./shell/RouteNotice.tsx";
 import { createShellState } from "./shell/shell-state.ts";
 import { registerShellShortcuts } from "./shell/shell-shortcuts.ts";
 import { TopBar } from "./shell/TopBar.tsx";
 import { TopBarStatus } from "./shell/TopBarStatus.tsx";
+import { createUrlRouter, isReplayAddress } from "./shell/url-router.ts";
 import { LiveSource } from "./source/live-source.ts";
 import { sharedSources } from "./source/shared-source.ts";
 import { browserStorage } from "./storage/local-store.ts";
@@ -72,10 +73,12 @@ function Shell(props: ShellOwnProps) {
   const boot = createBootProgress({ authOptional: () => replayRoute() });
   const sourceFor = sharedSources(boot.wrapSources(props.sourceFor));
   const shell = createShellState(browserStorage(), settings);
-  const replayRoute = () => shell.location().replay !== undefined || parseReplayHref(location.hash) !== undefined;
+  const replayRoute = () => shell.location().replay !== undefined || isReplayAddress(location.hash);
   // 窄屏（#29）：Console Panel 不显示，Console 改从 Menu 打开
   const narrow = props.narrow ?? mediaQuery(NARROW_QUERY);
   registerShellShortcuts(shortcuts, shell, narrow);
+  // URL 导航（#32）：地址 ↔ Main View 位置
+  const router = createUrlRouter(shell, settings);
   // 导入设置后界面重建：回到导入那一项，显示导入结果
   if (props.lastImport) shell.openMenu("transfer");
 
@@ -156,6 +159,7 @@ function Shell(props: ShellOwnProps) {
         anonymousRoute={replayRoute}
         openSettings={() => shell.openMenu("server")}
       />
+      <RouteNotice router={router} />
     </main>
   );
 }

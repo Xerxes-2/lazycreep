@@ -4,7 +4,7 @@
  * 是 Main View 的一种模式（#24）；开发用开关可以在服务器与录制数据（FixtureSource）之间切换数据来源。
  * 录制数据只在开发构建里可用：生产构建既不打包 `fixtures/` 也不显示开关（#14）。
  */
-import { createEffect, createMemo, createSignal, on, onCleanup, onMount, Show, untrack } from "solid-js";
+import { batch, createEffect, createMemo, createSignal, on, onCleanup, onMount, Show, untrack } from "solid-js";
 import { Portal } from "solid-js/web";
 import { useI18n } from "../i18n";
 import { createTickRate } from "../power/tick-rate.ts";
@@ -38,6 +38,11 @@ interface Target {
   readonly room: string;
 }
 
+/** 从外部打开的房间；给了 replay 就以该 Tick 进入 Replay */
+interface OpenRequest extends Target {
+  readonly replay?: { readonly tick: number; readonly latest?: boolean } | undefined;
+}
+
 /** 按需加载 `fixtures/season/` 的录制数据，按原始时序播放。 */
 async function loadSeasonFixtures(): Promise<Source> {
   const modules = import.meta.glob<unknown>("../../../fixtures/season/*.json", { import: "default" });
@@ -63,12 +68,14 @@ export interface RoomViewProps {
   readonly allies?: ReadonlySet<string>;
   /** 每个房间视口的存储；默认浏览器 localStorage */
   readonly cameraStorage?: KeyValueStorage;
-  /** 从外部（World Map，#16）打开的房间：每次给新对象就切过去 */
-  readonly open?: Target | undefined;
+  /** 从外部（World Map、URL 路由，#16 #32）打开的房间或 Replay：每次给新对象就切过去 */
+  readonly open?: OpenRequest | undefined;
   /** 给了就显示“返回地图”按钮（#16） */
   readonly onBack?: (() => void) | undefined;
   /** 显示的房间或 Replay 变化时回报（外壳状态记录当前位置，#24）；replayTick 是 Replay 的起始 Tick */
-  readonly onTarget?: ((target: Target | undefined, replayTick: number | undefined) => void) | undefined;
+  readonly onTarget?:
+    | ((target: Target | undefined, replayTick: number | undefined, latest: boolean | undefined) => void)
+    | undefined;
   /** 选中对象的详情改画到这个元素里（Sidebar 的选中对象区块，#24）；不给时画在房间旁边 */
   readonly detailsMount?: HTMLElement | undefined;
   /** 选中对象变化时回报（id 为 undefined 表示取消选中；窄屏据此切到选中对象标签，#29） */
@@ -153,27 +160,30 @@ export function RoomView(props: RoomViewProps) {
     source,
     cache: (props.historyCache ?? sharedHistoryCache)(),
     visible,
-    onRoute: (opened) => {
-      setShardInput(opened.shard);
-      setRoomInput(opened.room);
-      setTarget({ shard: opened.shard, room: opened.room });
-    },
   });
 
-  createEffect(() => props.onTarget?.(target(), replay.active() ? replay.request()?.tick : undefined));
+  createEffect(() => {
+    const request = replay.active() ? replay.request() : undefined;
+    props.onTarget?.(target(), request?.tick, request?.latest);
+  });
 
   registerRoomShortcuts(props.shortcuts, { replay, target, liveTick: () => roomState()?.gameTime });
 
-  // World Map 点房间进来（#16）
+  // World Map 点房间、URL 路由进来（#16 #32）
   createEffect(
     on(
       () => props.open,
       (opened) => {
         if (!opened) return;
-        replay.close();
-        setShardInput(opened.shard);
-        setRoomInput(opened.room);
-        setTarget({ shard: opened.shard, room: opened.room });
+        batch(() => {
+          setShardInput(opened.shard);
+          setRoomInput(opened.room);
+          setTarget({ shard: opened.shard, room: opened.room });
+          if (opened.replay) {
+            const { tick, latest } = opened.replay;
+            replay.open({ shard: opened.shard, room: opened.room, tick, ...(latest ? { latest: true } : {}) });
+          } else replay.close();
+        });
       },
     ),
   );

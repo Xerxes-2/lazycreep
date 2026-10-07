@@ -1167,3 +1167,23 @@ body {
 .map-pointed__room {
   font-weight: 600;
 }
+
+/* URL 导航（#32）：无效地址的提示 */
+.route-notice {
+  position: fixed;
+  top: 48px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100vw - 32px);
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--muted);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}

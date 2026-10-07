@@ -3,7 +3,6 @@ import { render } from "solid-js/web";
 import { I18nProvider } from "../i18n";
 import { MapAndRoom } from "../map/MapAndRoom.tsx";
 import { manualVisibility } from "../power/visibility.ts";
-import { parseReplayHref } from "../replay/replay-controller.ts";
 import type { SceneView, SceneViewOptions } from "../scene/pixi-scene-view.ts";
 import type { Scene } from "../scene/scene.ts";
 import { createSettings } from "../settings/settings.ts";
@@ -122,7 +121,7 @@ describe("PvP Overview 接入 World Map 与 Room View", () => {
     mount(true);
     await settle(() => expect(row("W17N21")).not.toBeNull());
     row("W17N21")!.querySelector<HTMLButtonElement>("[data-action=replay-battle]")!.click();
-    expect(parseReplayHref(location.hash)).toEqual({ shard: "shardSeason", room: "W17N21", tick: 1025136, latest: true });
+    await settle(() => expect(container.querySelector(".room-view .replay")).not.toBeNull());
     await settle(() => expect(container.querySelector<HTMLInputElement>("[name=room-view-room]")!.value).toBe("W17N21"));
     expect(slot("map").hidden).toBe(true);
   });
