@@ -313,7 +313,8 @@ export class LiveSource implements Source {
   /** POST，经 Gateway 的允许名单（ADR 0003）。 */
   async getMapStats(shard: string, rooms: readonly string[]): Promise<MapStats> {
     const path = "/game/map-stats";
-    const body = { rooms, statName: "owner0", ...this.shardQuery(shard) };
+    // minerals0 与 owner0 同价，且同样带回所有权与区域状态（实测，见 docs/research/screeps-api-facts.md 第 5 节）
+    const body = { rooms, statName: "minerals0", ...this.shardQuery(shard) };
     const response = await this.send(this.server.apiRoot + path, {}, true, body);
     return mapStatsFromWire(shard, await this.json<WireMapStats>(response, path), rooms);
   }

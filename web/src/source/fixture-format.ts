@@ -121,12 +121,18 @@ export interface WireWorldSize {
   readonly height: number;
 }
 
-/** `game/map-stats` 里的一个房间（只声明用到的字段；其余字段留给信息层，见 #17） */
+/** `game/map-stats` 里的一个房间（只声明用到的字段） */
 export interface WireRoomStats {
   readonly status: string;
   /** level 0 表示预定（reservation），1–8 为 RCL */
   readonly own?: { readonly user: string; readonly level: number };
   readonly sign?: { readonly user: string; readonly text: string; readonly time: number };
+  /** statName 为 `minerals0` 时才有（实测 2026-10-08；`owner0` 不带） */
+  readonly minerals0?: { readonly type: string; readonly density: number };
+  readonly novice?: number;
+  readonly respawnArea?: number;
+  readonly openTime?: number;
+  readonly safeMode?: boolean;
   readonly [key: string]: unknown;
 }
 

@@ -157,6 +157,16 @@ export interface RoomStats {
   /** 所有者；level 0 表示预定，1–8 为 RCL */
   readonly owner?: { readonly user: string; readonly level: number };
   readonly sign?: { readonly user: string; readonly text: string; readonly time: number };
+  /** 房间里的矿物（map-stats 的 `minerals0`）：类型如 `H`、`O`，density 1–4 */
+  readonly mineral?: { readonly type: string; readonly density: number };
+  /** 新手区截止时间（Unix 毫秒）；已过去的值表示曾经是新手区 */
+  readonly novice?: number;
+  /** 重生区截止时间（Unix 毫秒） */
+  readonly respawnArea?: number;
+  /** 房间开放时间（Unix 毫秒）；在此之前不可进入 */
+  readonly openTime?: number;
+  /** 控制器处于安全模式 */
+  readonly safeMode?: boolean;
 }
 
 /** 一次 map-stats 查询的结果；不存在的房间不出现在 rooms 里。 */
@@ -249,7 +259,8 @@ export interface Source {
   blockTileUrl(shard: string, cornerRoom: string): string;
   getWorldSize(shard: string): Promise<WorldSize>;
   /**
-   * 房间的所有权等统计（`POST game/map-stats`，需要全权限 token，每 Server 每小时 60 次）。
+   * 房间的所有权、矿物与区域状态（`POST game/map-stats`，statName `minerals0`，
+   * 需要全权限 token，每 Server 每小时 60 次）。
    * 调用方负责限流与缓存，见 World Map 的 ownership loader。
    */
   getMapStats(shard: string, rooms: readonly string[]): Promise<MapStats>;

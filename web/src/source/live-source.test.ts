@@ -141,14 +141,52 @@ describe("LiveSource HTTP：与同样 wire 数据的 FixtureSource 结果一致"
 });
 
 describe("LiveSource map-stats 请求", () => {
-  it("是带 token 的 POST，JSON 里是房间、owner0 与 Shard", async () => {
+  it("是带 token 的 POST，JSON 里是房间、minerals0 与 Shard（minerals0 同时带回所有权，额度相同）", async () => {
     const { source, seen } = live({ token: TOKEN });
     await source.getMapStats(SHARD, [OWN_ROOM, "W14S28"]);
     expect(seen).toHaveLength(1);
     expect(seen[0]!.method).toBe("POST");
     expect(seen[0]!.url.pathname).toBe("/season/api/game/map-stats");
     expect(seen[0]!.token).toBe(TOKEN);
-    expect(JSON.parse(seen[0]!.body)).toEqual({ rooms: [OWN_ROOM, "W14S28"], statName: "owner0", shard: SHARD });
+    expect(JSON.parse(seen[0]!.body)).toEqual({ rooms: [OWN_ROOM, "W14S28"], statName: "minerals0", shard: SHARD });
+  });
+
+  it("带出矿物、新手区 / 重生区 / 开放时间与安全模式（实测 MMO 响应的形状）", async () => {
+    const { source } = live({
+      token: TOKEN,
+      routes: {
+        "/season/api/game/map-stats": {
+          body: {
+            ok: 1,
+            gameTime: 5,
+            stats: {
+              W38N13: {
+                status: "normal",
+                novice: 1717521321020,
+                own: { user: "u1", level: 8 },
+                minerals0: { type: "O", density: 3 },
+              },
+              W38N14: { status: "normal", respawnArea: 1890000000000, openTime: 1890000000001, safeMode: true },
+              W38N15: { status: "out of borders" },
+            },
+            statsMax: {},
+            decorations: {},
+            users: { u1: { _id: "u1", username: "Alice", badge: {} } },
+          },
+        },
+      },
+    });
+    const stats = await source.getMapStats(SHARD, ["W38N13", "W38N14", "W38N15"]);
+    expect(stats.rooms).toEqual({
+      W38N13: {
+        status: "normal",
+        novice: 1717521321020,
+        owner: { user: "u1", level: 8 },
+        mineral: { type: "O", density: 3 },
+      },
+      W38N14: { status: "normal", respawnArea: 1890000000000, openTime: 1890000000001, safeMode: true },
+      W38N15: { status: "out of borders" },
+    });
   });
 
   it("速率限制（429）是 rateLimited", async () => {

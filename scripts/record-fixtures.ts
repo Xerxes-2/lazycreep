@@ -283,7 +283,7 @@ if (want("mapStats")) {
       names.push(`${x < 0 ? `W${-x - 1}` : `E${x}`}${y < 0 ? `N${-y - 1}` : `S${y}`}`);
     }
   }
-  const statName = "owner0";
+  const statName = "minerals0";
   const res = await fetch(origin + server.apiRoot + "/game/map-stats", {
     method: "POST",
     headers: { "X-Token": token, "Content-Type": "application/json" },

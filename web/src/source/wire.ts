@@ -105,6 +105,11 @@ export function mapStatsFromWire(shard: string, wire: WireMapStats, rooms: reado
       entry.sign = { user: stats.sign.user, text: stats.sign.text, time: stats.sign.time };
       addUser(stats.sign.user);
     }
+    if (stats.minerals0) entry.mineral = { type: stats.minerals0.type, density: stats.minerals0.density };
+    if (typeof stats.novice === "number") entry.novice = stats.novice;
+    if (typeof stats.respawnArea === "number") entry.respawnArea = stats.respawnArea;
+    if (typeof stats.openTime === "number") entry.openTime = stats.openTime;
+    if (stats.safeMode === true) entry.safeMode = true;
     out[room] = entry;
   }
   return { shard, gameTime: wire.gameTime, rooms: out, users };
