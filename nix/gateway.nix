@@ -1,4 +1,5 @@
 # Gateway：gateway/Caddyfile 加一个启动脚本，脚本给环境变量填默认值后 exec caddy。
+# 上游地址的默认值只来自 gateway/routes.json（Caddyfile 不写默认值）；routes.json 缺字段时求值失败。
 # 环境变量可在调用时覆盖（测试据此把上游指向本地模拟服务器）。
 {
   lib,

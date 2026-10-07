@@ -5,7 +5,7 @@
  */
 import { createServer as createHttpServer, request as httpRequest, type IncomingHttpHeaders, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -170,6 +170,13 @@ describe("开发服务器的 Gateway 代理", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toBe("image/png");
     expect(tiles.seen.map((r) => r.path)).toContain("/map/shardSeason/E0N0.png");
+  });
+
+  it("上游地址只在 routes.json 里写一份：Caddyfile 不写死默认值", () => {
+    const caddyfile = readFileSync(new URL("../gateway/Caddyfile", import.meta.url), "utf8");
+    for (const origin of [routes.apiOrigin, routes.tilesOrigin]) expect(caddyfile).not.toContain(origin);
+    expect(caddyfile).toContain("{$MSC_API_UPSTREAM}");
+    expect(caddyfile).toContain("{$MSC_TILES_UPSTREAM}");
   });
 
   it("不把 cookie 带给上游", async () => {

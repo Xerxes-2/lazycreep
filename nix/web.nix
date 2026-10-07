@@ -19,6 +19,8 @@ let
       ../pnpm-lock.yaml
       # 开发服务器的 Gateway 代理读取路径与 POST 允许名单
       ../gateway/routes.json
+      # 测试断言 Caddyfile 不写死上游地址（上游只在 routes.json 写一份）
+      ../gateway/Caddyfile
       # 中文文案对照词表的 _Avoid_ 词（i18n/dict/glossary.test.ts）
       ../GLOSSARY.md
       # 测试回放录制好的 fixture

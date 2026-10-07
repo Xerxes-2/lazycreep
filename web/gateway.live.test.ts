@@ -12,6 +12,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { loadEnv } from "vite";
+import routes from "../gateway/routes.json" with { type: "json" };
 import { postAllowlistPaths } from "./gateway-dev.ts";
 import { LiveSource } from "./src/source/live-source.ts";
 import { SERVER_PRESETS } from "./src/source/servers.ts";
@@ -55,6 +56,9 @@ describe.skipIf(!LIVE)("经 Gateway 联调", () => {
           MSC_ADDRESS: "127.0.0.1",
           MSC_PORT: String(port),
           MSC_WEB_ROOT: webRoot,
+          // Caddyfile 不写默认上游，与 Nix 启动脚本一样从 routes.json 取
+          MSC_API_UPSTREAM: routes.apiOrigin,
+          MSC_TILES_UPSTREAM: routes.tilesOrigin,
           MSC_POST_ALLOWLIST: postAllowlistPaths().join(" "),
         },
         stdio: "ignore",
