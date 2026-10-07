@@ -122,9 +122,9 @@ describe("Room View 页面", () => {
     expect(liveSources).toHaveLength(1);
   });
 
-  it("切到录制回放后由 FixtureSource 驱动", async () => {
+  it("数据来源切到录制数据后由 FixtureSource 驱动", async () => {
     mount();
-    input("room-view-mode", "fixture");
+    input("room-view-source", "recording");
     watch("shardSeason", "E13N21");
     await settle(() => expect(tick()).not.toBe("—"));
     expect(fixtureSources.length).toBeGreaterThan(0);

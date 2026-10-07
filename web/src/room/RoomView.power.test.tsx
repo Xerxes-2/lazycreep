@@ -168,7 +168,7 @@ describe("Room View 省电", () => {
   });
 });
 
-describe("录制回放仅开发可用", () => {
+describe("录制数据仅开发可用", () => {
   beforeEach(() => {
     localStorage.clear();
     visibility = manualVisibility(true);
@@ -184,7 +184,7 @@ describe("录制回放仅开发可用", () => {
     vi.unstubAllEnvs();
   });
 
-  const modeSwitch = () => container.querySelector("select[name=room-view-mode]");
+  const modeSwitch = () => container.querySelector("select[name=room-view-source]");
 
   it("开发构建显示数据来源开关", () => {
     vi.stubEnv("DEV", true);

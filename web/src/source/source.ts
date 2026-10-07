@@ -1,6 +1,6 @@
 /**
  * Source：前端与一切外部数据之间唯一的边界（spec #1 接缝 1）。
- * 实现：FixtureSource（回放 `fixtures/`）；LiveSource（HTTP 经同源 Gateway，WebSocket 直连官方）。
+ * 实现：FixtureSource（播放 `fixtures/` 的录制数据）；LiveSource（HTTP 经同源 Gateway，WebSocket 直连官方）。
  */
 
 /** 一个 Server 的连接配置。路径是相对 Gateway 的同源路径，WebSocket 是绝对地址。 */

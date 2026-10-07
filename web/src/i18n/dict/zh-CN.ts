@@ -55,9 +55,9 @@ export const zhCN = {
   "readings.error.server": "服务器报告订阅错误：{message}",
 
   "roomView.title": "房间视图",
-  "roomView.mode": "数据来源",
-  "roomView.mode.live": "真实服务器",
-  "roomView.mode.fixture": "录制回放",
+  "roomView.source": "数据来源",
+  "roomView.source.server": "服务器",
+  "roomView.source.recording": "录制数据",
   "roomView.open": "打开",
   "roomView.tick": "Tick",
 
@@ -66,7 +66,7 @@ export const zhCN = {
 
   "replay.enter": "回放",
   "replay.mode": "回放中",
-  "replay.backToLive": "回到 Live",
+  "replay.backToLive": "回到即时",
   "replay.play": "播放",
   "replay.pause": "暂停",
   "replay.stepBack": "后退一 Tick",

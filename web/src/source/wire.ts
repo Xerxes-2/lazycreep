@@ -1,6 +1,6 @@
 /**
  * 服务器 wire 格式到 Source 类型的转换。FixtureSource 与 LiveSource 共用，
- * 保证回放与即时数据经过同一套转换。
+ * 保证录制数据与即时数据经过同一套转换。
  */
 import type {
   WireConsole,
@@ -29,7 +29,7 @@ import type {
   UserInfo,
 } from "./source.ts";
 
-/** interval 由服务器按 Tick 截取；回放时按 lastPvpTime >= time - interval 截取同样的结果。 */
+/** interval 由服务器按 Tick 截取；播放录制数据时按 lastPvpTime >= time - interval 截取同样的结果。 */
 export function pvpFromWire(wire: WirePvp, interval: number): PvpShard[] {
   return Object.entries(wire.pvp).map(([shard, { time, rooms }]) => ({
     shard,

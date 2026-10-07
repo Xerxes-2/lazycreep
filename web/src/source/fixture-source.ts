@@ -1,6 +1,6 @@
 /**
- * FixtureSource：从 `fixtures/` 的录制文件回放的 Source。
- * 流按录制时的帧间隔回放，`speed` 为加速倍数（Infinity = 不等待，仍按顺序异步投递）。
+ * FixtureSource：播放 `fixtures/` 录制文件的 Source。
+ * 流按录制时的帧间隔播放，`speed` 为加速倍数（Infinity = 不等待，仍按顺序异步投递）。
  */
 import {
   FIXTURE_FORMAT_VERSION,
@@ -101,7 +101,7 @@ export function fixtureBundle(files: Iterable<unknown>): FixtureBundle {
 }
 
 export interface FixtureSourceOptions {
-  /** 回放加速倍数，默认 1（原始时序） */
+  /** 播放加速倍数，默认 1（原始时序） */
   readonly speed?: number;
 }
 
@@ -111,7 +111,7 @@ export class FixtureSource implements Source {
   private readonly speed: number;
   private readonly playbacks = new Set<() => void>();
   private readonly connectionListeners = new Set<(state: ConnectionState) => void>();
-  /** 回放没有真实连接：从一开始就视为已认证，close 后断开。 */
+  /** 录制数据没有真实连接：从一开始就视为已认证，close 后断开。 */
   private state: ConnectionState = "authenticated";
   private readonly sent: { shard: string; expression: string }[] = [];
   /** 与 LiveSource 相同的约束：任何时刻最多一条房间订阅。 */
@@ -198,7 +198,7 @@ export class FixtureSource implements Source {
     room: string,
     listener: (update: RoomMapUpdate) => void,
     _onError?: StreamErrorListener,
-    /** 回放不区分页面可见性 */
+    /** 录制数据不区分页面可见性 */
     _options?: RoomMapOptions,
   ): Unsubscribe {
     const fixture = this.find<RoomMapFixture>("roomMap2", (f) => f.meta.shard === shard && f.meta.room === room);

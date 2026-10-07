@@ -109,7 +109,7 @@ describe("FixtureSource 回放时序", () => {
     expect(newTicks.length).toBeGreaterThan(10);
   });
 
-  it("roomMap2 流按录制回放，带用户坐标", async () => {
+  it("roomMap2 流按录制播放，带用户坐标", async () => {
     const source = new FixtureSource(bundle, { speed: Infinity });
     const updates: RoomMapUpdate[] = [];
     source.subscribeRoomMap(SHARD, OWN_ROOM, (update) => updates.push(update));

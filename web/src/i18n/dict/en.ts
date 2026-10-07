@@ -57,9 +57,9 @@ export const en: Partial<Record<MessageKey, string>> = {
   "readings.error.server": "Server reported a subscription error: {message}",
 
   "roomView.title": "Room View",
-  "roomView.mode": "Data source",
-  "roomView.mode.live": "Server",
-  "roomView.mode.fixture": "Recorded fixtures",
+  "roomView.source": "Data source",
+  "roomView.source.server": "Server",
+  "roomView.source.recording": "Recorded data",
   "roomView.open": "Open",
   "roomView.tick": "Tick",
 

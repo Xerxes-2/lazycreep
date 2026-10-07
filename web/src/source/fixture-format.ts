@@ -1,6 +1,6 @@
 /**
  * `fixtures/` 录制文件的格式。fixture 保存的是服务器原样返回的数据（wire 格式）加元数据，
- * 由 Source 实现负责把它们转换成 Source 接口的类型，所以回放也会经过同一套转换。
+ * 由 Source 实现负责把它们转换成 Source 接口的类型，所以录制数据也会经过同一套转换。
  * 录制脚本（scripts/record-fixtures.ts）与 FixtureSource 共用这些类型。
  */
 import type { ServerConfig } from "./source.ts";
@@ -171,7 +171,7 @@ export type TerrainFixture = ResponseFixture<"terrain", WireTerrain>;
 export type MeFixture = ResponseFixture<"me", WireMe>;
 export type VersionFixture = ResponseFixture<"version", WireVersion>;
 export type WorldSizeFixture = ResponseFixture<"worldSize", WireWorldSize> & { readonly meta: { readonly shard: string } };
-/** 录到的是某个区域的房间；回放时只能答出这些房间。 */
+/** 录到的是某个区域的房间；播放时只能答出这些房间。 */
 export type MapStatsFixture = ResponseFixture<"mapStats", WireMapStats> & {
   readonly meta: { readonly shard: string; readonly statName: string };
 };

@@ -1,8 +1,8 @@
 /**
  * Room View（Live 最小版）：选一个房间，逐 Tick 画出地形、建筑与 creep，并显示当前 Tick。
  * 数据流：Source 房间流 → reduceLiveTick → RoomState → buildRoomScene → SceneView。
- * 放在面板系统里（#2）；开发用开关可以在真实服务器与录制回放（FixtureSource）之间切换。
- * 录制回放只在开发构建里可用：生产构建既不打包 `fixtures/` 也不显示开关（#14）。
+ * 放在面板系统里（#2）；开发用开关可以在服务器与录制数据（FixtureSource）之间切换数据来源。
+ * 录制数据只在开发构建里可用：生产构建既不打包 `fixtures/` 也不显示开关（#14）。
  */
 import { createEffect, createMemo, createSignal, on, onCleanup, onMount, Show, untrack } from "solid-js";
 import { Portal } from "solid-js/web";
@@ -30,14 +30,15 @@ import { sharedHistoryCache } from "../replay/replay-settings.ts";
 import type { ShortcutCommands } from "../customize/keybindings.ts";
 import { registerRoomShortcuts } from "../customize/room-shortcuts.ts";
 
-type Mode = "live" | "fixture";
+/** 数据来源：服务器（经共享 Source），或开发构建里的录制数据（FixtureSource） */
+type DataSource = "server" | "recording";
 
 interface Target {
   readonly shard: string;
   readonly room: string;
 }
 
-/** 按需加载 `fixtures/season/` 的录制数据，按原始时序回放。 */
+/** 按需加载 `fixtures/season/` 的录制数据，按原始时序播放。 */
 async function loadSeasonFixtures(): Promise<Source> {
   const modules = import.meta.glob<unknown>("../../../fixtures/season/*.json", { import: "default" });
   const files = await Promise.all(Object.values(modules).map((load) => load()));
@@ -50,7 +51,7 @@ export interface RoomViewProps {
   readonly settings: Settings;
   /** 真实服务器的 Source */
   readonly sourceFor: SourceFactory;
-  /** 录制回放的 Source；开发构建默认加载 `fixtures/season/`，生产构建默认没有 */
+  /** 录制数据的 Source；开发构建默认加载 `fixtures/season/`，生产构建默认没有 */
   readonly fixtureSource?: () => Promise<Source>;
   /** 默认是 Pixi 适配层；测试里换成记录 Scene 的假实现 */
   readonly createView?: (options: SceneViewOptions) => Promise<SceneView>;
@@ -81,13 +82,13 @@ export function RoomView(props: RoomViewProps) {
   // import.meta.env.DEV 在生产构建里是常量 false：loadSeasonFixtures 连同 fixtures 一起被摇掉
   const loadFixtures = props.fixtureSource ?? (import.meta.env.DEV ? loadSeasonFixtures : undefined);
 
-  const [mode, setMode] = createSignal<Mode>("live");
+  const [dataSource, setDataSource] = createSignal<DataSource>("server");
   const [source, setSource] = createSignal<Source>();
   const [sourceError, setSourceError] = createSignal<string>();
 
   createEffect(() => {
     setSourceError(undefined);
-    if (mode() === "live" || !loadFixtures) {
+    if (dataSource() === "server" || !loadFixtures) {
       const created = props.sourceFor(settings.server(), settings.token() || undefined);
       setSource(created);
       onCleanup(() => created.close());
@@ -133,7 +134,7 @@ export function RoomView(props: RoomViewProps) {
     onCleanup(() => (alive = false));
   });
 
-  const sharded = () => source()?.server.sharded ?? (mode() === "fixture" || settings.server().sharded);
+  const sharded = () => source()?.server.sharded ?? (dataSource() === "recording" || settings.server().sharded);
 
   const [shardInput, setShardInput] = createSignal(settings.shard() ?? "shardSeason");
   const [roomInput, setRoomInput] = createSignal("");
@@ -337,10 +338,14 @@ export function RoomView(props: RoomViewProps) {
       <form class="room-view__form" data-testid="room-view-form" onSubmit={submit}>
         <Show when={loadFixtures}>
           <label>
-            {t("roomView.mode")}
-            <select name="room-view-mode" value={mode()} onChange={(e) => setMode(e.currentTarget.value as Mode)}>
-              <option value="live">{t("roomView.mode.live")}</option>
-              <option value="fixture">{t("roomView.mode.fixture")}</option>
+            {t("roomView.source")}
+            <select
+              name="room-view-source"
+              value={dataSource()}
+              onChange={(e) => setDataSource(e.currentTarget.value as DataSource)}
+            >
+              <option value="server">{t("roomView.source.server")}</option>
+              <option value="recording">{t("roomView.source.recording")}</option>
             </select>
           </label>
         </Show>
