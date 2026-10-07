@@ -10,13 +10,15 @@
 let
   pnpm = pnpm_11.override { nodejs-slim = nodejs-slim_22; };
   root = ../.;
-  # 只把前端构建需要的文件放进源码，避免本地 node_modules / dist / .env* 进入 store。
+  # 只把前端构建与测试需要的文件放进源码，避免本地 node_modules / dist / .env* 进入 store。
   src = lib.fileset.toSource {
     inherit root;
     fileset = lib.fileset.unions [
       ../package.json
       ../pnpm-workspace.yaml
       ../pnpm-lock.yaml
+      # 测试回放录制好的 fixture
+      ../fixtures
       (lib.fileset.difference ../web (
         lib.fileset.unions [
           (lib.fileset.maybeMissing ../web/node_modules)
