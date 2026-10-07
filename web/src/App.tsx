@@ -1,8 +1,8 @@
 import { createEffect } from "solid-js";
 import { I18nProvider, useI18n } from "./i18n";
+import { MapAndRoom } from "./map/MapAndRoom.tsx";
 import { pageVisibility } from "./power/visibility.ts";
 import { RawReadings } from "./readings/RawReadings.tsx";
-import { RoomView } from "./room/RoomView.tsx";
 import { SettingsPage, type SourceFactory } from "./settings/SettingsPage.tsx";
 import { createSettings, type SettingsStorage } from "./settings/settings.ts";
 import { LiveSource } from "./source/live-source.ts";
@@ -43,7 +43,7 @@ function Shell(props: { sourceFor: SourceFactory }) {
       </header>
       <p class="shell__tagline">{t("app.tagline")}</p>
       <SettingsPage settings={settings} sourceFor={props.sourceFor} />
-      <RoomView settings={settings} sourceFor={props.sourceFor} />
+      <MapAndRoom settings={settings} sourceFor={props.sourceFor} />
       <RawReadings settings={settings} sourceFor={props.sourceFor} />
     </main>
   );

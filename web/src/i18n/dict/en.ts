@@ -110,6 +110,14 @@ export const en: Partial<Record<MessageKey, string>> = {
   "roomDetails.go.east": "Go to the room east: {room}",
   "roomDetails.go.west": "Go to the room west: {room}",
 
+  "worldMap.title": "World Map",
+  "worldMap.shard": "Shard",
+  "worldMap.hint": "Scroll or pinch to zoom, drag to pan; zoom in and tap a room to open it.",
+  "worldMap.loading": "Loading map…",
+  "worldMap.noToken": "Enter a token to show room ownership.",
+  "worldMap.ownershipError": "Failed to load ownership: {message}",
+  "worldMap.back": "Back to map",
+
   "error.unauthorized": "The token is invalid or expired. Generate a new full-access token in your Screeps account settings.",
   "error.forbidden": "Request refused (HTTP 403).",
   "error.rateLimited": "Rate limit reached, try again later.",

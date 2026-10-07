@@ -108,6 +108,14 @@ export const zhCN = {
   "roomDetails.go.east": "去东边的房间 {room}",
   "roomDetails.go.west": "去西边的房间 {room}",
 
+  "worldMap.title": "世界地图",
+  "worldMap.shard": "Shard",
+  "worldMap.hint": "滚轮或双指缩放，拖动平移；放大后点房间进入房间视图。",
+  "worldMap.loading": "正在加载地图…",
+  "worldMap.noToken": "填写 token 后才能显示所有权。",
+  "worldMap.ownershipError": "所有权加载失败：{message}",
+  "worldMap.back": "返回地图",
+
   "error.unauthorized": "token 无效或已失效。请在 Screeps 账户设置里生成新的全权限 token。",
   "error.forbidden": "请求被拒绝（HTTP 403）。",
   "error.rateLimited": "触发了速率限制，请稍后再试。",

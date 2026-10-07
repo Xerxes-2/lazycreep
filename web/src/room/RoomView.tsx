@@ -4,7 +4,7 @@
  * 固定布局；开发用开关可以在真实服务器与录制回放（FixtureSource）之间切换。
  * 录制回放只在开发构建里可用：生产构建既不打包 `fixtures/` 也不显示开关（#14）。
  */
-import { createEffect, createMemo, createSignal, onCleanup, onMount, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, on, onCleanup, onMount, Show, untrack } from "solid-js";
 import { useI18n } from "../i18n";
 import { createTickRate } from "../power/tick-rate.ts";
 import { useVisible } from "../power/use-visible.ts";
@@ -58,6 +58,10 @@ export interface RoomViewProps {
   readonly allies?: ReadonlySet<string>;
   /** 每个房间视口的存储；默认浏览器 localStorage */
   readonly cameraStorage?: CameraStorage;
+  /** 从外部（World Map，#16）打开的房间：每次给新对象就切过去 */
+  readonly open?: Target | undefined;
+  /** 给了就显示“返回地图”按钮（#16） */
+  readonly onBack?: (() => void) | undefined;
 }
 
 function browserCameraStorage(): CameraStorage | undefined {
@@ -148,6 +152,36 @@ export function RoomView(props: RoomViewProps) {
       setTarget({ shard: opened.shard, room: opened.room });
     },
   });
+
+  // World Map 点房间进来（#16）
+  createEffect(
+    on(
+      () => props.open,
+      (opened) => {
+        if (!opened) return;
+        replay.close();
+        setShardInput(opened.shard);
+        setRoomInput(opened.room);
+        setTarget({ shard: opened.shard, room: opened.room });
+      },
+    ),
+  );
+  // 切换 Shard 后 Room View 跟随：别的 Shard 上的房间不再显示（#16）
+  createEffect(
+    on(
+      settings.shard,
+      (chosen) => {
+        if (chosen === undefined) return;
+        setShardInput(chosen);
+        const current = untrack(target);
+        if (current && current.shard !== chosen) {
+          replay.close();
+          setTarget(undefined);
+        }
+      },
+      { defer: true },
+    ),
+  );
 
   createEffect(() => {
     const src = source();
@@ -278,6 +312,11 @@ export function RoomView(props: RoomViewProps) {
   return (
     <section class="room-view" aria-labelledby="room-view-title">
       <h2 id="room-view-title">{t("roomView.title")}</h2>
+      <Show when={props.onBack}>
+        <button type="button" data-action="back-to-map" onClick={() => props.onBack?.()}>
+          {t("worldMap.back")}
+        </button>
+      </Show>
       <form class="room-view__form" data-testid="room-view-form" onSubmit={submit}>
         <Show when={loadFixtures}>
           <label>

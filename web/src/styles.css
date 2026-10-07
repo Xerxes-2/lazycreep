@@ -262,6 +262,54 @@ body {
   min-width: 44px;
 }
 
+/* World Map（#16） */
+.world-map h2 {
+  font-size: 1.25rem;
+}
+
+.world-map__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+}
+
+.world-map__bar label {
+  display: grid;
+  gap: 4px;
+}
+
+.world-map select {
+  font: inherit;
+  min-height: 36px;
+  padding: 6px 8px;
+  border: 1px solid color-mix(in srgb, var(--muted) 60%, transparent);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.world-map__hint {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.world-map__canvas {
+  width: 100%;
+  margin-top: 12px;
+}
+
+.world-map__canvas canvas {
+  display: block;
+  max-width: 100%;
+  touch-action: none;
+  cursor: grab;
+}
+
+[data-action="back-to-map"] {
+  margin-bottom: 12px;
+}
+
 .replay__speeds {
   display: inline-flex;
   gap: 4px;
