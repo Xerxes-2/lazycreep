@@ -58,7 +58,9 @@ function fakeNotifications(permission: NotificationPermission) {
   return { api, shown };
 }
 
-function mount(options: { permission?: NotificationPermission; visibility?: VisibilitySignal; sources?: FixtureSource[] } = {}) {
+function mount(
+  options: { permission?: NotificationPermission; visibility?: VisibilitySignal; sources?: FixtureSource[]; narrow?: boolean } = {},
+) {
   const settings = createSettings(localStorage);
   settings.setToken("token");
   const notifications = fakeNotifications(options.permission ?? "default");
@@ -78,6 +80,7 @@ function mount(options: { permission?: NotificationPermission; visibility?: Visi
           roomView={{ historyCache: async () => undefined }}
           visibility={options.visibility ?? manualVisibility(true)}
           alerts={alerts}
+          narrow={() => options.narrow ?? false}
         />
       </I18nProvider>
     ),
@@ -114,14 +117,14 @@ describe("Attack Alert 接入", () => {
     expect(stranger.textContent).not.toContain("volotsyouga");
   });
 
-  it("点横幅进入该房间的 Room View，横幅消失", async () => {
-    mount();
+  it("点横幅进入该房间的 Room View，横幅消失（Monitor Mode 下切到 Room View 标签）", async () => {
+    mount({ narrow: true });
     await settle(() => expect(banners()).toContain("stranger:E13N21"));
     container
       .querySelector<HTMLElement>('.attack-alert__item[data-reason="stranger"]')!
       .querySelector<HTMLButtonElement>("[data-action=open-alert-room]")!
       .click();
-    expect(container.querySelector<HTMLElement>(".world-map__host")!.hidden).toBe(true);
+    expect(container.querySelector<HTMLElement>('[data-panel="map"]')!.hidden).toBe(true);
     expect(container.querySelector<HTMLInputElement>("[name=room-view-room]")!.value).toBe("E13N21");
     expect(banners()).not.toContain("stranger:E13N21");
   });

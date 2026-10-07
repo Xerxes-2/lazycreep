@@ -174,6 +174,15 @@ export const zhCN = {
   "alert.settings.stranger": "陌生人在我的房间停留（排除路过侦察）",
   "alert.settings.cooldown": "同一房间同一原因的冷却（分钟）",
   "alert.settings.strangerTicks": "陌生人停留多少 Tick 才通知",
+
+  // 面板系统（#2）
+  "panels.toolbar": "面板",
+  "panels.add": "添加面板：",
+  "panels.reset": "恢复默认布局",
+  "panels.close": "关闭{panel}",
+  "panels.tabs": "面板",
+  "panels.manageTabs": "选择标签栏里的面板",
+  "panels.details.hint": "在房间视图里点选对象，详情显示在这里。",
 } as const satisfies Record<string, string>;
 
 export type MessageKey = keyof typeof zhCN;

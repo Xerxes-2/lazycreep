@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createSignal } from "solid-js";
 import { render } from "solid-js/web";
 import { I18nProvider } from "../i18n";
 import type { SceneView, SceneViewOptions, Viewport } from "../scene/pixi-scene-view.ts";
@@ -36,7 +37,8 @@ async function fakeView(options: SceneViewOptions): Promise<SceneView> {
   };
 }
 
-function mount() {
+/** narrow：Monitor Mode（一次只显示一个面板） */
+function mount(narrow = false) {
   const settings = createSettings(localStorage);
   settings.setToken("token");
   dispose = render(
@@ -47,6 +49,7 @@ function mount() {
           sourceFor={() => new FixtureSource(bundle, { speed: Infinity })}
           createView={fakeView}
           roomView={{ historyCache: async () => undefined }}
+          narrow={() => narrow}
         />
       </I18nProvider>
     ),
@@ -57,7 +60,7 @@ function mount() {
 
 const settle = (assertion: () => void) => vi.waitFor(assertion, { timeout: 3000, interval: 5 });
 const mapCanvas = () => container.querySelector<HTMLCanvasElement>(".world-map canvas")!;
-const mapHost = () => container.querySelector<HTMLElement>(".world-map__host")!;
+const panel = (id: string) => container.querySelector<HTMLElement>(`[data-panel="${id}"]`)!;
 const backButton = () => container.querySelector<HTMLButtonElement>("button[data-action=back-to-map]");
 const roomInput = () => container.querySelector<HTMLInputElement>("[name=room-view-room]")!;
 
@@ -90,8 +93,8 @@ describe("World Map 与 Room View", () => {
     container.remove();
   });
 
-  it("地图上点房间进入它的 Room View；返回地图时视口不变", async () => {
-    mount();
+  it("Monitor Mode：地图上点房间切到 Room View 标签；返回地图时视口不变", async () => {
+    mount(true);
     await settle(() => expect(viewports.get(mapCanvas())).toBeDefined());
     expect(backButton()).toBeNull();
 
@@ -101,14 +104,69 @@ describe("World Map 与 Room View", () => {
     const zoomed = { ...viewports.get(mapCanvas())! };
     tap(at(W13S28));
 
-    expect(mapHost().hidden).toBe(true);
+    expect(panel("map").hidden).toBe(true);
+    expect(panel("room").hidden).toBe(false);
+    expect(container.querySelector('[data-tab="room"]')!.getAttribute("aria-selected")).toBe("true");
     expect(roomInput().value).toBe("W13S28");
     await settle(() => expect(container.querySelector("[data-testid=room-view-tick]")!.textContent).not.toBe("—"));
 
     backButton()!.click();
-    expect(mapHost().hidden).toBe(false);
-    expect(backButton()).toBeNull();
+    expect(panel("map").hidden).toBe(false);
+    expect(panel("room").hidden).toBe(true);
     expect(viewports.get(mapCanvas())).toEqual(zoomed);
+  });
+
+  it("桌面布局：地图上点房间聚焦 Room View 面板，地图仍显示；返回地图聚焦地图，视口不变", async () => {
+    mount();
+    await settle(() => expect(viewports.get(mapCanvas())).toBeDefined());
+    for (let i = 0; i < 10; i++) {
+      mapCanvas().dispatchEvent(new WheelEvent("wheel", { ...at(W13S28), deltaY: -200, bubbles: true, cancelable: true }));
+    }
+    const zoomed = { ...viewports.get(mapCanvas())! };
+    tap(at(W13S28));
+
+    expect(panel("room").hasAttribute("data-focused")).toBe(true);
+    expect(panel("map").hidden).toBe(false);
+    expect(roomInput().value).toBe("W13S28");
+    backButton()!.click();
+    expect(panel("map").hasAttribute("data-focused")).toBe(true);
+    expect(viewports.get(mapCanvas())).toEqual(zoomed);
+  });
+
+  it("切换布局（断点变化）时面板不重建：地图视口与房间保持", async () => {
+    const [narrow, setNarrow] = createSignal(false);
+    const settings = createSettings(localStorage);
+    settings.setToken("token");
+    dispose = render(
+      () => (
+        <I18nProvider>
+          <MapAndRoom
+            settings={settings}
+            sourceFor={() => new FixtureSource(bundle, { speed: Infinity })}
+            createView={fakeView}
+            roomView={{ historyCache: async () => undefined }}
+            narrow={narrow}
+          />
+        </I18nProvider>
+      ),
+      container,
+    );
+    await settle(() => expect(viewports.get(mapCanvas())).toBeDefined());
+    for (let i = 0; i < 10; i++) {
+      mapCanvas().dispatchEvent(new WheelEvent("wheel", { ...at(W13S28), deltaY: -200, bubbles: true, cancelable: true }));
+    }
+    tap(at(W13S28));
+    const canvas = mapCanvas();
+    const zoomed = { ...viewports.get(canvas)! };
+    const views = canvases.length;
+
+    setNarrow(true);
+    expect(container.querySelector('[data-tab="room"]')!.getAttribute("aria-selected")).toBe("false");
+    expect(panel("map").hidden).toBe(false);
+    expect(mapCanvas()).toBe(canvas);
+    expect(viewports.get(canvas)).toEqual(zoomed);
+    expect(roomInput().value).toBe("W13S28");
+    expect(canvases).toHaveLength(views);
   });
 
   it("切换 Shard 后 Room View 不再显示旧 Shard 的房间，Shard 输入跟随", async () => {

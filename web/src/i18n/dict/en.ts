@@ -176,4 +176,13 @@ export const en: Partial<Record<MessageKey, string>> = {
   "alert.settings.stranger": "Stranger staying in my room (passing scouts excluded)",
   "alert.settings.cooldown": "Cooldown per room and reason (minutes)",
   "alert.settings.strangerTicks": "Ticks a stranger must stay before alerting",
+
+  // 面板系统（#2）
+  "panels.toolbar": "Panels",
+  "panels.add": "Add panel:",
+  "panels.reset": "Reset layout",
+  "panels.close": "Close {panel}",
+  "panels.tabs": "Panels",
+  "panels.manageTabs": "Choose the panels in the tab bar",
+  "panels.details.hint": "Select an object in the Room View to see its details here.",
 };

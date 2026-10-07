@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render } from "solid-js/web";
 import { App } from "./App";
 import { FixtureSource, fixtureBundle } from "./source/fixture-source.ts";
@@ -75,9 +75,9 @@ describe("App", () => {
 
   it("shows the settings page, translated with the interface language", () => {
     mount();
-    expect(container.querySelector("h2")?.textContent).toBe("设置");
+    expect(container.querySelector("#settings-title")?.textContent).toBe("设置");
     languageButton().click();
-    expect(container.querySelector("h2")?.textContent).toBe("Settings");
+    expect(container.querySelector("#settings-title")?.textContent).toBe("Settings");
   });
 
   it("shows the Ally List in the settings, kept across reloads", () => {
@@ -89,5 +89,42 @@ describe("App", () => {
     input.closest("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     mount();
     expect(container.querySelector('[data-ally="Alice"]')).not.toBeNull();
+  });
+
+  it("全页共用一个 Source：各面板与告警只建一个；换 token 时关掉旧的、建一个新的", async () => {
+    localStorage.setItem("msc.alerts", JSON.stringify({ pvp: true, nuke: true, stranger: true }));
+    const made: { token: string | undefined; source: FixtureSource }[] = [];
+    dispose = render(
+      () => (
+        <App
+          sourceFor={(_server, token) => {
+            const source = new FixtureSource(bundle, { speed: Infinity });
+            made.push({ token, source });
+            return source;
+          }}
+        />
+      ),
+      container,
+    );
+    expect(container.querySelector("[data-panel=map]")).not.toBeNull();
+    expect(container.querySelector("[data-panel=room]")).not.toBeNull();
+    expect(container.querySelector("[data-panel=settings]")).not.toBeNull();
+    expect(made).toHaveLength(1);
+
+    const close = vi.spyOn(made[0]!.source, "close");
+    const token = container.querySelector<HTMLInputElement>("input[name=token]")!;
+    token.value = "new-token";
+    token.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(made.map((m) => m.token)).toEqual([undefined, "new-token"]);
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it("窄屏进入 Monitor Mode：底部标签切换面板，一次只显示一个", () => {
+    dispose = render(() => <App sourceFor={() => new FixtureSource(bundle)} narrow={() => true} />, container);
+    const shown = () => [...container.querySelectorAll<HTMLElement>("[data-panel]")].filter((el) => !el.hidden).map((el) => el.dataset["panel"]);
+    expect(shown()).toEqual(["map"]);
+    container.querySelector<HTMLButtonElement>('[data-tab="settings"]')!.click();
+    expect(shown()).toEqual(["settings"]);
+    expect(container.querySelector("#settings-title")).not.toBeNull();
   });
 });

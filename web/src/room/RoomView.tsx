@@ -1,10 +1,11 @@
 /**
  * Room View（Live 最小版）：选一个房间，逐 Tick 画出地形、建筑与 creep，并显示当前 Tick。
  * 数据流：Source 房间流 → reduceLiveTick → RoomState → buildRoomScene → SceneView。
- * 固定布局；开发用开关可以在真实服务器与录制回放（FixtureSource）之间切换。
+ * 放在面板系统里（#2）；开发用开关可以在真实服务器与录制回放（FixtureSource）之间切换。
  * 录制回放只在开发构建里可用：生产构建既不打包 `fixtures/` 也不显示开关（#14）。
  */
 import { createEffect, createMemo, createSignal, on, onCleanup, onMount, Show, untrack } from "solid-js";
+import { Portal } from "solid-js/web";
 import { useI18n } from "../i18n";
 import { createTickRate } from "../power/tick-rate.ts";
 import { useVisible } from "../power/use-visible.ts";
@@ -62,6 +63,8 @@ export interface RoomViewProps {
   readonly open?: Target | undefined;
   /** 给了就显示“返回地图”按钮（#16） */
   readonly onBack?: (() => void) | undefined;
+  /** 选中对象的详情改画到这个元素里（面板系统的“对象详情”面板，#2）；不给时画在房间旁边 */
+  readonly detailsMount?: HTMLElement | undefined;
 }
 
 function browserCameraStorage(): CameraStorage | undefined {
@@ -309,6 +312,18 @@ export function RoomView(props: RoomViewProps) {
     setTarget({ shard: sharded() ? shardInput().trim() : "", room });
   };
 
+  const details = () => (
+    <RoomDetailsPanel
+      object={(() => {
+        const id = controls.selectedId();
+        return id === undefined ? undefined : shownState()?.objects[id];
+      })()}
+      users={shownState()?.users ?? {}}
+      gameTime={replay.active() ? replay.snapshot()?.target : roomState()?.gameTime}
+      onClose={() => controls.select(undefined)}
+    />
+  );
+
   return (
     <section class="room-view" aria-labelledby="room-view-title">
       <h2 id="room-view-title">{t("roomView.title")}</h2>
@@ -401,15 +416,9 @@ export function RoomView(props: RoomViewProps) {
           <div class="room-view__canvas" ref={host} />
           <RoomEdgeArrows room={target()?.room} onGo={goTo} />
         </div>
-        <RoomDetailsPanel
-          object={(() => {
-            const id = controls.selectedId();
-            return id === undefined ? undefined : shownState()?.objects[id];
-          })()}
-          users={shownState()?.users ?? {}}
-          gameTime={replay.active() ? replay.snapshot()?.target : roomState()?.gameTime}
-          onClose={() => controls.select(undefined)}
-        />
+        <Show when={props.detailsMount} keyed fallback={details()}>
+          {(mount) => <Portal mount={mount}>{details()}</Portal>}
+        </Show>
       </div>
     </section>
   );

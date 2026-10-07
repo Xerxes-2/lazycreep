@@ -64,7 +64,7 @@ function trackingSource(): Source {
   return source;
 }
 
-function mount() {
+function mount(detailsMount?: HTMLElement) {
   dispose = render(
     () => (
       <I18nProvider>
@@ -75,6 +75,7 @@ function mount() {
           historyCache={async () => undefined}
           allies={new Set()}
           cameraStorage={{ getItem: (k) => storage.get(k) ?? null, setItem: (k, v) => void storage.set(k, v) }}
+          detailsMount={detailsMount}
         />
       </I18nProvider>
     ),
@@ -167,6 +168,17 @@ describe("Room View 交互", () => {
     tap(1, 1, pointerType);
     await settle(() => expect(container.querySelector("[data-testid=room-details]")).toBeNull());
     expect(lastScene().primitives.some((p) => p.key.endsWith("/selected"))).toBe(false);
+  });
+
+  it("给了 detailsMount（对象详情面板，#2）时详情画在那里，不在房间旁边", async () => {
+    const mountEl = document.createElement("div");
+    container.append(mountEl);
+    mount(mountEl);
+    await openRoom("W13S28");
+    tap(...screenOf(CREEP), "mouse");
+    await settle(() => expect(mountEl.querySelector("[data-testid=room-details]")).not.toBeNull());
+    expect(container.querySelector(".room-view [data-testid=room-details]")).toBeNull();
+    expect(mountEl.querySelector("[data-field=type]")!.textContent).toBe("creep");
   });
 
   it("Replay 期间点选作用于重放出来的对象", async () => {
