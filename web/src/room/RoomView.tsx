@@ -2,6 +2,7 @@
  * Room View（Live 最小版）：选一个房间，逐 Tick 画出地形、建筑与 creep，并显示当前 Tick。
  * 数据流：Source 房间流 → reduceLiveTick → RoomState → buildRoomScene → SceneView。
  * 固定布局；开发用开关可以在真实服务器与录制回放（FixtureSource）之间切换。
+ * 录制回放只在开发构建里可用：生产构建既不打包 `fixtures/` 也不显示开关（#14）。
  */
 import { createEffect, createMemo, createSignal, onCleanup, onMount, Show } from "solid-js";
 import { useI18n } from "../i18n";
@@ -39,7 +40,7 @@ export interface RoomViewProps {
   readonly settings: Settings;
   /** 真实服务器的 Source */
   readonly sourceFor: SourceFactory;
-  /** 录制回放的 Source；默认加载 `fixtures/season/` */
+  /** 录制回放的 Source；开发构建默认加载 `fixtures/season/`，生产构建默认没有 */
   readonly fixtureSource?: () => Promise<Source>;
   /** 默认是 Pixi 适配层；测试里换成记录 Scene 的假实现 */
   readonly createView?: (options: SceneViewOptions) => Promise<SceneView>;
@@ -51,6 +52,8 @@ export function RoomView(props: RoomViewProps) {
   const { t } = useI18n();
   const settings = props.settings;
   const visible = useVisible(props.visibility);
+  // import.meta.env.DEV 在生产构建里是常量 false：loadSeasonFixtures 连同 fixtures 一起被摇掉
+  const loadFixtures = props.fixtureSource ?? (import.meta.env.DEV ? loadSeasonFixtures : undefined);
 
   const [mode, setMode] = createSignal<Mode>("live");
   const [source, setSource] = createSignal<Source>();
@@ -58,7 +61,7 @@ export function RoomView(props: RoomViewProps) {
 
   createEffect(() => {
     setSourceError(undefined);
-    if (mode() === "live") {
+    if (mode() === "live" || !loadFixtures) {
       const created = props.sourceFor(settings.server(), settings.token() || undefined);
       setSource(created);
       onCleanup(() => created.close());
@@ -67,7 +70,7 @@ export function RoomView(props: RoomViewProps) {
     setSource(undefined);
     let alive = true;
     let created: Source | undefined;
-    (props.fixtureSource ?? loadSeasonFixtures)().then(
+    loadFixtures().then(
       (loaded) => {
         if (!alive) return loaded.close();
         created = loaded;
@@ -196,13 +199,15 @@ export function RoomView(props: RoomViewProps) {
     <section class="room-view" aria-labelledby="room-view-title">
       <h2 id="room-view-title">{t("roomView.title")}</h2>
       <form class="room-view__form" data-testid="room-view-form" onSubmit={submit}>
-        <label>
-          {t("roomView.mode")}
-          <select name="room-view-mode" value={mode()} onChange={(e) => setMode(e.currentTarget.value as Mode)}>
-            <option value="live">{t("roomView.mode.live")}</option>
-            <option value="fixture">{t("roomView.mode.fixture")}</option>
-          </select>
-        </label>
+        <Show when={loadFixtures}>
+          <label>
+            {t("roomView.mode")}
+            <select name="room-view-mode" value={mode()} onChange={(e) => setMode(e.currentTarget.value as Mode)}>
+              <option value="live">{t("roomView.mode.live")}</option>
+              <option value="fixture">{t("roomView.mode.fixture")}</option>
+            </select>
+          </label>
+        </Show>
         <Show when={sharded()}>
           <label>
             {t("readings.shard")}

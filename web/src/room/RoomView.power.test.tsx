@@ -167,3 +167,35 @@ describe("Room View 省电", () => {
     await vi.waitFor(() => expect(rateText()).toBe("3500 ms/Tick"));
   });
 });
+
+describe("录制回放仅开发可用", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    visibility = manualVisibility(true);
+    room = manualRoomSource();
+    container = document.createElement("div");
+    document.body.append(container);
+  });
+
+  afterEach(() => {
+    dispose?.();
+    dispose = undefined;
+    container.remove();
+    vi.unstubAllEnvs();
+  });
+
+  const modeSwitch = () => container.querySelector("select[name=room-view-mode]");
+
+  it("开发构建显示数据来源开关", () => {
+    vi.stubEnv("DEV", true);
+    mount();
+    expect(modeSwitch()).not.toBeNull();
+  });
+
+  it("生产构建不显示数据来源开关", () => {
+    vi.stubEnv("DEV", false);
+    mount();
+    expect(modeSwitch()).toBeNull();
+    expect(field("[data-testid=room-view-state]").textContent).toBe("已认证");
+  });
+});
