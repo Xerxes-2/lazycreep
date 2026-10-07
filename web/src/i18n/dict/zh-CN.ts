@@ -282,6 +282,10 @@ export const zhCN = {
   "transfer.error.notSettings": "这不是本客户端导出的设置文件。",
   "transfer.error.newerVersion": "这个设置文件来自更新版本的客户端，无法导入。",
   "transfer.error.noStorage": "浏览器本地存储不可用。",
+
+  "topBar.shard": "Shard",
+  "topBar.tick": "Tick {tick}",
+  "topBar.cpu": "CPU {cpu} · Memory {memory} KB",
 } as const satisfies Record<string, string>;
 
 export type MessageKey = keyof typeof zhCN;

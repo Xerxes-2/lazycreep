@@ -25,6 +25,7 @@ import { Menu, type MenuItemDef } from "./shell/Menu.tsx";
 import { createShellState } from "./shell/shell-state.ts";
 import { registerShellShortcuts } from "./shell/shell-shortcuts.ts";
 import { TopBar } from "./shell/TopBar.tsx";
+import { TopBarStatus } from "./shell/TopBarStatus.tsx";
 import { LiveSource } from "./source/live-source.ts";
 import { sharedSources } from "./source/shared-source.ts";
 import { browserStorage } from "./storage/local-store.ts";
@@ -35,6 +36,8 @@ const liveSource: SourceFactory = (server, token) =>
 interface ShellProps {
   readonly sourceFor: SourceFactory;
   readonly narrow?: Accessor<boolean>;
+  /** Top Bar 轮询 `game/time` 的间隔（测试用；默认 TICK_POLL_MS） */
+  readonly tickPollMs?: number;
 }
 
 interface ShellOwnProps extends ShellProps {
@@ -114,7 +117,13 @@ function Shell(props: ShellOwnProps) {
 
   return (
     <main class="shell" data-layout={narrow() ? "narrow" : "wide"}>
-      <TopBar shell={shell} consoleToggle={!narrow()} />
+      <TopBar shell={shell} consoleToggle={!narrow()}>
+        <TopBarStatus
+          settings={settings}
+          sourceFor={sourceFor}
+          {...(props.tickPollMs === undefined ? {} : { tickPollMs: props.tickPollMs })}
+        />
+      </TopBar>
       <MapAndRoom
         settings={settings}
         sourceFor={sourceFor}
@@ -159,6 +168,7 @@ export function App(props: Partial<ShellProps>) {
           <Shell
             sourceFor={props.sourceFor ?? liveSource}
             {...(props.narrow ? { narrow: props.narrow } : {})}
+            {...(props.tickPollMs === undefined ? {} : { tickPollMs: props.tickPollMs })}
             onImported={onImported}
             lastImport={lastImport()}
           />

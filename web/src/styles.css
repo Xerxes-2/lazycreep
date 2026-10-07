@@ -103,10 +103,52 @@ body {
   min-width: 0;
 }
 
+/* #25：Top Bar 状态 */
+.top-bar select {
+  font: inherit;
+  min-height: 36px;
+  padding: 4px 6px;
+  border: 1px solid color-mix(in srgb, var(--muted) 60%, transparent);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+}
+
+.top-bar__connection,
+.top-bar__tick,
+.top-bar__cpu {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.top-bar__connection::before {
+  content: "●";
+  margin-right: 4px;
+  color: var(--muted);
+}
+
+.top-bar__connection[data-connection="authenticated"]::before {
+  color: #3fb950;
+}
+
+.top-bar__connection[data-connection="connecting"]::before,
+.top-bar__connection[data-connection="reconnecting"]::before {
+  color: #d29922;
+}
+
+.top-bar__connection[data-connection="unauthorized"] {
+  color: #d64545;
+}
+
+.top-bar__connection[data-connection="unauthorized"]::before {
+  color: #d64545;
+}
+
 .shell__body {
   flex: 1;
   display: flex;
   min-height: 0;
+  position: relative;
 }
 
 .shell__main {
@@ -891,15 +933,30 @@ body {
 
 /* Attack Alert（#4）：页内横幅固定在视口顶部 */
 .attack-alert {
-  position: fixed;
-  top: 8px;
+  position: absolute;
+  top: 0;
   left: 50%;
   transform: translateX(-50%);
   z-index: 100;
+  animation: attack-alert-slide 0.2s ease-out;
   display: flex;
   flex-direction: column;
   gap: 6px;
   width: min(480px, calc(100vw - 16px));
+}
+
+/* #25：横幅从 Top Bar 下沿滑出，盖在 Main View 与 Sidebar 之上，不挤动布局 */
+@keyframes attack-alert-slide {
+  from {
+    transform: translate(-50%, -100%);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .attack-alert {
+    animation: none;
+  }
 }
 
 .attack-alert__item {

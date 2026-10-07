@@ -1,6 +1,6 @@
 /**
  * Attack Alert 的投递：已授权时发系统通知，否则在页内横幅里列出；点击进入该房间的 Room View。
- * 横幅固定在视口顶部，放在哪个组件里都一样显示。
+ * 横幅挂在外壳主体顶部，从 Top Bar 下沿滑出，不属于 Main View（#25，样式见 styles.css）。
  */
 import { createSignal, For, Show, type Accessor } from "solid-js";
 import { useI18n, type MessageKey } from "../i18n";

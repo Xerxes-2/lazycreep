@@ -284,4 +284,8 @@ export const en: Partial<Record<MessageKey, string>> = {
   "transfer.error.notSettings": "This is not a settings file exported by this client.",
   "transfer.error.newerVersion": "This settings file comes from a newer client version and cannot be imported.",
   "transfer.error.noStorage": "Browser local storage is unavailable.",
+
+  "topBar.shard": "Shard",
+  "topBar.tick": "Tick {tick}",
+  "topBar.cpu": "CPU {cpu} · Memory {memory} KB",
 };
