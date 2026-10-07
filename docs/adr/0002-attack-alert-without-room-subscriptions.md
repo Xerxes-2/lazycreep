@@ -8,4 +8,4 @@ status: accepted
 ## Consequences
 
 - 检测到的是"房间级别发生了战斗 / 有陌生人 / 有核弹"，不是逐对象的伤害事件；更细的判定留给用户打开该房间后的 Room View。
-- 若日后实验证明多房间订阅无上限，可以在不改变告警语义的前提下换数据源。
+- 2026-10-08 实测证实了上限的存在：一条连接订阅 6 个 `room:` 时，首帧之后大多数 Tick 收到 `subscribe limit reached` 错误；订阅 2 个 `room:` 加 2 个 `roomMap2:` 时 50 Tick 无错（见 `docs/research/screeps-api-facts.md` 第 2 节）。本决策因此不再只是规避未知，而是必需。
