@@ -58,6 +58,7 @@ function covers(p: Primitive, x: number, y: number): boolean {
   switch (p.kind) {
     case "rect":
     case "bar":
+    case "image":
       return p.x <= x && x <= p.x + p.width && p.y <= y && y <= p.y + p.height;
     case "circle":
       return (x - p.x) ** 2 + (y - p.y) ** 2 <= p.radius ** 2;

@@ -1,5 +1,6 @@
 /**
  * Scene：渲染前的纯数据（spec #1 接缝 2）。Room View 与 World Map 都先产出 Scene，
+ * 图元有 rect / circle / line / polygon / text / bar / image 七种。
  * 再交给与来源无关的 Pixi 适配层画出来。Scene 里只有可 JSON 序列化的值，没有函数与类实例。
  *
  * 坐标是“世界单位”：Room View 里 1 单位 = 1 格，格 (x, y) 占 [x, x+1) × [y, y+1)；
@@ -89,13 +90,27 @@ export interface BarPrimitive extends PrimitiveBase {
   readonly background: Color;
 }
 
+/**
+ * 图片（例如 World Map 的地形瓦片）：把 url 指向的图拉伸进矩形。只存 URL 与矩形，
+ * 加载由适配层负责；加载完成前与加载失败时什么都不画。url 须同源（WebGL 纹理需要 CORS）。
+ */
+export interface ImagePrimitive extends PrimitiveBase {
+  readonly kind: "image";
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+  readonly url: string;
+}
+
 export type Primitive =
   | RectPrimitive
   | CirclePrimitive
   | LinePrimitive
   | PolygonPrimitive
   | TextPrimitive
-  | BarPrimitive;
+  | BarPrimitive
+  | ImagePrimitive;
 
 export type PrimitiveKind = Primitive["kind"];
 

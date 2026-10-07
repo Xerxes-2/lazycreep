@@ -21,6 +21,7 @@ function bounds(p: Primitive): { x0: number; y0: number; x1: number; y1: number 
   switch (p.kind) {
     case "rect":
     case "bar":
+    case "image":
       return { x0: p.x, y0: p.y, x1: p.x + p.width, y1: p.y + p.height };
     case "circle":
       return { x0: p.x - p.radius, y0: p.y - p.radius, x1: p.x + p.radius, y1: p.y + p.radius };

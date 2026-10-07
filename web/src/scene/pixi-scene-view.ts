@@ -5,8 +5,18 @@
  * - 不用 Pixi 的 Application 与自动 ticker；只在 Scene 变化、尺寸 / 视口变化
  *   或显式 requestRender() 时安排一帧，同一帧内多次请求合并成一次 render
  */
-import { Container, Graphics, Text, Ticker, autoDetectRenderer, type Renderer } from "pixi.js";
-import type { Primitive, Scene, Stroke } from "./scene.ts";
+import {
+  Container,
+  Graphics,
+  ImageSource,
+  Sprite,
+  Text,
+  Texture,
+  Ticker,
+  autoDetectRenderer,
+  type Renderer,
+} from "pixi.js";
+import type { ImagePrimitive, Primitive, Scene, Stroke } from "./scene.ts";
 
 /** 世界坐标到画布 CSS 像素：screen = world * scale + (x, y) */
 export interface Viewport {
@@ -28,6 +38,38 @@ export interface SceneViewOptions {
   readonly renderer?: SceneRenderer;
   /** 安排一帧，默认 requestAnimationFrame */
   readonly schedule?: (frame: () => void) => void;
+  /** image 图元的纹理加载与卸载，默认 fetch + createImageBitmap */
+  readonly textures?: TextureLoader;
+  /** 没有图元在用的纹理最多留多少张，超出时先卸载最早闲置的；默认 512 */
+  readonly textureCacheSize?: number;
+}
+
+export interface TextureLoader {
+  load(url: string): Promise<Texture>;
+  unload(url: string): void;
+}
+
+/**
+ * 默认的纹理加载：fetch → createImageBitmap → Texture，每个视图各一份。
+ * 不用 Pixi 的 Assets：实测它在本适配层下（全局 ticker 已停）的加载永远不完成。
+ */
+function fetchTextures(): TextureLoader {
+  const loaded = new Map<string, Texture>();
+  return {
+    async load(url) {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`${url}：HTTP ${response.status}`);
+      const bitmap = await createImageBitmap(await response.blob());
+      const texture = new Texture({ source: new ImageSource({ resource: bitmap }) });
+      loaded.set(url, texture);
+      return texture;
+    },
+    unload(url) {
+      const texture = loaded.get(url);
+      loaded.delete(url);
+      texture?.destroy(true);
+    },
+  };
 }
 
 export interface SceneView {
@@ -47,11 +89,98 @@ export interface SceneView {
 /** 文字先按这个字号栅格化再缩放到世界单位，避免放大后发糊。 */
 const TEXT_RASTER_SIZE = 32;
 
-type Node = Graphics | Text;
+type Node = Graphics | Text | Sprite;
+type NodeKind = "graphics" | "text" | "image";
+
+function nodeKind(p: Primitive): NodeKind {
+  return p.kind === "text" ? "text" : p.kind === "image" ? "image" : "graphics";
+}
 
 interface Entry {
   primitive: Primitive;
   node: Node;
+}
+
+/**
+ * image 图元的纹理：按 url 共享，加载完成后贴到所有在用的 Sprite 上并请求一帧。
+ * 没有 Sprite 在用的纹理先闲置，闲置数超过上限时卸载最早闲置的。
+ */
+function createTextureCache(loader: TextureLoader, limit: number, onLoaded: () => void) {
+  interface Slot {
+    texture: Texture | undefined;
+    readonly users: Map<Sprite, ImagePrimitive>;
+  }
+  const slots = new Map<string, Slot>();
+  /** 插入顺序即闲置先后 */
+  const idle = new Set<string>();
+  let closed = false;
+
+  const paint = (sprite: Sprite, p: ImagePrimitive, texture: Texture | undefined) => {
+    sprite.texture = texture ?? Texture.EMPTY;
+    sprite.visible = texture !== undefined;
+    sprite.position.set(p.x, p.y);
+    sprite.setSize(p.width, p.height);
+    sprite.alpha = p.alpha ?? 1;
+  };
+
+  const evict = () => {
+    for (const url of idle) {
+      if (idle.size <= limit) break;
+      idle.delete(url);
+      const slot = slots.get(url);
+      slots.delete(url);
+      if (slot?.texture) loader.unload(url);
+    }
+  };
+
+  const slotFor = (url: string): Slot => {
+    const existing = slots.get(url);
+    if (existing) return existing;
+    const slot: Slot = { texture: undefined, users: new Map() };
+    slots.set(url, slot);
+    loader.load(url).then(
+      (texture) => {
+        if (closed || slots.get(url) !== slot) {
+          // 加载期间已被淘汰或视图已销毁
+          loader.unload(url);
+          return;
+        }
+        slot.texture = texture;
+        for (const [sprite, p] of slot.users) paint(sprite, p, texture);
+        if (slot.users.size > 0) onLoaded();
+      },
+      () => {
+        // 加载失败（例如 403 的非块角瓦片）：保持空白，不重试
+      },
+    );
+    return slot;
+  };
+
+  return {
+    /** 让 sprite 显示 p；url 变了就换纹理。 */
+    attach(sprite: Sprite, p: ImagePrimitive, previous?: ImagePrimitive) {
+      if (previous && previous.url !== p.url) this.detach(sprite, previous.url);
+      const slot = slotFor(p.url);
+      idle.delete(p.url);
+      slot.users.set(sprite, p);
+      paint(sprite, p, slot.texture);
+    },
+    detach(sprite: Sprite, url: string) {
+      const slot = slots.get(url);
+      if (!slot) return;
+      slot.users.delete(sprite);
+      if (slot.users.size === 0) {
+        idle.add(url);
+        evict();
+      }
+    },
+    close() {
+      closed = true;
+      for (const [url, slot] of slots) if (slot.texture) loader.unload(url);
+      slots.clear();
+      idle.clear();
+    },
+  };
 }
 
 function sameStroke(a: Stroke | undefined, b: Stroke | undefined): boolean {
@@ -87,7 +216,7 @@ function strokeStyle(stroke: Stroke) {
   return { color: stroke.color, width: stroke.width, alpha: stroke.alpha ?? 1 };
 }
 
-function drawGraphics(g: Graphics, p: Exclude<Primitive, { kind: "text" }>): void {
+function drawGraphics(g: Graphics, p: Exclude<Primitive, { kind: "text" | "image" }>): void {
   g.clear();
   switch (p.kind) {
     case "rect":
@@ -138,7 +267,8 @@ function drawText(t: Text, p: Extract<Primitive, { kind: "text" }>): void {
   t.alpha = p.alpha ?? 1;
 }
 
-function createNode(p: Primitive): Node {
+/** image 图元的显示对象由纹理缓存负责，这里只管 Graphics 与 Text。 */
+function createNode(p: Exclude<Primitive, ImagePrimitive>): Node {
   if (p.kind === "text") {
     const t = new Text({ text: p.text });
     drawText(t, p);
@@ -149,7 +279,7 @@ function createNode(p: Primitive): Node {
   return g;
 }
 
-function updateNode(node: Node, p: Primitive): void {
+function updateNode(node: Node, p: Exclude<Primitive, ImagePrimitive>): void {
   if (p.kind === "text") drawText(node as Text, p);
   else drawGraphics(node as Graphics, p);
 }
@@ -215,6 +345,28 @@ export async function createSceneView(options: SceneViewOptions): Promise<SceneV
     return changed;
   };
 
+  const textures = createTextureCache(
+    options.textures ?? fetchTextures(),
+    options.textureCacheSize ?? 512,
+    () => requestRender(),
+  );
+
+  const make = (p: Primitive): Node => {
+    if (p.kind !== "image") return createNode(p);
+    const sprite = new Sprite();
+    textures.attach(sprite, p);
+    return sprite;
+  };
+  const update = (node: Node, p: Primitive, previous: Primitive) => {
+    if (p.kind === "image") textures.attach(node as Sprite, p, previous as ImagePrimitive);
+    else updateNode(node, p);
+  };
+  const drop = (entry: Entry) => {
+    if (entry.primitive.kind === "image") textures.detach(entry.node as Sprite, entry.primitive.url);
+    world.removeChild(entry.node);
+    entry.node.destroy();
+  };
+
   /** 把 Scene 同步进显示树；返回是否有任何可见变化。 */
   const sync = (scene: Scene): boolean => {
     let changed = false;
@@ -222,9 +374,9 @@ export async function createSceneView(options: SceneViewOptions): Promise<SceneV
     for (const primitive of scene.primitives) {
       seen.add(primitive.key);
       const entry = entries.get(primitive.key);
-      if (!entry || (entry.primitive.kind === "text") !== (primitive.kind === "text")) {
-        if (entry) entry.node.destroy();
-        const node = createNode(primitive);
+      if (!entry || nodeKind(entry.primitive) !== nodeKind(primitive)) {
+        if (entry) drop(entry);
+        const node = make(primitive);
         node.zIndex = primitive.layer;
         world.addChild(node);
         entries.set(primitive.key, { primitive, node });
@@ -232,7 +384,7 @@ export async function createSceneView(options: SceneViewOptions): Promise<SceneV
         continue;
       }
       if (!samePrimitive(entry.primitive, primitive)) {
-        updateNode(entry.node, primitive);
+        update(entry.node, primitive, entry.primitive);
         entry.node.zIndex = primitive.layer;
         changed = true;
       }
@@ -240,8 +392,7 @@ export async function createSceneView(options: SceneViewOptions): Promise<SceneV
     }
     for (const [key, entry] of entries) {
       if (seen.has(key)) continue;
-      world.removeChild(entry.node);
-      entry.node.destroy();
+      drop(entry);
       entries.delete(key);
       changed = true;
     }
@@ -287,6 +438,7 @@ export async function createSceneView(options: SceneViewOptions): Promise<SceneV
       destroyed = true;
       stage.destroy({ children: true });
       entries.clear();
+      textures.close();
       renderer.destroy();
     },
   };

@@ -5,7 +5,7 @@
  * 文字测量、逐对象绘制调用）都真实走一遍，只是像素不落地。
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { autoDetectRenderer } from "pixi.js";
+import { autoDetectRenderer, Texture } from "pixi.js";
 import type { Scene } from "./scene.ts";
 import { createSceneView, type SceneRenderer, type SceneView } from "./pixi-scene-view.ts";
 
@@ -167,6 +167,102 @@ describe("Pixi 适配层", () => {
       expect(step()).toBe(4);
       view.setViewport({ x: 0, y: 0, scale: 10 });
       expect(step()).toBe(4);
+    });
+
+    describe("image 图元", () => {
+      const tile = (key: string, url: string, x = 0): Scene["primitives"][number] => ({
+        key,
+        kind: "image",
+        layer: 0,
+        x,
+        y: 0,
+        width: 1,
+        height: 1,
+        url,
+      });
+
+      /** 手动兑现的纹理加载：测试决定每个 url 何时加载完成或失败。 */
+      function manualTextures() {
+        const pending = new Map<string, { resolve: (t: Texture) => void; reject: (e: Error) => void }>();
+        const loads: string[] = [];
+        const unloads: string[] = [];
+        return {
+          loads,
+          unloads,
+          textures: {
+            load: (url: string) => {
+              loads.push(url);
+              return new Promise<Texture>((resolve, reject) => pending.set(url, { resolve, reject }));
+            },
+            unload: (url: string) => void unloads.push(url),
+          },
+          async resolve(url: string) {
+            pending.get(url)!.resolve(Texture.WHITE);
+            await Promise.resolve();
+          },
+          async reject(url: string) {
+            pending.get(url)!.reject(new Error("403"));
+            await Promise.resolve();
+          },
+        };
+      }
+
+      async function withTextures(cacheSize?: number) {
+        const frames = manualFrames();
+        const renderer = await canvasRenderer();
+        const render = vi.spyOn(renderer, "render");
+        const textures = manualTextures();
+        const view = await createSceneView({
+          width: 400,
+          height: 300,
+          renderer,
+          schedule: frames.schedule,
+          textures: textures.textures,
+          ...(cacheSize === undefined ? {} : { textureCacheSize: cacheSize }),
+        });
+        views.push(view);
+        const step = () => {
+          frames.flush();
+          return render.mock.calls.length;
+        };
+        return { view, step, textures };
+      }
+
+      const imageScene = (...primitives: Scene["primitives"]): Scene => ({ ...scene, primitives });
+
+      it("纹理加载完成后再渲染一次；同一 url 只加载一次", async () => {
+        const { view, step, textures } = await withTextures();
+        view.show(imageScene(tile("a", "/t/a.png"), tile("b", "/t/a.png", 1)));
+        expect(step()).toBe(1);
+        expect(textures.loads).toEqual(["/t/a.png"]);
+        await textures.resolve("/t/a.png");
+        expect(step()).toBe(2);
+        expect(step()).toBe(2);
+      });
+
+      it("加载失败不抛错，也不触发渲染", async () => {
+        const { view, step, textures } = await withTextures();
+        view.show(imageScene(tile("a", "/t/missing.png")));
+        expect(step()).toBe(1);
+        await textures.reject("/t/missing.png");
+        expect(step()).toBe(1);
+      });
+
+      it("图元消失时纹理留在缓存里，回来时不重新加载；超出缓存上限的闲置纹理被卸载", async () => {
+        const { view, step, textures } = await withTextures(1);
+        view.show(imageScene(tile("a", "/t/a.png")));
+        await textures.resolve("/t/a.png");
+        view.show(imageScene(tile("b", "/t/b.png")));
+        await textures.resolve("/t/b.png");
+        view.show(imageScene(tile("a", "/t/a.png")));
+        step();
+        expect(textures.loads).toEqual(["/t/a.png", "/t/b.png"]);
+        expect(textures.unloads).toEqual([]);
+        view.show(imageScene(tile("c", "/t/c.png")));
+        await textures.resolve("/t/c.png");
+        // 闲置的 a、b 超出上限 1：最早闲置的 b 被卸载
+        expect(textures.unloads).toEqual(["/t/b.png"]);
+      });
     });
 
     it("销毁后不再渲染", async () => {
