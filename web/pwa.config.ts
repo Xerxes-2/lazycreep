@@ -1,0 +1,40 @@
+import type { VitePWAOptions } from "vite-plugin-pwa";
+
+/**
+ * Gateway 反代的路径（ADR 0001）。导航回退不得用缓存的应用外壳回答它们，
+ * 否则直接打开这些 URL 会得到 index.html 而不是上游响应。
+ */
+const GATEWAY_PATHS = /^\/(?:api|season\/api|ptr\/api|room-history|map-tiles)(?:\/|$)/;
+
+/**
+ * service worker 只预缓存构建产出的静态资源，不做运行时缓存：
+ * API 响应、历史 chunk 与地图瓦片一律走网络。
+ */
+export const pwaOptions = {
+  registerType: "autoUpdate",
+  injectRegister: "auto",
+  manifest: {
+    name: "Screeps 客户端",
+    short_name: "Screeps",
+    description: "轻快、省电的自用 Screeps 客户端",
+    lang: "zh-CN",
+    start_url: "/",
+    scope: "/",
+    display: "standalone",
+    background_color: "#1b1f24",
+    theme_color: "#1b1f24",
+    icons: [
+      { src: "icon-192.png", sizes: "192x192", type: "image/png" },
+      { src: "icon-512.png", sizes: "512x512", type: "image/png" },
+      { src: "icon-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+      { src: "icon.svg", sizes: "any", type: "image/svg+xml" },
+    ],
+  },
+  workbox: {
+    globPatterns: ["**/*.{js,css,html,svg,png,ico,woff2,webmanifest}"],
+    navigateFallback: "index.html",
+    navigateFallbackDenylist: [GATEWAY_PATHS],
+    runtimeCaching: [],
+    cleanupOutdatedCaches: true,
+  },
+} satisfies Partial<VitePWAOptions>;
