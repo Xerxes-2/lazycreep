@@ -14,4 +14,5 @@ status: accepted
 
 - 风险与在浏览器里登录官方网页相当：token 只存在用户自己设备的浏览器中，Gateway 不保存，前有 Cloudflare Access。
 - WebSocket 由浏览器直连官方，不经 Gateway；官方 WebSocket 协议没有改代码类的写命令，所以不受此名单约束也无妨。
+- 名单按路径匹配，而 Caddy 先解码、清理路径再匹配，上游却收到原始路径；所以代理路径上原始路径含编码斜杠（`%2F`）、编码点（`%2E`）或 `.` / `..` 段的请求一律 400，不论方法（Caddyfile 与开发代理一致）。
 - 本地开发与录制使用同一 token，存放于被忽略的 `.env.local`。

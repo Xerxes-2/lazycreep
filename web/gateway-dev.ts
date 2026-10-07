@@ -25,12 +25,26 @@ const PROXIED_PREFIXES = [...routes.apiPrefixes.map((p) => `${p}/`), "/room-hist
 
 type Middleware = (req: IncomingMessage, res: ServerResponse, next: () => void) => void;
 
+/**
+ * 原始路径（不含查询串）里有编码斜杠（%2F）、编码点（%2E）或 `.` / `..` 段。
+ * 这类路径在 Gateway 与上游眼里可能是两个不同的端点，代理路径上一律拒绝（400），与 Caddyfile 一致。
+ */
+export function isAmbiguousPath(rawUrl: string): boolean {
+  const path = rawUrl.split("?", 1)[0]!;
+  return /%2[ef]/i.test(path) || path.split("/").some((segment) => segment === "." || segment === "..");
+}
+
 function writeGuard(): Middleware {
   const allowed = new Set(postAllowlistPaths());
   return (req, res, next) => {
-    // URL 解析会去掉 `..`，与上游看到的路径一致；百分号编码保持原样，不会误放行
-    const path = new URL(req.url ?? "/", "http://gateway.invalid").pathname;
-    if (!PROXIED_PREFIXES.some((prefix) => path.startsWith(prefix))) return next();
+    const raw = req.url ?? "/";
+    const path = new URL(raw, "http://gateway.invalid").pathname;
+    if (!PROXIED_PREFIXES.some((prefix) => path.startsWith(prefix) || raw.startsWith(prefix))) return next();
+    if (isAmbiguousPath(raw)) {
+      res.statusCode = 400;
+      res.end("gateway: ambiguous path");
+      return;
+    }
     const method = req.method ?? "GET";
     if (method === "GET" || method === "HEAD" || (method === "POST" && allowed.has(path))) return next();
     res.statusCode = 403;

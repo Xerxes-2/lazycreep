@@ -117,6 +117,25 @@ def request(method, path, body=None, headers=None):
     return res.status, res.getheader("Content-Type") or "", data
 
 
+# 原始路径含编码斜杠、编码点或 `.` / `..` 段：Gateway 返回 400，不到达上游
+BAD_PATHS = [
+    "/api/user/code/..%2F..%2Fuser/console",
+    "/season/api/user%2Fcode",
+    "/season/api/user%2fconsole",
+    "/season/api/user/%2E%2E/code",
+    "/ptr/api/%2e/user/console",
+    "/season/api/game/map-stats/../../user/code",
+    "/season/api/user/console/../code",
+    "/season/api/./user/console",
+    "/api/user/console/..",
+    "/x/../api/user/console",
+    "/room-history/shardSeason/..%2F..%2Fapi/1.json",
+    "/room-history/shardSeason/W1N1/../../../api/user/code",
+    "/map-tiles/../api/user/console",
+    "/map-tiles/shardSeason%2F..%2FE0N0.png",
+]
+
+
 def wait_ready():
     deadline = time.time() + 20
     while time.time() < deadline:
@@ -167,9 +186,6 @@ class GatewayTest(unittest.TestCase):
             "/season/api/game/market/create-order",
             "/season/api/user/memory",
             "/season/api/user/console/",
-            "/season/api/game/map-stats/../../user/code",
-            "/season/api/user/console/../code",
-            "/season/api/user%2Fcode",
             "/room-history/shardSeason/W1N1/100.json",
             "/map-tiles/shardSeason/E0N0.png",
         ]
@@ -177,6 +193,22 @@ class GatewayTest(unittest.TestCase):
             status, _, _ = request("POST", path, b"{}", {"X-Token": TOKEN, "Content-Type": "application/json"})
             self.assertEqual(status, 403, path)
         self.assertEqual(len(api.requests) + len(tiles.requests), before)
+
+    def test_paths_with_encoded_slash_or_dot_or_dot_segments_are_400_for_any_method(self):
+        # Caddy 的 path 匹配先解码再清理，上游却收到原始路径：这类路径一律拒绝（ADR 0003）
+        before = len(api.requests) + len(tiles.requests)
+        for path in BAD_PATHS:
+            for method in ["GET", "POST"]:
+                body = b"{}" if method == "POST" else None
+                status, _, _ = request(method, path, body, {"X-Token": TOKEN, "Content-Type": "application/json"})
+                self.assertEqual(status, 400, f"{method} {path}")
+        self.assertEqual(len(api.requests) + len(tiles.requests), before)
+
+    def test_encoded_slash_in_query_is_not_a_bad_path(self):
+        path = "/api/user/find?username=a%2Fb/../c"
+        status, _, _ = request("GET", path)
+        self.assertEqual(status, 200)
+        self.assertEqual(len(api.received("GET", path)), 1)
 
     def test_other_write_methods_are_403(self):
         before = len(api.requests)

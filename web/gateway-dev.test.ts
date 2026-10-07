@@ -3,7 +3,7 @@
  * 开发服务器的 Gateway 代理：与 gateway/Caddyfile 同样的路径与 POST 允许名单。
  * 上游指向本地模拟服务器，不触网。
  */
-import { createServer as createHttpServer, type IncomingHttpHeaders, type Server } from "node:http";
+import { createServer as createHttpServer, request as httpRequest, type IncomingHttpHeaders, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -70,6 +70,36 @@ function send(method: string, path: string, init: { body?: string; headers?: Rec
   return fetch(base + path, { method, ...init });
 }
 
+/** 原样发出路径（fetch 会先规范化 URL，去掉 `..`），返回状态码 */
+function sendRaw(method: string, path: string): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const req = httpRequest(base + "/", { method, path, headers: { "Content-Type": "application/json" } }, (res) => {
+      res.resume();
+      res.on("end", () => resolve(res.statusCode ?? 0));
+    });
+    req.on("error", reject);
+    req.end(method === "POST" ? "{}" : undefined);
+  });
+}
+
+/** 与 gateway/test_gateway.py 的 BAD_PATHS 相同 */
+const BAD_PATHS = [
+  "/api/user/code/..%2F..%2Fuser/console",
+  "/season/api/user%2Fcode",
+  "/season/api/user%2fconsole",
+  "/season/api/user/%2E%2E/code",
+  "/ptr/api/%2e/user/console",
+  "/season/api/game/map-stats/../../user/code",
+  "/season/api/user/console/../code",
+  "/season/api/./user/console",
+  "/api/user/console/..",
+  "/x/../api/user/console",
+  "/room-history/shardSeason/..%2F..%2Fapi/1.json",
+  "/room-history/shardSeason/W1N1/../../../api/user/code",
+  "/map-tiles/../api/user/console",
+  "/map-tiles/shardSeason%2F..%2FE0N0.png",
+];
+
 describe("开发服务器的 Gateway 代理", () => {
   it("每个 API 前缀的 GET 都转发，带查询与 X-Token，Host 是上游", async () => {
     for (const prefix of routes.apiPrefixes) {
@@ -101,8 +131,6 @@ describe("开发服务器的 Gateway 代理", () => {
       ["POST", "/season/api/user/code"],
       ["POST", "/ptr/api/user/code"],
       ["POST", "/season/api/user/console/"],
-      ["POST", "/season/api/user/console/../code"],
-      ["POST", "/season/api/user%2Fcode"],
       ["PUT", "/season/api/user/console"],
       ["DELETE", "/season/api/game/map-stats"],
       ["POST", "/room-history/shardSeason/W1N1/100.json"],
@@ -113,6 +141,22 @@ describe("开发服务器的 Gateway 代理", () => {
       expect(res.status, `${method} ${path}`).toBe(403);
     }
     expect(api.seen.length + tiles.seen.length).toBe(before);
+  });
+
+  it("原始路径含编码斜杠、编码点或 . / .. 段时返回 400，不到达上游（任何方法）", async () => {
+    const before = api.seen.length + tiles.seen.length;
+    for (const path of BAD_PATHS) {
+      for (const method of ["GET", "POST"]) {
+        expect(await sendRaw(method, path), `${method} ${path}`).toBe(400);
+      }
+    }
+    expect(api.seen.length + tiles.seen.length).toBe(before);
+  });
+
+  it("查询串里的编码斜杠不算", async () => {
+    const path = "/api/user/find?username=a%2Fb/../c";
+    expect(await sendRaw("GET", path)).toBe(200);
+    expect(api.seen.some((r) => r.path === path)).toBe(true);
   });
 
   it("room-history 转发到 API 上游", async () => {

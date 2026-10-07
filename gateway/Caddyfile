@@ -39,8 +39,14 @@ http://:{$MSC_PORT:8080} {
 		}
 	}
 
+	# path 匹配先解码再清理，上游却收到原始路径：原始路径（不含查询串）里有编码斜杠、编码点
+	# 或 `.` / `..` 段时，Gateway 与上游可能看到两个不同的端点，代理路径上一律 400（与 web/gateway-dev.ts 一致）。
+	# 每个代理 handle 里都要先 respond 它，再判断写操作。
+	@ambiguous_path vars_regexp {http.request.orig_uri} `^[^?]*(%2[eEfF]|/\.\.?(/|\?|$))`
+
 	@api path /api/* /season/api/* /ptr/api/*
 	handle @api {
+		respond @ambiguous_path "gateway: ambiguous path" 400
 		respond @write_not_allowed "gateway: write not allowed" 403
 		reverse_proxy {$MSC_API_UPSTREAM:https://screeps.com} {
 			import upstream_headers
@@ -48,6 +54,7 @@ http://:{$MSC_PORT:8080} {
 	}
 
 	handle /room-history/* {
+		respond @ambiguous_path "gateway: ambiguous path" 400
 		respond @write_not_allowed "gateway: write not allowed" 403
 		reverse_proxy {$MSC_API_UPSTREAM:https://screeps.com} {
 			import upstream_headers
@@ -55,6 +62,7 @@ http://:{$MSC_PORT:8080} {
 	}
 
 	handle_path /map-tiles/* {
+		respond @ambiguous_path "gateway: ambiguous path" 400
 		respond @write_not_allowed "gateway: write not allowed" 403
 		rewrite * /map{path}
 		reverse_proxy {$MSC_TILES_UPSTREAM:https://d3os7yery2usni.cloudfront.net} {
