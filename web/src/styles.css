@@ -321,3 +321,109 @@ body {
   font-size: 0.85rem;
   font-variant-numeric: tabular-nums;
 }
+
+/* ---- Room View 交互（#12）：边缘箭头、详情卡 ---- */
+
+.room-view__stage {
+  display: grid;
+  gap: 12px;
+}
+
+.room-view__frame {
+  position: relative;
+  width: 100%;
+  max-width: 720px;
+}
+
+.room-view__canvas canvas {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.room-view .room-view__edge {
+  position: absolute;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0;
+  opacity: 0.55;
+  background: color-mix(in srgb, var(--bg) 80%, transparent);
+}
+
+.room-view .room-view__edge:hover,
+.room-view .room-view__edge:focus-visible {
+  opacity: 1;
+}
+
+.room-view__edge--north { top: 4px; left: 50%; transform: translateX(-50%); }
+.room-view__edge--south { bottom: 4px; left: 50%; transform: translateX(-50%); }
+.room-view__edge--west { left: 4px; top: 50%; transform: translateY(-50%); }
+.room-view__edge--east { right: 4px; top: 50%; transform: translateY(-50%); }
+
+/* 窄屏：详情是贴底的卡片 */
+.room-details {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  max-height: 45vh;
+  overflow: auto;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  border-top: 1px solid color-mix(in srgb, var(--muted) 50%, transparent);
+  border-radius: 12px 12px 0 0;
+  background: var(--bg);
+  box-shadow: 0 -4px 16px rgb(0 0 0 / 0.25);
+}
+
+.room-details__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.room-details h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.room-details dl {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 12px;
+  margin: 8px 0 0;
+}
+
+.room-details dt {
+  color: var(--muted);
+}
+
+.room-details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
+.room-details__raw summary {
+  margin-top: 8px;
+  cursor: pointer;
+  color: var(--muted);
+}
+
+/* 宽屏：详情是画布右侧的侧栏 */
+@media (min-width: 900px) {
+  .room-view__stage:has(.room-details) {
+    grid-template-columns: minmax(0, 1fr) 260px;
+    align-items: start;
+  }
+
+  .room-details {
+    position: static;
+    max-height: none;
+    padding: 12px;
+    border: 1px solid color-mix(in srgb, var(--muted) 50%, transparent);
+    border-radius: 8px;
+    box-shadow: none;
+  }
+}

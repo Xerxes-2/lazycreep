@@ -17,6 +17,8 @@ import type { Settings } from "../settings/settings.ts";
 import { FixtureSource, fixtureBundle } from "../source/fixture-source.ts";
 import { STATE_KEYS } from "../readings/RawReadings.tsx";
 import type { ConnectionState, Source, StreamError, Terrain } from "../source/source.ts";
+import { cameraKey, type CameraStorage } from "./room-camera-store.ts";
+import { RoomDetailsPanel, RoomEdgeArrows, createRoomControls } from "./room-controls.tsx";
 import { ROOM_SIZE, buildRoomScene } from "./room-scene.ts";
 import { reduceLiveTick, type RoomState } from "./room-state.ts";
 import type { HistoryCache } from "../replay/history-cache.ts";
@@ -52,6 +54,18 @@ export interface RoomViewProps {
   readonly visibility?: VisibilitySignal;
   /** Replay 的历史缓存；默认是全页共用的 IndexedDB 缓存 */
   readonly historyCache?: () => Promise<HistoryCache | undefined>;
+  /** Ally List（用户名），着色用；默认空 */
+  readonly allies?: ReadonlySet<string>;
+  /** 每个房间视口的存储；默认浏览器 localStorage */
+  readonly cameraStorage?: CameraStorage;
+}
+
+function browserCameraStorage(): CameraStorage | undefined {
+  try {
+    return globalThis.localStorage;
+  } catch {
+    return undefined;
+  }
 }
 
 export function RoomView(props: RoomViewProps) {
@@ -95,6 +109,22 @@ export function RoomView(props: RoomViewProps) {
     const src = source();
     if (src) onCleanup(src.onConnection(setConnection));
     else setConnection("disconnected");
+  });
+
+  const [me, setMe] = createSignal<string>();
+  createEffect(() => {
+    const src = source();
+    setMe(undefined);
+    if (!src) return;
+    let alive = true;
+    // 取不到当前用户（未登录、测试替身）时所有玩家按陌生人着色
+    Promise.resolve()
+      .then(() => src.getMe())
+      .then(
+        (info) => alive && setMe(info.id),
+        () => {},
+      );
+    onCleanup(() => (alive = false));
   });
 
   const sharded = () => source()?.server.sharded ?? (mode() === "fixture" || settings.server().sharded);
@@ -155,19 +185,38 @@ export function RoomView(props: RoomViewProps) {
     });
   });
 
+  const [canvasSize, setCanvasSize] = createSignal({ width: DEFAULT_SIZE, height: DEFAULT_SIZE });
+  const [view, setView] = createSignal<SceneView>();
+  const controls = createRoomControls({
+    view,
+    size: canvasSize,
+    cameraKey: () => {
+      const current = target();
+      return current && cameraKey(source()?.server.id ?? settings.server().id, current.shard, current.room);
+    },
+    storage: props.cameraStorage ?? browserCameraStorage(),
+    scene: () => scene(),
+    world: { width: ROOM_SIZE, height: ROOM_SIZE },
+  });
+
+  /** 画面上的房间状态：Replay 期间是重放出来的状态，否则是 Live 状态 */
+  const shownState = () => (replay.active() ? replay.snapshot()?.roomState : roomState());
+
   // 页面不可见时不构建新 Scene，沿用上一个（#14）
   const scene = createMemo<Scene | undefined>((previous) => {
     if (!visible()) return previous;
     if (!target()) return undefined;
-    const state = replay.active() ? replay.snapshot()?.roomState : roomState();
+    const state = shownState();
     if (!state) {
       return { width: ROOM_SIZE, height: ROOM_SIZE, background: DEFAULT_THEME.background, primitives: [] };
     }
-    return buildRoomScene({ state, terrain: terrain() }, { theme: DEFAULT_THEME });
+    return buildRoomScene(
+      { state, terrain: terrain() },
+      { theme: DEFAULT_THEME, zoom: controls.zoom(), selectedId: controls.selectedId(), me: me(), allies: props.allies },
+    );
   });
 
   let host!: HTMLDivElement;
-  const [view, setView] = createSignal<SceneView>();
   const [viewError, setViewError] = createSignal<string>();
 
   onMount(() => {
@@ -183,11 +232,13 @@ export function RoomView(props: RoomViewProps) {
         if (!alive) return made.destroy();
         created = made;
         host.append(made.canvas);
+        setCanvasSize(size());
         setView(made);
         if (typeof ResizeObserver === "function") {
           observer = new ResizeObserver(() => {
             const { width, height } = size();
             made.resize(width, height);
+            setCanvasSize({ width, height });
           });
           observer.observe(host);
         }
@@ -207,6 +258,14 @@ export function RoomView(props: RoomViewProps) {
     const s = scene();
     if (v && s) v.show(s);
   });
+
+  const goTo = (room: string) => {
+    const current = target();
+    if (!current) return;
+    replay.close();
+    setRoomInput(room);
+    setTarget({ shard: current.shard, room });
+  };
 
   const submit = (event: SubmitEvent) => {
     event.preventDefault();
@@ -298,7 +357,21 @@ export function RoomView(props: RoomViewProps) {
           </p>
         )}
       </Show>
-      <div class="room-view__canvas" ref={host} />
+      <div class="room-view__stage">
+        <div class="room-view__frame">
+          <div class="room-view__canvas" ref={host} />
+          <RoomEdgeArrows room={target()?.room} onGo={goTo} />
+        </div>
+        <RoomDetailsPanel
+          object={(() => {
+            const id = controls.selectedId();
+            return id === undefined ? undefined : shownState()?.objects[id];
+          })()}
+          users={shownState()?.users ?? {}}
+          gameTime={replay.active() ? replay.snapshot()?.target : roomState()?.gameTime}
+          onClose={() => controls.select(undefined)}
+        />
+      </div>
     </section>
   );
 }
