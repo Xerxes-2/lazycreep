@@ -17,9 +17,10 @@ import { errorMessage, type SourceFactory } from "../settings/SettingsPage.tsx";
 import type { Settings } from "../settings/settings.ts";
 import type { ShardInfo, Source } from "../source/source.ts";
 import { fitCamera, panBy, sceneRect, sceneZoom, screenToWorld, visibleRect, zoomAt } from "./map-camera.ts";
-import { buildMapScene } from "./map-scene.ts";
+import { buildMapScene, MAP_LAYERS, type MapLayerPainter } from "./map-scene.ts";
 import { applyMapStats, mapStateFrom, roomAtWorld, type MapState } from "./map-state.ts";
 import { createOwnershipLoader } from "./ownership-loader.ts";
+import type { OwnershipHub } from "./ownership-hub.ts";
 
 /** 每个房间至少这么多 CSS 像素时，点击房间进入 Room View */
 export const ENTER_ZOOM = 32;
@@ -42,6 +43,13 @@ export interface MapViewProps {
   readonly visibility?: VisibilitySignal;
   /** 视口停止变化多久后才取所有权，默认 600 毫秒 */
   readonly settleMs?: number;
+  /**
+   * 与其他功能共用的所有权缓存与额度（#3）；须与本组件的 Server + token 一致。
+   * 不给时组件自建一个加载器。
+   */
+  readonly ownership?: OwnershipHub;
+  /** 叠加在默认图层之上的额外图层（例如 PvP 热点）；按 Shard 给出，变化时重建 Scene */
+  readonly overlays?: (shard: string) => readonly MapLayerPainter[];
 }
 
 export function MapView(props: MapViewProps) {
@@ -114,6 +122,8 @@ export function MapView(props: MapViewProps) {
             me: untrack(me),
           }),
         );
+        const known = props.ownership?.stats(current);
+        if (known) setMapState((state) => state && applyMapStats(state, known));
       },
       (error: unknown) => alive && setLoadError(errorMessage(t, error)),
     );
@@ -127,6 +137,16 @@ export function MapView(props: MapViewProps) {
   const loader = createMemo(() => {
     const src: Source = source();
     setOwnershipError(undefined);
+    const shared = props.ownership;
+    if (shared) {
+      onCleanup(
+        shared.subscribe(
+          (stats) => setMapState((state) => state && applyMapStats(state, stats)),
+          (error) => setOwnershipError(errorMessage(t, error)),
+        ),
+      );
+      return shared;
+    }
     const created = createOwnershipLoader({
       fetch: (s, rooms) => src.getMapStats(s, rooms),
       onStats: (stats) => setMapState((state) => state && applyMapStats(state, stats)),
@@ -201,7 +221,8 @@ export function MapView(props: MapViewProps) {
     const state = mapState();
     const input = sceneInput();
     if (!state || !input) return undefined;
-    return buildMapScene(state, { theme: DEFAULT_THEME, zoom: input.zoom, visible: input.rect });
+    const layers = props.overlays ? [...MAP_LAYERS, ...props.overlays(state.shard)] : MAP_LAYERS;
+    return buildMapScene(state, { theme: DEFAULT_THEME, zoom: input.zoom, visible: input.rect }, layers);
   });
 
   createEffect(() => {
