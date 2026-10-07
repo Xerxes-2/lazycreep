@@ -232,6 +232,23 @@ body {
   display: none;
 }
 
+/* 上边缘的拖动手柄（#30）：贴在滚动区顶端，不随内容滚走 */
+.console-dock__resize {
+  position: sticky;
+  top: -6px;
+  z-index: 1;
+  height: 8px;
+  margin: -6px -8px 0;
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.console-dock__resize:hover,
+.console-dock__resize:focus-visible {
+  background: color-mix(in srgb, var(--accent) 40%, transparent);
+  outline: none;
+}
+
 /* Menu（#24）：左侧滑出层 */
 .menu-backdrop {
   position: fixed;

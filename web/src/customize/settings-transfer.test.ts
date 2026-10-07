@@ -40,7 +40,7 @@ function customizeEverything() {
     const colors = createColorScheme(localStorage);
     colors.setColor("background", 0x101010);
     colors.setPlayerColor("Bob", 0x00ff00);
-    createKeybindings(localStorage).set("panel.map", "Shift+M");
+    createKeybindings(localStorage).set("sidebar.toggle", "Shift+H");
     createAllyList(localStorage).add("Friend");
     createAlertSettings(localStorage, fakeNotifications).update({ nuke: false, cooldownMinutes: 7 });
     createReplaySettings(localStorage).setCacheLimitMb(64);

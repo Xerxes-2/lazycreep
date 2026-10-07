@@ -52,21 +52,16 @@ describe("快捷键接到页面（#5）", () => {
     container.remove();
   });
 
-  it("M 在 World Map 与 Room View 之间切换 Main View；旧的数字键动作落到外壳上的对应位置", () => {
+  it("M 在 World Map 与 Room View 之间切换 Main View（字母不分大小写）；反引号开合 Console Panel", () => {
     mount();
     expect(mainView()).toBe("map");
     press(DEFAULT_KEYS["view.toggleMapRoom"].toLowerCase());
     expect(mainView()).toBe("room");
     press(DEFAULT_KEYS["view.toggleMapRoom"]);
     expect(mainView()).toBe("map");
-    press(DEFAULT_KEYS["panel.room"]);
-    expect(mainView()).toBe("room");
-    press(DEFAULT_KEYS["panel.map"]);
-    expect(mainView()).toBe("map");
-    press(DEFAULT_KEYS["panel.console"]);
+    press(DEFAULT_KEYS["console.toggle"]);
     expect(consoleOpen()).toBe(true);
-    press(DEFAULT_KEYS["panel.settings"]);
-    expect(menuOpen()).toBe(true);
+    expect(menuOpen()).toBe(false);
   });
 
   it("输入框获得焦点时不拦截", () => {
@@ -107,22 +102,23 @@ describe("快捷键接到页面（#5）", () => {
 
   it("重绑界面：冲突时提示，确认后改用并解除原绑定，立即生效", async () => {
     mount();
-    press(DEFAULT_KEYS["panel.room"]);
     openMenuItem("shortcuts");
     const row = (id: string) => container.querySelector<HTMLElement>(`[data-shortcut="${id}"]`)!;
-    row("panel.map").querySelector<HTMLButtonElement>("[data-action=shortcut-rebind]")!.click();
-    const capture = row("panel.map").querySelector<HTMLButtonElement>("[data-shortcut-capture]")!;
-    press(DEFAULT_KEYS["panel.room"], capture);
+    row("console.toggle").querySelector<HTMLButtonElement>("[data-action=shortcut-rebind]")!.click();
+    const capture = row("console.toggle").querySelector<HTMLButtonElement>("[data-shortcut-capture]")!;
+    press(DEFAULT_KEYS["view.toggleMapRoom"], capture);
     // 录入时不触发原动作
-    expect(mainView()).toBe("room");
-    const conflict = container.querySelector("[data-testid=shortcut-conflict]");
-    expect(conflict?.textContent).toContain("切到房间视图");
-    container.querySelector<HTMLButtonElement>("[data-action=shortcut-replace]")!.click();
-    expect(row("panel.map").querySelector("kbd")!.textContent).toBe(DEFAULT_KEYS["panel.room"]);
-    expect(row("panel.room").querySelector("kbd")!.textContent).toBe("未绑定");
-
-    press(DEFAULT_KEYS["panel.room"]);
     expect(mainView()).toBe("map");
+    const conflict = container.querySelector("[data-testid=shortcut-conflict]");
+    expect(conflict?.textContent).toContain("在地图与房间视图之间切换");
+    container.querySelector<HTMLButtonElement>("[data-action=shortcut-replace]")!.click();
+    expect(row("console.toggle").querySelector("kbd")!.textContent).toBe(DEFAULT_KEYS["view.toggleMapRoom"]);
+    expect(row("view.toggleMapRoom").querySelector("kbd")!.textContent).toBe("未绑定");
+
+    container.querySelector<HTMLButtonElement>("[data-action=close-menu]")!.click();
+    press(DEFAULT_KEYS["view.toggleMapRoom"]);
+    expect(mainView()).toBe("map");
+    expect(consoleOpen()).toBe(true);
   });
 });
 
@@ -155,7 +151,7 @@ describe("设置导入后无需刷新即生效（#5）", () => {
       ["msc.locale", "en"],
       ["msc.uiTheme", '"dark"'],
       ["msc.allies", '["Remote"]'],
-      ["msc.keys", JSON.stringify({ "panel.room": "Q" })],
+      ["msc.keys", JSON.stringify({ ...DEFAULT_KEYS, "view.toggleMapRoom": "Q" })],
       ["msc.settings", JSON.stringify({ serverId: "season", customServers: [], token: "remote-token", shards: {} })],
     ]);
     const file = JSON.stringify(exportSettings(source));

@@ -188,6 +188,8 @@ export const zhCN = {
   // 窄屏（#29）
   "shell.sheet.tabs": "侧栏区块",
   "shell.sheet.close": "收起侧栏",
+  // 快捷键与导出收尾（#30）
+  "consolePanel.resize": "拖动调整控制台面板高度",
   // Console 面板（#6）
   "console.title": "Console",
   "console.shard": "Shard",
@@ -250,14 +252,11 @@ export const zhCN = {
 
   "shortcuts.title": "快捷键",
   "shortcuts.hint": "在输入框里打字时快捷键不生效。点“重绑”后按下新键，Esc 取消。",
-  "shortcuts.action.panel.map": "切到世界地图",
-  "shortcuts.action.panel.room": "切到房间视图",
-  "shortcuts.action.panel.pvp": "切到 PvP 一览",
-  "shortcuts.action.panel.details": "切到对象详情",
-  "shortcuts.action.panel.settings": "切到设置",
-  "shortcuts.action.panel.console": "切到 Console",
   "shortcuts.action.view.toggleMapRoom": "在地图与房间视图之间切换",
   "shortcuts.action.replay.toggle": "Live / Replay 切换",
+  "shortcuts.action.sidebar.toggle": "收起或展开侧栏",
+  "shortcuts.action.console.toggle": "收起或展开控制台面板",
+  "shortcuts.action.shell.close": "关闭菜单（窄屏下也收起侧栏面板）",
   "shortcuts.action.replay.playPause": "Replay 播放 / 暂停",
   "shortcuts.action.replay.stepBack": "Replay 后退一 Tick",
   "shortcuts.action.replay.stepForward": "Replay 前进一 Tick",

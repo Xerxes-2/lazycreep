@@ -190,6 +190,8 @@ export const en: Partial<Record<MessageKey, string>> = {
   // Narrow layout (#29)
   "shell.sheet.tabs": "Sidebar sections",
   "shell.sheet.close": "Collapse the Sidebar",
+  // Shortcuts and export wrap-up (#30)
+  "consolePanel.resize": "Drag to resize the Console Panel",
   // Console panel (#6)
   "console.title": "Console",
   "console.shard": "Shard",
@@ -252,14 +254,11 @@ export const en: Partial<Record<MessageKey, string>> = {
 
   "shortcuts.title": "Keyboard shortcuts",
   "shortcuts.hint": "Shortcuts are ignored while typing in a text field. Click Rebind, then press the new key; Esc cancels.",
-  "shortcuts.action.panel.map": "Go to World Map",
-  "shortcuts.action.panel.room": "Go to Room View",
-  "shortcuts.action.panel.pvp": "Go to PvP Overview",
-  "shortcuts.action.panel.details": "Go to object details",
-  "shortcuts.action.panel.settings": "Go to settings",
-  "shortcuts.action.panel.console": "Go to Console",
   "shortcuts.action.view.toggleMapRoom": "Switch between map and Room View",
   "shortcuts.action.replay.toggle": "Toggle Live / Replay",
+  "shortcuts.action.sidebar.toggle": "Show or hide the Sidebar",
+  "shortcuts.action.console.toggle": "Show or hide the Console Panel",
+  "shortcuts.action.shell.close": "Close the Menu (on narrow screens, also the Sidebar panel)",
   "shortcuts.action.replay.playPause": "Replay play / pause",
   "shortcuts.action.replay.stepBack": "Replay one tick back",
   "shortcuts.action.replay.stepForward": "Replay one tick forward",

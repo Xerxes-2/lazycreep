@@ -63,7 +63,7 @@ function Shell(props: ShellOwnProps) {
   const shell = createShellState(browserStorage(), settings);
   // 窄屏（#29）：Console Panel 不显示，Console 改从 Menu 打开
   const narrow = props.narrow ?? mediaQuery(NARROW_QUERY);
-  registerShellShortcuts(shortcuts, shell);
+  registerShellShortcuts(shortcuts, shell, narrow);
   // 导入设置后界面重建：回到导入那一项，显示导入结果
   if (props.lastImport) shell.openMenu("transfer");
 
