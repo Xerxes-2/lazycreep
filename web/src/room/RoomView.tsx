@@ -19,6 +19,10 @@ import { STATE_KEYS } from "../readings/RawReadings.tsx";
 import type { ConnectionState, Source, StreamError, Terrain } from "../source/source.ts";
 import { ROOM_SIZE, buildRoomScene } from "./room-scene.ts";
 import { reduceLiveTick, type RoomState } from "./room-state.ts";
+import type { HistoryCache } from "../replay/history-cache.ts";
+import { createReplayController } from "../replay/replay-controller.ts";
+import { ReplayControls, ReplayEntry } from "../replay/ReplayControls.tsx";
+import { sharedHistoryCache } from "../replay/replay-settings.ts";
 
 type Mode = "live" | "fixture";
 
@@ -46,6 +50,8 @@ export interface RoomViewProps {
   readonly createView?: (options: SceneViewOptions) => Promise<SceneView>;
   /** 页面可见性（#14）：不可见时暂停渲染；默认跟随 document */
   readonly visibility?: VisibilitySignal;
+  /** Replay 的历史缓存；默认是全页共用的 IndexedDB 缓存 */
+  readonly historyCache?: () => Promise<HistoryCache | undefined>;
 }
 
 export function RoomView(props: RoomViewProps) {
@@ -102,6 +108,17 @@ export function RoomView(props: RoomViewProps) {
   const [terrainError, setTerrainError] = createSignal<string>();
   const [tickMs, setTickMs] = createSignal<number>();
 
+  const replay = createReplayController({
+    source,
+    cache: (props.historyCache ?? sharedHistoryCache)(),
+    visible,
+    onRoute: (opened) => {
+      setShardInput(opened.shard);
+      setRoomInput(opened.room);
+      setTarget({ shard: opened.shard, room: opened.room });
+    },
+  });
+
   createEffect(() => {
     const src = source();
     const current = target();
@@ -113,18 +130,21 @@ export function RoomView(props: RoomViewProps) {
     if (!src || !current) return;
     let alive = true;
     const rate = createTickRate();
-    const off = src.subscribeRoom(
-      current.shard,
-      current.room,
-      (tick) => {
-        if (tick.gameTime !== undefined) {
-          rate.record(tick.gameTime);
-          setTickMs(rate.msPerTick());
-        }
-        setRoomState((state) => reduceLiveTick(state, tick));
-      },
-      setStreamError,
-    );
+    // Replay 期间退订 Live 房间流
+    const off = replay.active()
+      ? () => {}
+      : src.subscribeRoom(
+          current.shard,
+          current.room,
+          (tick) => {
+            if (tick.gameTime !== undefined) {
+              rate.record(tick.gameTime);
+              setTickMs(rate.msPerTick());
+            }
+            setRoomState((state) => reduceLiveTick(state, tick));
+          },
+          setStreamError,
+        );
     src.getTerrain(current.shard, current.room).then(
       (loaded) => alive && setTerrain(loaded),
       (error: unknown) => alive && setTerrainError(errorMessage(t, error)),
@@ -139,7 +159,7 @@ export function RoomView(props: RoomViewProps) {
   const scene = createMemo<Scene | undefined>((previous) => {
     if (!visible()) return previous;
     if (!target()) return undefined;
-    const state = roomState();
+    const state = replay.active() ? replay.snapshot()?.roomState : roomState();
     if (!state) {
       return { width: ROOM_SIZE, height: ROOM_SIZE, background: DEFAULT_THEME.background, primitives: [] };
     }
@@ -192,6 +212,7 @@ export function RoomView(props: RoomViewProps) {
     event.preventDefault();
     const room = roomInput().trim().toUpperCase();
     if (!room) return;
+    replay.close();
     setTarget({ shard: sharded() ? shardInput().trim() : "", room });
   };
 
@@ -228,13 +249,39 @@ export function RoomView(props: RoomViewProps) {
       <p class="room-view__status">
         <span data-testid="room-view-state">{t(STATE_KEYS[connection()])}</span>
         {" · "}
-        {t("roomView.tick")} <span data-testid="room-view-tick">{roomState()?.gameTime ?? "—"}</span>
+        {t("roomView.tick")}{" "}
+        <span data-testid="room-view-tick">
+          {(replay.active() ? replay.snapshot()?.target : roomState()?.gameTime) ?? "—"}
+        </span>
+        <Show when={replay.active()}> · {t("replay.mode")}</Show>
         {" · "}
         {t("power.tickRate")}{" "}
         <span data-testid="room-view-tick-rate">
           {tickMs() === undefined ? "—" : t("power.msPerTick", { ms: Math.round(tickMs()!) })}
         </span>
       </p>
+      <Show when={target()}>
+        {(current) => (
+          <Show
+            when={replay.snapshot()}
+            fallback={
+              <ReplayEntry
+                error={replay.entryError()}
+                onEnter={() => replay.enterFromLive(current().shard, current().room, roomState()?.gameTime)}
+              />
+            }
+          >
+            {(snapshot) => (
+              <ReplayControls
+                snapshot={snapshot()}
+                engine={replay.engine()!}
+                latest={replay.request()?.latest ?? false}
+                onBackToLive={replay.close}
+              />
+            )}
+          </Show>
+        )}
+      </Show>
       <Show when={sourceError() ?? terrainError() ?? viewError()}>
         {(message) => (
           <p class="settings__error" role="alert">

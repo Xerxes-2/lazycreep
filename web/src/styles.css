@@ -240,3 +240,84 @@ body {
   display: block;
   max-width: 100%;
 }
+
+/* Replay（#15）：控制与时间轴按触摸尺寸设计 */
+.replay {
+  display: grid;
+  gap: 8px;
+  max-width: 720px;
+  margin-bottom: 12px;
+}
+
+.replay__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.room-view .replay button,
+.room-view .replay input {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.replay__speeds {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.room-view .replay button[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+.replay__jump {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.replay__jump input {
+  width: 9ch;
+  font-variant-numeric: tabular-nums;
+}
+
+.replay__timeline {
+  position: relative;
+  height: 44px;
+  touch-action: none;
+  user-select: none;
+  cursor: pointer;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--muted) 20%, transparent);
+}
+
+.replay__timeline:focus-visible {
+  outline: 2px solid var(--accent);
+}
+
+.replay__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+  pointer-events: none;
+}
+
+.replay__thumb {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  margin-left: -2px;
+  background: var(--accent);
+  pointer-events: none;
+}
+
+.replay__range {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}

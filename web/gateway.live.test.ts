@@ -16,6 +16,7 @@ import { postAllowlistPaths } from "./gateway-dev.ts";
 import { LiveSource } from "./src/source/live-source.ts";
 import { SERVER_PRESETS } from "./src/source/servers.ts";
 import { SourceError } from "./src/source/source.ts";
+import { createReplay, type ReplaySnapshot } from "./src/replay/replay-engine.ts";
 
 const LIVE = process.env["SCREEPS_LIVE"] === "1";
 const repoRoot = resolve(import.meta.dirname, "..");
@@ -115,6 +116,29 @@ describe.skipIf(!LIVE)("经 Gateway 联调", () => {
     const chunk = await source.getHistoryChunk("shardSeason", "W13S28", base);
     if (chunk) expect(chunk.ticks[0]?.gameTime).toBe(base);
   });
+
+  it("Replay：token 失效时仍能从当前 Tick 退到最近的历史并重放（#15）", async () => {
+    const source = season("not-a-real-token");
+    const time = await source.getTime("shardSeason");
+    const engine = createReplay({
+      shard: "shardSeason",
+      room: "W13S28",
+      start: time,
+      latest: true,
+      chunkSize: source.getVersion().then((v) => v.historyChunkSize),
+      fetchChunk: (shard, room, chunkBase) => source.getHistoryChunk(shard, room, chunkBase),
+    });
+    try {
+      const done = await new Promise<ReplaySnapshot>((resolve) =>
+        engine.subscribe((s) => s.status !== "loading" && resolve(s)),
+      );
+      expect(done.status).toBe("ready");
+      expect(done.target).toBeLessThan(time);
+      expect(Object.keys(done.roomState?.objects ?? {}).length).toBeGreaterThan(0);
+    } finally {
+      engine.dispose();
+    }
+  }, 30_000);
 
   it("名单外的 POST 被 Gateway 拒绝（不带 token）", async () => {
     const res = await fetch(`${base}/season/api/user/code`, { method: "POST", body: "{}" });
