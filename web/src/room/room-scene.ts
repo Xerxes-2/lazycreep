@@ -8,6 +8,7 @@ import type { Terrain } from "../source/source.ts";
 import { LAYER, center, num, type ObjectPainter, type ObjectPainters, type PaintContext, type PrimitiveDraft } from "./room-paint.ts";
 import { ROOM_OBJECT_PAINTERS } from "./room-painters.ts";
 import type { RoomState } from "./room-state.ts";
+import { roomVisualPrimitives } from "./room-visual.ts";
 
 export { LAYER, ROOM_OBJECT_PAINTERS };
 export type { ObjectPainter, ObjectPainters, PaintContext, PrimitiveDraft };
@@ -109,6 +110,7 @@ export function buildRoomScene(
       primitives.push({ ...draft, key: `${id}/${part}`, objectId: id } as Primitive);
     }
   }
+  primitives.push(...roomVisualPrimitives(room.state.visual));
   // 稳定排序：同层按出现顺序
   primitives.sort((a, b) => a.layer - b.layer);
   return { width: ROOM_SIZE, height: ROOM_SIZE, background: theme.background, primitives };
