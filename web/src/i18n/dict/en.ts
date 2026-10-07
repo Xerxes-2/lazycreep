@@ -56,6 +56,13 @@ export const en: Partial<Record<MessageKey, string>> = {
   "readings.error.replaced": "This room subscription was replaced by another room.",
   "readings.error.server": "Server reported a subscription error: {message}",
 
+  "roomView.title": "Room View",
+  "roomView.mode": "Data source",
+  "roomView.mode.live": "Server",
+  "roomView.mode.fixture": "Recorded fixtures",
+  "roomView.open": "Open",
+  "roomView.tick": "Tick",
+
   "error.unauthorized": "The token is invalid or expired. Generate a new full-access token in your Screeps account settings.",
   "error.forbidden": "Request refused (HTTP 403).",
   "error.rateLimited": "Rate limit reached, try again later.",

@@ -191,3 +191,52 @@ body {
   margin: 0;
   font-variant-numeric: tabular-nums;
 }
+
+.room-view h2 {
+  font-size: 1.25rem;
+}
+
+.room-view__form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+}
+
+.room-view__form label {
+  display: grid;
+  gap: 4px;
+}
+
+.room-view input,
+.room-view select,
+.room-view button {
+  font: inherit;
+  min-height: 36px;
+  padding: 6px 8px;
+  border: 1px solid color-mix(in srgb, var(--muted) 60%, transparent);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.room-view button {
+  border-color: var(--accent);
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.room-view__status {
+  font-variant-numeric: tabular-nums;
+}
+
+.room-view__canvas {
+  width: 100%;
+  max-width: 720px;
+  aspect-ratio: 1;
+}
+
+.room-view__canvas canvas {
+  display: block;
+  max-width: 100%;
+}

@@ -54,6 +54,13 @@ export const zhCN = {
   "readings.error.replaced": "这条房间订阅已被另一个房间顶替。",
   "readings.error.server": "服务器报告订阅错误：{message}",
 
+  "roomView.title": "房间视图",
+  "roomView.mode": "数据来源",
+  "roomView.mode.live": "真实服务器",
+  "roomView.mode.fixture": "录制回放",
+  "roomView.open": "打开",
+  "roomView.tick": "Tick",
+
   "error.unauthorized": "token 无效或已失效。请在 Screeps 账户设置里生成新的全权限 token。",
   "error.forbidden": "请求被拒绝（HTTP 403）。",
   "error.rateLimited": "触发了速率限制，请稍后再试。",

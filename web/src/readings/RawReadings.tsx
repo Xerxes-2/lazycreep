@@ -8,7 +8,7 @@ import type { Settings } from "../settings/settings.ts";
 import type { SourceFactory } from "../settings/SettingsPage.tsx";
 import type { ConnectionState, StreamError } from "../source/source.ts";
 
-const STATE_KEYS: Record<ConnectionState, MessageKey> = {
+export const STATE_KEYS: Record<ConnectionState, MessageKey> = {
   connecting: "connection.connecting",
   authenticated: "connection.authenticated",
   disconnected: "connection.disconnected",

@@ -67,6 +67,12 @@ describe("App", () => {
     expect(container.querySelector("[data-testid=readings-state]")?.textContent).toBe("已认证");
   });
 
+  it("shows the room view", () => {
+    mount();
+    expect(container.querySelector("#room-view-title")?.textContent).toBe("房间视图");
+    expect(container.querySelector("[data-testid=room-view-tick]")?.textContent).toBe("—");
+  });
+
   it("shows the settings page, translated with the interface language", () => {
     mount();
     expect(container.querySelector("h2")?.textContent).toBe("设置");
