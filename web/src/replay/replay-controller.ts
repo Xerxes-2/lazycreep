@@ -23,23 +23,28 @@ export interface ReplayRequest extends ReplayTarget {
 
 const ROUTE = "#/replay";
 
-/** “房间 + Tick”直接打开 Replay 的地址（hash 路由）。 */
-export function replayHref(target: ReplayTarget): string {
+/**
+ * “房间 + Tick”直接打开 Replay 的地址（hash 路由）。
+ * latest：tick 可能新到所在 chunk 还没生成（例如 PvP Overview 的“回看”），没有时退到最近的已有历史。
+ */
+export function replayHref(target: ReplayRequest): string {
   const query = new URLSearchParams({ shard: target.shard, room: target.room, tick: String(target.tick) });
+  if (target.latest) query.set("latest", "1");
   return `${ROUTE}?${query}`;
 }
 
-export function parseReplayHref(hash: string): ReplayTarget | undefined {
+export function parseReplayHref(hash: string): ReplayRequest | undefined {
   if (!hash.startsWith(`${ROUTE}?`)) return undefined;
   const query = new URLSearchParams(hash.slice(ROUTE.length + 1));
   const room = query.get("room")?.trim().toUpperCase();
   const tick = Number(query.get("tick"));
   if (!room || !Number.isInteger(tick) || tick < 0) return undefined;
-  return { shard: query.get("shard") ?? "", room, tick };
+  const target = { shard: query.get("shard") ?? "", room, tick };
+  return query.get("latest") === "1" ? { ...target, latest: true } : target;
 }
 
 /** 从任何地方打开某房间某 Tick 的 Replay（例如 PvP Overview 的“回看这场战斗”）。 */
-export function openReplay(target: ReplayTarget): void {
+export function openReplay(target: ReplayRequest): void {
   const href = replayHref(target);
   if (location.hash === href) window.dispatchEvent(new HashChangeEvent("hashchange"));
   else location.hash = href;

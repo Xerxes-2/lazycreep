@@ -108,7 +108,7 @@ export interface PvpShard {
   readonly shard: string;
   /** 服务器在生成列表时的 Tick */
   readonly time: number;
-  /** 按 lastPvpTime 降序 */
+  /** 接口原样的顺序：通常按 lastPvpTime 降序，但不保证（实测 MMO shard3 为升序） */
   readonly rooms: readonly PvpRoom[];
 }
 

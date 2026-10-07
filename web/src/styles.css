@@ -306,6 +306,48 @@ body {
   cursor: grab;
 }
 
+/* PvP Overview（#3） */
+.pvp-overview h2 {
+  font-size: 1.25rem;
+}
+
+.pvp-overview__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.pvp-overview__bar button[aria-pressed="true"] {
+  font-weight: 600;
+  outline: 2px solid var(--fg);
+}
+
+.pvp-overview__shard h3 {
+  font-size: 1rem;
+  margin-bottom: 4px;
+}
+
+.pvp-overview__rooms {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.pvp-overview__rooms th,
+.pvp-overview__rooms td {
+  text-align: left;
+  padding: 4px 8px 4px 0;
+}
+
+.pvp-overview button {
+  min-height: 36px;
+}
+
+.pvp-overview__nukes {
+  padding-left: 1.25rem;
+}
+
 [data-action="back-to-map"] {
   margin-bottom: 12px;
 }

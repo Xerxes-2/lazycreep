@@ -35,6 +35,7 @@ Researched 2026-10-08 by a background agent. Sources: official docs, screepers/n
 
 ## 5. PvP / map feeds
 - `GET /api/experimental/pvp?interval=N` -> `{ok:1, pvp:{<shard>:{time, rooms:[{_id, lastPvpTime}]}}}`, sorted desc. Anonymous OK; season via `/season/api/experimental/pvp` -> `shardSeason`. https://github.com/screepers/node-screeps-api/blob/master/src/http/experimental.ts
+- Observed 2026-10-08 (MMO, anonymous): `interval=500` is accepted (shard0 188 rooms, shard2 257); the response also lists `shardX`; shard3's `rooms` came back sorted **ascending**, the other shards descending, so clients must sort themselves.
 - `GET /api/experimental/nukes` -> `{nukes:{<shard>:[{_id,type,room,x,y,landTime,launchRoomName}]}}`; also on season.
 - `POST /api/game/map-stats {rooms, statName, shard}` (token, 60/h). statName: `owner0`, `claim0`, `<stat>8|180|1440` for creepsLost, creepsProduced, energyConstruction, energyControl, energyCreeps, energyHarvested, powerProcessed. Response per room: `own:{user,level}`, `sign`, `hardSign`, `status`, `<statName>:{user,value}`, plus `users`.
 - No dedicated "battles now" endpoint. Community precedent: daboross/screeps-warreport, ScreepsSC battle radar.
