@@ -8,7 +8,9 @@ import {
   type ConsoleFixture,
   type FixtureKind,
   type HistoryFixture,
+  type MapStatsFixture,
   type MeFixture,
+  type WorldSizeFixture,
   type NukesFixture,
   type PvpFixture,
   type RoomFixture,
@@ -25,7 +27,9 @@ import {
   type ConsoleEvent,
   type CpuUpdate,
   type HistoryChunk,
+  type MapStats,
   type Nuke,
+  type WorldSize,
   type PvpShard,
   type RoomMapUpdate,
   type RoomTick,
@@ -41,6 +45,7 @@ import {
 import {
   consoleEventFromWire,
   historyChunkFromWire,
+  mapStatsFromWire,
   meFromWire,
   nukesFromWire,
   pvpFromWire,
@@ -68,6 +73,8 @@ const KINDS: readonly FixtureKind[] = [
   "terrain",
   "me",
   "version",
+  "worldSize",
+  "mapStats",
 ];
 
 function isFixtureFile(value: unknown): value is FixtureFile {
@@ -261,6 +268,21 @@ export class FixtureSource implements Source {
 
   tileUrl(shard: string, room: string): string {
     return `${this.server.tileRoot}/${shard}/${room}.png`;
+  }
+
+  blockTileUrl(shard: string, cornerRoom: string): string {
+    return `${this.server.tileRoot}/${shard}/zoom2/${cornerRoom}.png`;
+  }
+
+  async getWorldSize(shard: string): Promise<WorldSize> {
+    const body = await this.body<WorldSizeFixture>("worldSize", `${shard} 的世界尺寸`, (f) => f.meta.shard === shard);
+    return { width: body.width, height: body.height };
+  }
+
+  /** 录到的是一个区域：区域外的房间与不存在的房间一样不出现在结果里。 */
+  async getMapStats(shard: string, rooms: readonly string[]): Promise<MapStats> {
+    const body = await this.body<MapStatsFixture>("mapStats", `${shard} 的 map-stats`, (f) => f.meta.shard === shard);
+    return mapStatsFromWire(shard, body, rooms);
   }
 
   async getMe(): Promise<UserInfo> {

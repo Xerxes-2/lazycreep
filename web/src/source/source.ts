@@ -144,6 +144,30 @@ export interface UserInfo {
   readonly rooms: Readonly<Record<string, readonly string[]>>;
 }
 
+/** 一个 Shard 的世界尺寸，以房间计（`game/world-size`）。 */
+export interface WorldSize {
+  readonly width: number;
+  readonly height: number;
+}
+
+/** map-stats 里一个房间的情况。 */
+export interface RoomStats {
+  /** 例如 `normal`、`out of borders` */
+  readonly status: string;
+  /** 所有者；level 0 表示预定，1–8 为 RCL */
+  readonly owner?: { readonly user: string; readonly level: number };
+  readonly sign?: { readonly user: string; readonly text: string; readonly time: number };
+}
+
+/** 一次 map-stats 查询的结果；不存在的房间不出现在 rooms 里。 */
+export interface MapStats {
+  readonly shard: string;
+  readonly gameTime: number;
+  readonly rooms: Readonly<Record<string, RoomStats>>;
+  /** 出现在 rooms 里的用户 */
+  readonly users: Readonly<Record<string, RoomUser>>;
+}
+
 export interface ServerVersion {
   readonly package: number;
   readonly protocol: number;
@@ -218,6 +242,17 @@ export interface Source {
   getShards(): Promise<readonly ShardInfo[]>;
   getTerrain(shard: string, room: string): Promise<Terrain>;
   tileUrl(shard: string, room: string): string;
+  /**
+   * zoom2 块瓦片：一张图覆盖 4×4 个房间，按块西北角的房间命名；
+   * 传入的房间必须是块角（有符号坐标都是 4 的倍数），否则 CDN 返回 403。
+   */
+  blockTileUrl(shard: string, cornerRoom: string): string;
+  getWorldSize(shard: string): Promise<WorldSize>;
+  /**
+   * 房间的所有权等统计（`POST game/map-stats`，需要全权限 token，每 Server 每小时 60 次）。
+   * 调用方负责限流与缓存，见 World Map 的 ownership loader。
+   */
+  getMapStats(shard: string, rooms: readonly string[]): Promise<MapStats>;
   /** token 所属用户的 id 与房间 */
   getMe(): Promise<UserInfo>;
   /** base 必须按 chunk 大小对齐；历史不存在时得到 null。 */

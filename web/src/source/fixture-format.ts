@@ -18,7 +18,9 @@ export type FixtureKind =
   | "shards"
   | "terrain"
   | "me"
-  | "version";
+  | "version"
+  | "worldSize"
+  | "mapStats";
 
 export interface FixtureMeta<K extends FixtureKind = FixtureKind> {
   readonly format: typeof FIXTURE_FORMAT_VERSION;
@@ -113,6 +115,28 @@ export interface WireMe {
   readonly rooms: { readonly shards: Readonly<Record<string, readonly string[]>> };
 }
 
+/** `game/world-size`：以房间计的世界宽高 */
+export interface WireWorldSize {
+  readonly width: number;
+  readonly height: number;
+}
+
+/** `game/map-stats` 里的一个房间（只声明用到的字段；其余字段留给信息层，见 #17） */
+export interface WireRoomStats {
+  readonly status: string;
+  /** level 0 表示预定（reservation），1–8 为 RCL */
+  readonly own?: { readonly user: string; readonly level: number };
+  readonly sign?: { readonly user: string; readonly text: string; readonly time: number };
+  readonly [key: string]: unknown;
+}
+
+/** `game/map-stats`：不存在的房间不出现在 stats 里；users 只保留 _id 与 username。 */
+export interface WireMapStats {
+  readonly gameTime: number;
+  readonly stats: Readonly<Record<string, WireRoomStats>>;
+  readonly users: Readonly<Record<string, { readonly _id: string; readonly username: string }>>;
+}
+
 // ---- 文件 ----
 
 export interface StreamFixture<K extends "room" | "roomMap2" | "console", T> {
@@ -140,6 +164,11 @@ export type ShardsFixture = ResponseFixture<"shards", WireShards>;
 export type TerrainFixture = ResponseFixture<"terrain", WireTerrain>;
 export type MeFixture = ResponseFixture<"me", WireMe>;
 export type VersionFixture = ResponseFixture<"version", WireVersion>;
+export type WorldSizeFixture = ResponseFixture<"worldSize", WireWorldSize> & { readonly meta: { readonly shard: string } };
+/** 录到的是某个区域的房间；回放时只能答出这些房间。 */
+export type MapStatsFixture = ResponseFixture<"mapStats", WireMapStats> & {
+  readonly meta: { readonly shard: string; readonly statName: string };
+};
 
 export type FixtureFile =
   | RoomFixture
@@ -152,7 +181,9 @@ export type FixtureFile =
   | ShardsFixture
   | TerrainFixture
   | MeFixture
-  | VersionFixture;
+  | VersionFixture
+  | WorldSizeFixture
+  | MapStatsFixture;
 
 /** 一个 fixture 文件的推荐文件名（相对录制输出目录）。 */
 export function fixtureFileName(meta: {

@@ -211,6 +211,28 @@ describe("FixtureSource 一次性数据", () => {
   it("瓦片 URL 来自 Server 配置", () => {
     expect(source.tileUrl(SHARD, OWN_ROOM)).toBe("/map-tiles/shardSeason/W13S28.png");
   });
+
+  it("zoom2 块瓦片 URL 按块角房间命名", () => {
+    expect(source.blockTileUrl(SHARD, "W16S28")).toBe("/map-tiles/shardSeason/zoom2/W16S28.png");
+  });
+
+  it("世界尺寸以房间计", async () => {
+    expect(await source.getWorldSize(SHARD)).toEqual({ width: 102, height: 102 });
+  });
+
+  it("map-stats 只答所问的房间：所有者、等级、用户名", async () => {
+    const stats = await source.getMapStats(SHARD, [OWN_ROOM, "W14S28", "W12S21", "E40N40"]);
+    expect(stats.shard).toBe(SHARD);
+    expect(stats.gameTime).toBeGreaterThan(1025000);
+    expect(Object.keys(stats.rooms).sort()).toEqual(["W12S21", OWN_ROOM, "W14S28"]);
+    expect(stats.rooms[OWN_ROOM]).toMatchObject({ status: "normal", owner: { user: USER_ID, level: 8 } });
+    expect(stats.rooms["W14S28"]!.owner).toEqual({ user: USER_ID, level: 0 });
+    const odiodin = stats.rooms["W12S21"]!.owner!.user;
+    expect(stats.users[odiodin]!.username).toBe("Odiodin");
+    expect(stats.users[USER_ID]!.username).toBe("Xerxes_2");
+    // 只带与所问房间有关的用户
+    expect(Object.values(stats.users).some((u) => u.username === "Kamots")).toBe(false);
+  });
 });
 
 describe("FixtureSource Console", () => {

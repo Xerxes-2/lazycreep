@@ -7,6 +7,7 @@
 import type {
   WireConsole,
   WireHistoryChunk,
+  WireMapStats,
   WireNukes,
   WirePvp,
   WireRoomPayload,
@@ -14,6 +15,7 @@ import type {
   WireTerrain,
   WireTime,
   WireVersion,
+  WireWorldSize,
 } from "./fixture-format.ts";
 import {
   SourceError,
@@ -21,7 +23,9 @@ import {
   type ConsoleEvent,
   type CpuUpdate,
   type HistoryChunk,
+  type MapStats,
   type Nuke,
+  type WorldSize,
   type PvpShard,
   type RoomMapUpdate,
   type RoomTick,
@@ -39,6 +43,7 @@ import { browserSocket, ChannelSocket, type ReconnectOptions, type SocketFactory
 import {
   consoleEventFromWire,
   historyChunkFromWire,
+  mapStatsFromWire,
   meFromWire,
   nukesFromWire,
   pvpFromWire,
@@ -141,12 +146,18 @@ export class LiveSource implements Source {
     return this.server.sharded ? { shard } : {};
   }
 
-  /** 发 GET，返回 Response；网络失败归为 network。 */
-  private async send(path: string, query: Query, withToken: boolean): Promise<Response> {
+  /** 发 GET（给了 json 则发 POST），返回 Response；网络失败归为 network。 */
+  private async send(path: string, query: Query, withToken: boolean, json?: unknown): Promise<Response> {
     const headers: Record<string, string> = {};
     if (withToken && this.token !== undefined) headers["X-Token"] = this.token;
+    const post: RequestInit = {};
+    if (json !== undefined) {
+      headers["Content-Type"] = "application/json";
+      post.method = "POST";
+      post.body = JSON.stringify(json);
+    }
     try {
-      return await this.fetchImpl(this.url(path, query), { headers, signal: this.aborter.signal });
+      return await this.fetchImpl(this.url(path, query), { ...post, headers, signal: this.aborter.signal });
     } catch (error) {
       throw new SourceError("network", `${path}：${error instanceof Error ? error.message : String(error)}`);
     }
@@ -288,6 +299,23 @@ export class LiveSource implements Source {
 
   tileUrl(shard: string, room: string): string {
     return `${this.server.tileRoot}/${shard}/${room}.png`;
+  }
+
+  blockTileUrl(shard: string, cornerRoom: string): string {
+    return `${this.server.tileRoot}/${shard}/zoom2/${cornerRoom}.png`;
+  }
+
+  async getWorldSize(shard: string): Promise<WorldSize> {
+    const wire = await this.api<WireWorldSize>("/game/world-size", this.shardQuery(shard));
+    return { width: wire.width, height: wire.height };
+  }
+
+  /** POST，经 Gateway 的允许名单（ADR 0003）。 */
+  async getMapStats(shard: string, rooms: readonly string[]): Promise<MapStats> {
+    const path = "/game/map-stats";
+    const body = { rooms, statName: "owner0", ...this.shardQuery(shard) };
+    const response = await this.send(this.server.apiRoot + path, {}, true, body);
+    return mapStatsFromWire(shard, await this.json<WireMapStats>(response, path), rooms);
   }
 
   async getMe(): Promise<UserInfo> {

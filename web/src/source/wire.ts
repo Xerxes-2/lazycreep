@@ -5,6 +5,7 @@
 import type {
   WireConsole,
   WireHistoryChunk,
+  WireMapStats,
   WireMe,
   WireNukes,
   WirePvp,
@@ -16,7 +17,9 @@ import type {
 import type {
   ConsoleEvent,
   HistoryChunk,
+  MapStats,
   Nuke,
+  RoomStats,
   PvpShard,
   RoomTick,
   RoomUser,
@@ -80,6 +83,31 @@ export function historyChunkFromWire(shard: string, chunk: WireHistoryChunk): Hi
     .map(([time, objects]) => ({ gameTime: Number(time), objects }))
     .sort((a, b) => a.gameTime - b.gameTime);
   return { shard, room: chunk.room, base: chunk.base, ticks };
+}
+
+/** 只保留所问的房间与它们涉及的用户（所有者、签名者）。 */
+export function mapStatsFromWire(shard: string, wire: WireMapStats, rooms: readonly string[]): MapStats {
+  const out: Record<string, RoomStats> = {};
+  const users: Record<string, RoomUser> = {};
+  const addUser = (id: string) => {
+    const user = wire.users[id];
+    if (user) users[id] = { _id: user._id, username: user.username };
+  };
+  for (const room of rooms) {
+    const stats = wire.stats[room];
+    if (!stats) continue;
+    const entry: { -readonly [K in keyof RoomStats]: RoomStats[K] } = { status: stats.status };
+    if (stats.own) {
+      entry.owner = { user: stats.own.user, level: stats.own.level };
+      addUser(stats.own.user);
+    }
+    if (stats.sign) {
+      entry.sign = { user: stats.sign.user, text: stats.sign.text, time: stats.sign.time };
+      addUser(stats.sign.user);
+    }
+    out[room] = entry;
+  }
+  return { shard, gameTime: wire.gameTime, rooms: out, users };
 }
 
 export function roomTickFromWire(payload: WireRoomPayload): RoomTick {

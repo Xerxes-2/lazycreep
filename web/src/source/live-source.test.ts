@@ -32,6 +32,7 @@ interface SeenRequest {
   readonly method: string;
   readonly url: URL;
   readonly token: string | null;
+  readonly body: string;
 }
 
 /** 扮演 Gateway：按「路径?排好序的查询」应答，记下收到的请求。 */
@@ -40,7 +41,7 @@ function fakeGateway(routes: Record<string, Reply | (() => never)>) {
   const fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const request = new Request(input, init);
     const url = new URL(request.url);
-    seen.push({ method: request.method, url, token: request.headers.get("X-Token") });
+    seen.push({ method: request.method, url, token: request.headers.get("X-Token"), body: await request.text() });
     const params = [...url.searchParams].sort(([a], [b]) => a.localeCompare(b));
     const key = params.length ? `${url.pathname}?${new URLSearchParams(params)}` : url.pathname;
     const route = routes[key];
@@ -69,6 +70,9 @@ const seasonRoutes: Record<string, Reply> = {
   [`/season/api/user/rooms?id=${USER_ID}`]: {
     body: { ok: 1, ...(recorded("me") as { rooms: object }).rooms, reservations: {} },
   },
+  "/season/api/game/world-size?shard=shardSeason": { body: { ok: 1, ...(recorded("worldSize") as object) } },
+  // 真实响应还带 decorations 与完整的用户徽章
+  "/season/api/game/map-stats": { body: { ok: 1, decorations: {}, ...(recorded("mapStats") as object) } },
   "/room-history/shardSeason/W13S28/1024900.json": {
     body: recorded("history", (f) => f.meta.room === OWN_ROOM),
   },
@@ -123,6 +127,36 @@ describe("LiveSource HTTP：与同样 wire 数据的 FixtureSource 结果一致"
 
   it("瓦片 URL 是同源 Gateway 路径", () => {
     expect(source.tileUrl(SHARD, OWN_ROOM)).toBe("/map-tiles/shardSeason/W13S28.png");
+    expect(source.blockTileUrl(SHARD, "W16S28")).toBe("/map-tiles/shardSeason/zoom2/W16S28.png");
+  });
+
+  it("世界尺寸", async () => {
+    expect(await source.getWorldSize(SHARD)).toEqual(await fixture.getWorldSize(SHARD));
+  });
+
+  it("map-stats", async () => {
+    const rooms = [OWN_ROOM, "W14S28", "W12S21", "E40N40"];
+    expect(await source.getMapStats(SHARD, rooms)).toEqual(await fixture.getMapStats(SHARD, rooms));
+  });
+});
+
+describe("LiveSource map-stats 请求", () => {
+  it("是带 token 的 POST，JSON 里是房间、owner0 与 Shard", async () => {
+    const { source, seen } = live({ token: TOKEN });
+    await source.getMapStats(SHARD, [OWN_ROOM, "W14S28"]);
+    expect(seen).toHaveLength(1);
+    expect(seen[0]!.method).toBe("POST");
+    expect(seen[0]!.url.pathname).toBe("/season/api/game/map-stats");
+    expect(seen[0]!.token).toBe(TOKEN);
+    expect(JSON.parse(seen[0]!.body)).toEqual({ rooms: [OWN_ROOM, "W14S28"], statName: "owner0", shard: SHARD });
+  });
+
+  it("速率限制（429）是 rateLimited", async () => {
+    const { source } = live({
+      token: TOKEN,
+      routes: { "/season/api/game/map-stats": { status: 429, body: { error: "Rate limit exceeded" } } },
+    });
+    await expect(source.getMapStats(SHARD, [OWN_ROOM])).rejects.toMatchObject({ kind: "rateLimited" });
   });
 });
 
