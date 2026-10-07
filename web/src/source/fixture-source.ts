@@ -31,6 +31,7 @@ import {
   type Nuke,
   type WorldSize,
   type PvpShard,
+  type RoomMapOptions,
   type RoomMapUpdate,
   type RoomTick,
   type ServerConfig,
@@ -197,6 +198,8 @@ export class FixtureSource implements Source {
     room: string,
     listener: (update: RoomMapUpdate) => void,
     _onError?: StreamErrorListener,
+    /** 回放不区分页面可见性 */
+    _options?: RoomMapOptions,
   ): Unsubscribe {
     const fixture = this.find<RoomMapFixture>("roomMap2", (f) => f.meta.shard === shard && f.meta.room === room);
     if (!fixture) return () => {};
@@ -287,6 +290,25 @@ export class FixtureSource implements Source {
 
   async getMe(): Promise<UserInfo> {
     return meFromWire(await this.body<MeFixture>("me", "用户信息"));
+  }
+
+  /** 录制格式没有 user/find：从录到的用户信息、map-stats 与房间流里的用户找。 */
+  async getUsername(id: string): Promise<string> {
+    for (const file of this.files) {
+      if (file.meta.kind === "me") {
+        const user = (file as MeFixture).body?.user;
+        if (user?._id === id) return user.username;
+      } else if (file.meta.kind === "mapStats") {
+        const name = (file as MapStatsFixture).body?.users[id]?.username;
+        if (name !== undefined) return name;
+      } else if (file.meta.kind === "room") {
+        for (const frame of (file as RoomFixture).frames) {
+          const name = frame.data.users?.[id]?.username;
+          if (name !== undefined) return name;
+        }
+      }
+    }
+    throw new Error(`没有录到用户 ${id}`);
   }
 
   async getHistoryChunk(shard: string, room: string, base: number): Promise<HistoryChunk | null> {

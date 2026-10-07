@@ -27,6 +27,7 @@ import {
   type Nuke,
   type WorldSize,
   type PvpShard,
+  type RoomMapOptions,
   type RoomMapUpdate,
   type RoomTick,
   type ServerConfig,
@@ -65,7 +66,8 @@ export interface LiveSourceOptions {
   readonly socket?: SocketFactory;
   readonly reconnect?: ReconnectOptions;
   /**
-   * 页面可见性（#14）：不可见时退订 roomMap2 与用户频道（Console、CPU），只保留当前房间；
+   * 页面可见性（#14）：不可见时退订 roomMap2（声明 keepWhileHidden 的除外，见 Attack Alert）
+   * 与用户频道（Console、CPU），只保留当前房间；
    * 回到前台后重订阅。不给时一直视为可见。
    */
   readonly visibility?: VisibilitySignal;
@@ -231,8 +233,12 @@ export class LiveSource implements Source {
     room: string,
     listener: (update: RoomMapUpdate) => void,
     onError?: StreamErrorListener,
+    options?: RoomMapOptions,
   ): Unsubscribe {
-    return this.pausableStream(this.roomChannel("roomMap2", shard, room), listener, onError);
+    const channel = this.roomChannel("roomMap2", shard, room);
+    // 频道按监听者计数：可暂停的监听者隐藏时退出，只要还有 keepWhileHidden 的监听者，频道就不退订
+    if (options?.keepWhileHidden) return this.stream(channel, listener, onError);
+    return this.pausableStream(channel, listener, onError);
   }
 
   /** `user:<id>/<topic>`：id 取自 token 所属用户，取到之前先不订阅。 */
@@ -325,6 +331,13 @@ export class LiveSource implements Source {
       id: user._id,
     });
     return meFromWire({ user: { _id: user._id, username: user.username }, rooms: { shards: rooms.shards } });
+  }
+
+  async getUsername(id: string): Promise<string> {
+    const found = await this.api<{ user?: { username?: unknown } }>("/user/find", { id });
+    const username = found.user?.username;
+    if (typeof username !== "string") throw new SourceError("server", `/user/find：没有用户 ${id}`);
+    return username;
   }
 
   /** room-history 是公开文件，不带 token。 */

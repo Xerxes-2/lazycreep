@@ -463,6 +463,29 @@ describe("LiveSource WebSocket：页面不可见时省电（#14）", () => {
     expect(got).toEqual(["room", "map", "cpu"]);
   });
 
+  it("声明 keepWhileHidden 的 roomMap2 订阅（Attack Alert）隐藏时照常保留", async () => {
+    const { source, visibility, last } = await watching();
+    const got: string[] = [];
+    source.subscribeRoomMap(SHARD, "W12S28", () => got.push("alert"), undefined, { keepWhileHidden: true });
+    expect(last().commands).toEqual([`subscribe roomMap2:${SHARD}/W12S28`]);
+    last().sent.length = 0;
+    visibility.set(false);
+    expect(last().commands).not.toContain(`unsubscribe roomMap2:${SHARD}/W12S28`);
+    last().event(`roomMap2:${SHARD}/W12S28`, { w: [] });
+    expect(got).toEqual(["alert"]);
+  });
+
+  it("同一 roomMap2 频道：地图的可暂停订阅隐藏时退出，告警的订阅不受影响、频道不退订", async () => {
+    const { source, visibility, last, got } = await watching();
+    const alert: string[] = [];
+    source.subscribeRoomMap(SHARD, "W13S28", () => alert.push("alert"), undefined, { keepWhileHidden: true });
+    visibility.set(false);
+    expect(last().commands).not.toContain(`unsubscribe ${map}`);
+    last().event(map, { w: [] });
+    expect(alert).toEqual(["alert"]);
+    expect(got).toEqual([]);
+  });
+
   it("隐藏期间新建的 roomMap2 订阅等回到前台才发出", async () => {
     const { source, visibility, last } = await watching();
     visibility.set(false);

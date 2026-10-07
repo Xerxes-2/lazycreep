@@ -188,6 +188,12 @@ describe("FixtureSource 一次性数据", () => {
     });
   });
 
+  it("按 id 查玩家名：取自录到的用户信息、map-stats 与房间流里的用户", async () => {
+    expect(await source.getUsername(USER_ID)).toBe("Xerxes_2");
+    expect(await source.getUsername("685da7c42df7a30011653e6a")).toBe("dump_table");
+    await expect(source.getUsername("000000000000000000000000")).rejects.toThrow();
+  });
+
   it("版本信息带历史 chunk 大小", async () => {
     expect(await source.getVersion()).toEqual({ package: 247, protocol: 14, historyChunkSize: 100 });
   });

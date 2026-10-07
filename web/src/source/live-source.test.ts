@@ -70,6 +70,10 @@ const seasonRoutes: Record<string, Reply> = {
   [`/season/api/user/rooms?id=${USER_ID}`]: {
     body: { ok: 1, ...(recorded("me") as { rooms: object }).rooms, reservations: {} },
   },
+  [`/season/api/user/find?id=${USER_ID}`]: {
+    body: { ok: 1, user: { _id: USER_ID, username: "Xerxes_2", badge: {}, gcl: 1 } },
+  },
+  "/season/api/user/find?id=nobody": { body: { error: "user not found" } },
   "/season/api/game/world-size?shard=shardSeason": { body: { ok: 1, ...(recorded("worldSize") as object) } },
   // 真实响应还带 decorations 与完整的用户徽章
   "/season/api/game/map-stats": { body: { ok: 1, decorations: {}, ...(recorded("mapStats") as object) } },
@@ -117,6 +121,11 @@ describe("LiveSource HTTP：与同样 wire 数据的 FixtureSource 结果一致"
 
   it("用户信息：token 所属用户与各 Shard 的房间", async () => {
     expect(await source.getMe()).toEqual(await fixture.getMe());
+  });
+
+  it("按 id 查玩家名（user/find）", async () => {
+    expect(await source.getUsername(USER_ID)).toBe("Xerxes_2");
+    expect(await source.getUsername("nobody").catch((e: unknown) => e)).toMatchObject({ kind: "server" });
   });
 
   it("历史 chunk", async () => {

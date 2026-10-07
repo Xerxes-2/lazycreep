@@ -90,6 +90,14 @@ export interface HistoryChunk {
 /** roomMap2 一帧：键为类别（w 墙、r 路、pb、p、s、c、m、k）或用户 id，值为坐标列表。 */
 export type RoomMapUpdate = Readonly<Record<string, ReadonlyArray<readonly [number, number]>>>;
 
+export interface RoomMapOptions {
+  /**
+   * 页面不可见时也保留这条订阅（默认随页面隐藏暂停，#14）。
+   * 给 Attack Alert 用：系统通知恰恰在标签页不可见时最有用。
+   */
+  readonly keepWhileHidden?: boolean;
+}
+
 export type ConsoleEvent =
   | {
       readonly kind: "output";
@@ -237,6 +245,7 @@ export interface Source {
     room: string,
     listener: (update: RoomMapUpdate) => void,
     onError?: StreamErrorListener,
+    options?: RoomMapOptions,
   ): Unsubscribe;
   /** 当前用户的 Console 输出（所有 Shard；事件里带 Shard）。 */
   subscribeConsole(listener: (event: ConsoleEvent) => void, onError?: StreamErrorListener): Unsubscribe;
@@ -266,6 +275,8 @@ export interface Source {
   getMapStats(shard: string, rooms: readonly string[]): Promise<MapStats>;
   /** token 所属用户的 id 与房间 */
   getMe(): Promise<UserInfo>;
+  /** 按用户 id 查玩家名（`user/find`，匿名即可）；查不到时拒绝。 */
+  getUsername(id: string): Promise<string>;
   /** base 必须按 chunk 大小对齐；历史不存在时得到 null。 */
   getHistoryChunk(shard: string, room: string, base: number): Promise<HistoryChunk | null>;
 
