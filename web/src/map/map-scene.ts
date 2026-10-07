@@ -2,24 +2,25 @@
  * buildMapScene：MapState → Scene（World Map）。世界单位 1 = 一个房间，Scene 覆盖整个世界。
  * 只为与可见区域相交的房间产出图元；缩放级别决定用单房间瓦片还是 zoom2 块瓦片。
  *
- * 由若干“层”组成（MAP_LAYERS），每层是 `(ctx) => Primitive[]`。#17 的 RCL、矿物、Power Bank、
- * 新手区 / 禁区、我方与盟友高亮，以及 #3 的 PvP 热点，各加一层即可：层级常量在 MAP_LAYER 里预留，
+ * 由若干“层”组成（MAP_LAYERS），每层是 `(ctx) => Primitive[]`：层级常量在 MAP_LAYER 里，
  * 按缩放降密在层内看 ctx.zoom 决定，房间遍历用 ctx.visibleRooms。
+ * 信息层（区域、RCL、矿物、Power Bank、我方与盟友高亮）在 map-info-layers.ts。
  */
 import type { Color, Primitive, Scene } from "../scene/scene.ts";
 import type { Theme } from "../scene/theme.ts";
 import { ownerColorRule } from "../room/room-detail-rules.ts";
+import { paintAlliedHighlight, paintInfo, paintZones } from "./map-info-layers.ts";
 import { roomName, worldOffset, type MapState } from "./map-state.ts";
 
 /** 越大越靠上 */
 export const MAP_LAYER = {
   tile: 0,
   ownership: 10,
-  /** 留给 #17：新手区 / 禁区等整格覆盖 */
+  /** 新手区 / 重生区 / 禁区等整格覆盖 */
   zone: 20,
-  /** 留给 #17：RCL、矿物、Power Bank 等标注 */
+  /** RCL、矿物、Power Bank 等标注 */
   info: 30,
-  /** 留给 #17 / #3：我方、盟友高亮，PvP 热点 */
+  /** 我方、盟友高亮；PvP 热点（#3） */
   highlight: 40,
 } as const;
 
@@ -45,6 +46,8 @@ export interface MapView {
   readonly visible: WorldRect;
   /** 所有者着色规则；默认见 defaultOwnerColor */
   readonly ownerColor?: (userId: string, state: MapState) => Color;
+  /** 当前时间（Unix 毫秒），判断新手区等是否仍有效；默认 Date.now() */
+  readonly now?: number;
 }
 
 /** 一个可见房间 */
@@ -60,6 +63,8 @@ export interface MapPaintContext {
   readonly view: MapView;
   readonly theme: Theme;
   readonly zoom: number;
+  /** 当前时间（Unix 毫秒） */
+  readonly now: number;
   readonly ownerColor: (userId: string) => Color;
   /** 与可见区域相交、且在世界之内的房间 */
   readonly visibleRooms: readonly VisibleRoom[];
@@ -69,11 +74,11 @@ export type MapLayerPainter = (ctx: MapPaintContext) => readonly Primitive[];
 
 /**
  * 默认着色：与 Room View 同一条规则（#12 的 ownerColorRule），同一玩家在地图与房间里颜色一致。
- * 自己用 theme.owned，其他玩家按 id 稳定地取 theme.strangers 之一；
- * Ally List 进 MapState 后（#17）在这里把 allies 传进规则即可。
+ * 自己用 theme.owned，Ally List（MapState.allies）里的玩家用 theme.ally，
+ * 其他玩家按 id 稳定地取 theme.strangers 之一。
  */
 export function defaultOwnerColor(theme: Theme): (userId: string, state: MapState) => Color {
-  return (userId, state) => ownerColorRule(theme, state.users, { me: state.me })(userId);
+  return (userId, state) => ownerColorRule(theme, state.users, { me: state.me, allies: state.allies })(userId);
 }
 
 /** 与 rect 相交的整数格 [from, to]（含），再夹到 [0, limit) */
@@ -155,7 +160,13 @@ export const paintOwnership: MapLayerPainter = (ctx) => {
   return out;
 };
 
-export const MAP_LAYERS: readonly MapLayerPainter[] = [paintTiles, paintOwnership];
+export const MAP_LAYERS: readonly MapLayerPainter[] = [
+  paintTiles,
+  paintOwnership,
+  paintZones,
+  paintInfo,
+  paintAlliedHighlight,
+];
 
 export function buildMapScene(
   state: MapState,
@@ -168,6 +179,7 @@ export function buildMapScene(
     view,
     theme: view.theme,
     zoom: view.zoom,
+    now: view.now ?? Date.now(),
     ownerColor: (userId) => ownerColor(userId, state),
     visibleRooms: visibleRooms(state, view.visible),
   };

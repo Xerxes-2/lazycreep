@@ -6,8 +6,8 @@
  * - 有符号房间坐标：E0 / S0 为 0，W0 / N0 为 -1（W13 = -14）
  * - 世界坐标（Scene 单位，1 = 一个房间）：有符号坐标 + 世界尺寸的一半，所以世界左上角是 [0, 0)
  *
- * 扩展点（#17 信息层、#3 PvP 热点）：在这里加字段（例如 pvp 房间表、Ally List），
- * 房间级信息（RCL、矿物、新手区……）随 RoomStats 扩展，然后在 map-scene 的 MAP_LAYERS 里加一层。
+ * 扩展点（#3 PvP 热点等）：在这里加字段，然后在 map-scene 的 MAP_LAYERS 里加一层。
+ * 房间级信息（RCL、矿物、新手区……）随 RoomStats 扩展（来自 map-stats）；Power Bank 来自 roomMap2。
  */
 import type { MapStats, RoomStats, RoomUser, WorldSize } from "../source/source.ts";
 
@@ -29,6 +29,10 @@ export interface MapState {
   /** 已知的房间统计，按房间名；没查过或不存在的房间不在里面 */
   readonly rooms: Readonly<Record<string, RoomStats>>;
   readonly users: Readonly<Record<string, RoomUser>>;
+  /** Ally List：玩家用户名，不分大小写 */
+  readonly allies?: ReadonlySet<string>;
+  /** 已订阅 roomMap2 的房间里的 Power Bank 位置（房间内格坐标）；没订阅过的房间不在里面 */
+  readonly powerBanks: Readonly<Record<string, ReadonlyArray<readonly [number, number]>>>;
 }
 
 export interface RoomCoord {
@@ -79,7 +83,28 @@ export function mapStateFrom(init: {
     ...(init.me === undefined ? {} : { me: init.me }),
     rooms: {},
     users: {},
+    powerBanks: {},
   };
+}
+
+/** 换 Ally List；名单内容没变时原样返回旧状态。 */
+export function withAllies(state: MapState, allies: ReadonlySet<string>): MapState {
+  const old = state.allies;
+  if (old && old.size === allies.size && [...allies].every((name) => old.has(name))) return state;
+  return { ...state, allies };
+}
+
+/** 记下一个房间当前的 Power Bank（roomMap2 的 `pb`）；与已知的相同时原样返回旧状态。 */
+export function applyPowerBanks(
+  state: MapState,
+  room: string,
+  positions: ReadonlyArray<readonly [number, number]>,
+): MapState {
+  const old = state.powerBanks[room];
+  if (old && old.length === positions.length && old.every(([x, y], i) => positions[i]![0] === x && positions[i]![1] === y)) {
+    return state;
+  }
+  return { ...state, powerBanks: { ...state.powerBanks, [room]: positions } };
 }
 
 /** 合并一次 map-stats：结果里的房间覆盖旧值，其余保留。别的 Shard 的结果原样返回旧状态。 */
