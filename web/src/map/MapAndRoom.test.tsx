@@ -182,4 +182,58 @@ describe("World Map 与 Room View", () => {
     expect(container.querySelector<HTMLInputElement>("[name=room-view-shard]")!.value).toBe("shard2");
     await settle(() => expect(container.querySelector("[data-testid=room-view-tick]")!.textContent).toBe("—"));
   });
+
+  it("切换 Shard 不换共享 Source 的租约、不重建所有权缓存；房间仍在新 Shard 上时 Room View 不中断", async () => {
+    const settings = createSettings(localStorage);
+    settings.setToken("token");
+    settings.setShard("shardSeason");
+    let leases = 0;
+    let closed = 0;
+    const mapStats = vi.spyOn(FixtureSource.prototype, "getMapStats");
+    dispose = render(
+      () => (
+        <I18nProvider>
+          <MapAndRoom
+            settings={settings}
+            sourceFor={() => {
+              leases++;
+              const created = new FixtureSource(bundle, { speed: Infinity });
+              const close = created.close.bind(created);
+              created.close = () => {
+                closed++;
+                close();
+              };
+              return created;
+            }}
+            createView={fakeView}
+            roomView={{ historyCache: async () => undefined }}
+          />
+        </I18nProvider>
+      ),
+      container,
+    );
+    await settle(() => expect(viewports.get(mapCanvas())).toBeDefined());
+    for (let i = 0; i < 10; i++) {
+      mapCanvas().dispatchEvent(new WheelEvent("wheel", { ...at(W13S28), deltaY: -200, bubbles: true, cancelable: true }));
+    }
+    tap(at(W13S28));
+    await settle(() => expect(container.querySelector("[data-testid=room-view-tick]")!.textContent).not.toBe("—"));
+    await settle(() => expect(mapStats).toHaveBeenCalled());
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const leasesBefore = leases;
+    const statsBefore = mapStats.mock.calls.filter((c) => c[0] === "shardSeason").length;
+
+    // 重选同一个 Shard（例如从告警进入本 Shard 的房间）：房间留着，流不重订
+    settings.setShard("shardSeason");
+    expect(container.querySelector("[data-testid=room-view-tick]")!.textContent).not.toBe("—");
+
+    // 切走再切回：所有权缓存还在，不为同一区域重新请求 map-stats
+    settings.setShard("shard2");
+    settings.setShard("shardSeason");
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(leases).toBe(leasesBefore);
+    expect(closed).toBe(0);
+    expect(mapStats.mock.calls.filter((c) => c[0] === "shardSeason").length).toBe(statsBefore);
+    mapStats.mockRestore();
+  });
 });

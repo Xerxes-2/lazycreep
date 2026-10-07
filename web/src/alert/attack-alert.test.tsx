@@ -86,7 +86,7 @@ function mount(
     ),
     container,
   );
-  return { alerts, shown: notifications.shown };
+  return { alerts, settings, shown: notifications.shown };
 }
 
 const settle = (assertion: () => void) => vi.waitFor(assertion, { timeout: 3000, interval: 5 });
@@ -138,6 +138,25 @@ describe("Attack Alert 接入", () => {
     expect(nuke.body).toContain("W12N25");
     nuke.onClick();
     expect(container.querySelector<HTMLInputElement>("[name=room-view-room]")!.value).toBe("W17N21");
+  });
+
+  it("切换 Shard 不重建数据源与判定器：冷却保留，已告警的房间不重复告警", async () => {
+    const sources: FixtureSource[] = [];
+    const { settings, shown } = mount({ permission: "granted", sources });
+    await settle(() =>
+      expect(shown.map((n) => n.tag)).toEqual(
+        expect.arrayContaining(["shardSeason/E13N21/pvp", "shardSeason/W17N21/nuke", "shardSeason/E13N21/stranger"]),
+      ),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    const created = sources.length;
+    const before = shown.length;
+
+    settings.setShard("shard2");
+    settings.setShard("shardSeason");
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(sources.length).toBe(created);
+    expect(shown.length).toBe(before);
   });
 
   it("盟友不触发陌生人告警", async () => {

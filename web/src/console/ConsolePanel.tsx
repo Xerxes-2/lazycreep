@@ -35,11 +35,10 @@ export function ConsolePanel(props: ConsolePanelProps) {
   const prefs = createConsoleSettings(props.storage ?? browserStorage());
   const settings = props.settings;
 
-  // 只在 Server 或 token 变化时换 Source：设置里切 Shard 不应重建连接、清空日志
-  const server = createMemo(() => settings.server());
-  const token = createMemo(() => settings.token() || undefined);
+  // settings 的 server / token 按值判等：切 Shard 不会重建连接、清空日志
+  const token = () => settings.token() || undefined;
   const source = createMemo(() => {
-    const created = props.sourceFor(server(), token());
+    const created = props.sourceFor(settings.server(), token());
     onCleanup(() => created.close());
     return created;
   });
