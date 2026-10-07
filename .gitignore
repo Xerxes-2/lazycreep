@@ -13,3 +13,6 @@ result-*
 # 编辑器与系统
 .DS_Store
 *.swp
+
+# 个人的 Claude Code 本地文件
+.claude/*.local.*
