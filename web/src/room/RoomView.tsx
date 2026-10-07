@@ -71,6 +71,8 @@ export interface RoomViewProps {
   readonly onTarget?: ((target: Target | undefined, replayTick: number | undefined) => void) | undefined;
   /** 选中对象的详情改画到这个元素里（Sidebar 的选中对象区块，#24）；不给时画在房间旁边 */
   readonly detailsMount?: HTMLElement | undefined;
+  /** 选中对象变化时回报（id 为 undefined 表示取消选中；窄屏据此切到选中对象标签，#29） */
+  readonly onSelect?: ((id: string | undefined) => void) | undefined;
   /** Scene 调色板与着色规则（#5）；变化时重建 Scene。默认 DEFAULT_THEME */
   readonly theme?: Theme | undefined;
   /** 快捷键（#5）：Room View 登记 Live / Replay 切换与播放控制 */
@@ -241,6 +243,8 @@ export function RoomView(props: RoomViewProps) {
     scene: () => scene(),
     world: { width: ROOM_SIZE, height: ROOM_SIZE },
   });
+
+  createEffect(on(controls.selectedId, (id) => props.onSelect?.(id), { defer: true }));
 
   /** 画面上的房间状态：Replay 期间是重放出来的状态，否则是 Live 状态 */
   const shownState = () => (replay.active() ? replay.snapshot()?.roomState : roomState());

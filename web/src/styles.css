@@ -310,17 +310,90 @@ body {
   white-space: nowrap;
 }
 
-/* 窄屏（#29 前的过渡）：Sidebar 堆在 Main View 下方，限高并内部滚动 */
+/* 窄屏（#29）：Sidebar 变为从底部升起的半屏面板（仍挤压 Main View），区块变为顶部标签 */
 .shell__body[data-layout="narrow"] {
   flex-direction: column;
 }
 
 .shell__body[data-layout="narrow"] .sidebar {
-  flex: 0 0 auto;
+  flex: 0 0 50%;
   width: auto;
-  max-height: 40%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   border-left: 0;
   border-top: 1px solid color-mix(in srgb, var(--muted) 40%, transparent);
+  border-radius: 12px 12px 0 0;
+  box-shadow: 0 -4px 16px rgb(0 0 0 / 20%);
+}
+
+.shell__body[data-layout="narrow"] .sidebar[hidden] {
+  display: none;
+}
+
+.shell__body[data-layout="narrow"] .sidebar-section:not([hidden]) {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* 面板顶部：抓手、标签条与关闭；竖向手势留给下滑收起，横向仍可滚动标签 */
+.sheet__header {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 4px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--muted) 30%, transparent);
+  touch-action: pan-x;
+}
+
+.sheet__header::before {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  width: 36px;
+  height: 4px;
+  margin-left: -18px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--muted) 60%, transparent);
+}
+
+.sheet__tabs {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.sheet__header button {
+  font: inherit;
+  padding: 0 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--fg);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.sheet__tabs button[aria-selected="true"] {
+  border-bottom-color: var(--accent);
+  color: var(--accent);
+}
+
+/* 窄屏：Menu 占满宽度 */
+.shell[data-layout="narrow"] .menu {
+  width: 100vw;
+}
+
+/* 窄屏：外壳内所有按钮的触摸目标不低于 44px */
+.shell[data-layout="narrow"] button {
+  min-height: 44px;
+  min-width: 44px;
 }
 
 .shell__tagline {

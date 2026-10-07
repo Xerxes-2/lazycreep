@@ -15,6 +15,7 @@ import { AttackAlert } from "../alert/AttackAlert.tsx";
 import type { AlertSettings } from "../alert/alert-settings.ts";
 import { visibleOrKept } from "../alert/keep-awake.ts";
 import { mediaQuery, NARROW_QUERY } from "../shell/breakpoint.ts";
+import { createSheetTabs, revealSelection } from "../shell/bottom-sheet.tsx";
 import { createShellState, type ShellState } from "../shell/shell-state.ts";
 import { Sidebar } from "../shell/Sidebar.tsx";
 import type { SectionContext } from "../shell/sidebar-sections.tsx";
@@ -84,6 +85,8 @@ export function MapAndRoom(props: MapAndRoomProps) {
   });
 
   const [detailsHost, setDetailsHost] = createSignal<HTMLElement>();
+  // 窄屏底部面板的当前标签（#29）
+  const tabs = createSheetTabs();
   const sectionContext: SectionContext = {
     shell,
     settings: props.settings,
@@ -138,14 +141,15 @@ export function MapAndRoom(props: MapAndRoomProps) {
               {...props.roomView}
               open={shell.roomRequest()}
               onTarget={shell.reportRoom}
-              detailsMount={shell.sidebarOpen() && !shell.sectionCollapsed("room.selected") ? detailsHost() : undefined}
+              detailsMount={shell.sidebarOpen() && (narrow() || !shell.sectionCollapsed("room.selected")) ? detailsHost() : undefined}
+              onSelect={revealSelection(shell, tabs, narrow)}
               onBack={() => shell.navigate({ view: "map" })}
             />
           </div>
         </div>
         {props.bottom}
       </div>
-      <Sidebar ctx={sectionContext} />
+      <Sidebar ctx={sectionContext} narrow={narrow} tabs={tabs} />
     </div>
   );
 }

@@ -187,6 +187,9 @@ export const en: Partial<Record<MessageKey, string>> = {
   "shell.sidebar": "Sidebar",
   "shell.sidebar.toggle": "Collapse or expand the Sidebar",
   "shell.details.hint": "Select an object in the Room View to see its details here.",
+  // Narrow layout (#29)
+  "shell.sheet.tabs": "Sidebar sections",
+  "shell.sheet.close": "Collapse the Sidebar",
   // Console panel (#6)
   "console.title": "Console",
   "console.shard": "Shard",

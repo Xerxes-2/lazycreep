@@ -19,6 +19,7 @@ import { pageVisibility } from "./power/visibility.ts";
 import { RawReadings } from "./readings/RawReadings.tsx";
 import { SettingsPage, type SourceFactory } from "./settings/SettingsPage.tsx";
 import { createSettings } from "./settings/settings.ts";
+import { mediaQuery, NARROW_QUERY } from "./shell/breakpoint.ts";
 import { ConsoleDock } from "./shell/ConsoleDock.tsx";
 import { Menu, type MenuItemDef } from "./shell/Menu.tsx";
 import { createShellState } from "./shell/shell-state.ts";
@@ -60,6 +61,8 @@ function Shell(props: ShellOwnProps) {
   // 全页共享数据源：每个 Server + token 组合只有一个 Source（一条 WebSocket），各处与告警共用
   const sourceFor = sharedSources(props.sourceFor);
   const shell = createShellState(browserStorage(), settings);
+  // 窄屏（#29）：Console Panel 不显示，Console 改从 Menu 打开
+  const narrow = props.narrow ?? mediaQuery(NARROW_QUERY);
   registerShellShortcuts(shortcuts, shell);
   // 导入设置后界面重建：回到导入那一项，显示导入结果
   if (props.lastImport) shell.openMenu("transfer");
@@ -103,9 +106,15 @@ function Shell(props: ShellOwnProps) {
       : []),
   ];
 
+  const consoleItem: MenuItemDef = {
+    id: "console",
+    title: "console.title",
+    render: () => <ConsolePanel settings={settings} sourceFor={sourceFor} />,
+  };
+
   return (
-    <main class="shell">
-      <TopBar shell={shell} />
+    <main class="shell" data-layout={narrow() ? "narrow" : "wide"}>
+      <TopBar shell={shell} consoleToggle={!narrow()} />
       <MapAndRoom
         settings={settings}
         sourceFor={sourceFor}
@@ -114,10 +123,14 @@ function Shell(props: ShellOwnProps) {
         alerts={alerts}
         theme={colors.theme()}
         roomView={{ shortcuts }}
-        {...(props.narrow ? { narrow: props.narrow } : {})}
-        bottom={<ConsoleDock shell={shell}>{() => <ConsolePanel settings={settings} sourceFor={sourceFor} />}</ConsoleDock>}
+        narrow={narrow}
+        bottom={
+          <Show when={!narrow()}>
+            <ConsoleDock shell={shell}>{() => <ConsolePanel settings={settings} sourceFor={sourceFor} />}</ConsoleDock>
+          </Show>
+        }
       />
-      <Menu shell={shell} items={menuItems} />
+      <Menu shell={shell} items={narrow() ? [consoleItem, ...menuItems] : menuItems} />
     </main>
   );
 }
