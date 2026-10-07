@@ -7,8 +7,110 @@
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>Screeps 客户端</title>
+    <!-- 启动画面（#33）：样式内联、不依赖脚本，页面一打开即可见；脚本运行后由 src/boot/ 接管并按真实阶段推进 -->
+    <style>
+      #boot {
+        --boot-bg: #f6f7f9;
+        --boot-fg: #1b1f24;
+        --boot-muted: #5b6470;
+        --boot-accent: #3f7d2a;
+        --boot-track: #dde1e6;
+        --boot-error: #b3261e;
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        background: var(--boot-bg);
+        color: var(--boot-fg);
+        font-family: system-ui, -apple-system, "Segoe UI", "Noto Sans SC", sans-serif;
+        transition: opacity 0.3s ease;
+      }
+      @media (prefers-color-scheme: dark) {
+        #boot {
+          --boot-bg: #1b1f24;
+          --boot-fg: #e6e8eb;
+          --boot-muted: #9aa3ad;
+          --boot-accent: #8fd16a;
+          --boot-track: #2f353d;
+          --boot-error: #ff8a80;
+        }
+      }
+      #boot[data-boot-phase="done"] {
+        opacity: 0;
+        pointer-events: none;
+      }
+      #boot .boot__card {
+        width: min(320px, 100%);
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      #boot .boot__name {
+        margin: 0;
+        font-size: 1.25rem;
+        font-weight: 600;
+      }
+      #boot .boot__bar {
+        height: 4px;
+        border-radius: 2px;
+        background: var(--boot-track);
+        overflow: hidden;
+      }
+      #boot .boot__fill {
+        width: 6%;
+        height: 100%;
+        background: var(--boot-accent);
+        transition: width 0.3s ease;
+      }
+      #boot[data-boot-phase="failed"] .boot__fill {
+        background: var(--boot-error);
+      }
+      #boot .boot__text {
+        margin: 0;
+        font-size: 0.875rem;
+        color: var(--boot-muted);
+      }
+      #boot .boot__error {
+        margin: 0;
+        font-size: 0.875rem;
+        color: var(--boot-error);
+      }
+      #boot .boot__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      #boot .boot__actions button {
+        font: inherit;
+        font-size: 0.875rem;
+        padding: 4px 12px;
+        border: 1px solid var(--boot-muted);
+        border-radius: 4px;
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #boot,
+        #boot .boot__fill {
+          transition: none;
+        }
+      }
+    </style>
   </head>
   <body>
+    <div id="boot" data-boot-phase="running" data-boot-stage="program">
+      <div class="boot__card">
+        <p class="boot__name">Screeps 客户端</p>
+        <div class="boot__bar" role="progressbar" aria-label="启动进度" aria-valuemin="0" aria-valuemax="5" aria-valuenow="0">
+          <div class="boot__fill"></div>
+        </div>
+        <p class="boot__text" data-boot-text>加载程序…</p>
+      </div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
