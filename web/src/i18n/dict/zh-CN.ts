@@ -302,6 +302,18 @@ export const zhCN = {
   "topBar.shard": "Shard",
   "topBar.tick": "Tick {tick}",
   "topBar.cpu": "CPU {cpu} · Memory {memory} KB",
+
+  "boot.progress": "启动进度",
+  "boot.stage.program": "加载程序…",
+  "boot.stage.connect": "连接 Server…",
+  "boot.stage.auth": "认证…",
+  "boot.stage.map": "获取地图数据…",
+  "boot.stage.frame": "收到首帧…",
+  "boot.failed.network": "连不上 Server，请检查网络后重试。",
+  "boot.failed.unauthorized": "token 无效或已失效，请在设置里重新填写。",
+  "boot.retry": "重试",
+  "boot.enter": "仍要进入",
+  "boot.openSettings": "打开设置",
 } as const satisfies Record<string, string>;
 
 export type MessageKey = keyof typeof zhCN;

@@ -4,6 +4,8 @@ import { AlertSettingsPanel } from "./alert/AlertSettingsPanel.tsx";
 import { createAlertSettings } from "./alert/alert-settings.ts";
 import { AllyListSettings } from "./allies/AllyListSettings.tsx";
 import { ConsolePanel } from "./console/ConsolePanel.tsx";
+import { createBootProgress, type CreateView } from "./boot/boot-progress.ts";
+import { BootScreen } from "./boot/BootScreen.tsx";
 import { AppearanceSettings } from "./customize/AppearanceSettings.tsx";
 import { createColorScheme } from "./customize/color-scheme.ts";
 import { attachShortcuts, createKeybindings, createShortcutCommands } from "./customize/keybindings.ts";
@@ -12,6 +14,8 @@ import { SettingsTransfer } from "./customize/SettingsTransfer.tsx";
 import { ShortcutSettings } from "./customize/ShortcutSettings.tsx";
 import { browserDarkQuery, createUiTheme } from "./customize/ui-theme.ts";
 import { HistoryCacheSettings } from "./replay/HistoryCacheSettings.tsx";
+import { parseReplayHref } from "./replay/replay-controller.ts";
+import { createSceneView } from "./scene/pixi-scene-view.ts";
 import { createReplaySettings, mbToBytes, sharedHistoryCache } from "./replay/replay-settings.ts";
 import { I18nProvider, useI18n } from "./i18n";
 import { MapAndRoom } from "./map/MapAndRoom.tsx";
@@ -38,6 +42,8 @@ interface ShellProps {
   readonly narrow?: Accessor<boolean>;
   /** Top Bar 轮询 `game/time` 的间隔（测试用；默认 TICK_POLL_MS） */
   readonly tickPollMs?: number;
+  /** 测试里换成假的 SceneView */
+  readonly createView?: CreateView;
 }
 
 interface ShellOwnProps extends ShellProps {
@@ -62,8 +68,11 @@ function Shell(props: ShellOwnProps) {
   const shortcuts = createShortcutCommands();
   attachShortcuts(document, keybindings, shortcuts);
   // 全页共享数据源：每个 Server + token 组合只有一个 Source（一条 WebSocket），各处与告警共用
-  const sourceFor = sharedSources(props.sourceFor);
+  // 启动画面（#33）观察共享 Source 之下的真实事件；URL 指向 Replay 时认证不是必需的
+  const boot = createBootProgress({ authOptional: () => replayRoute() });
+  const sourceFor = sharedSources(boot.wrapSources(props.sourceFor));
   const shell = createShellState(browserStorage(), settings);
+  const replayRoute = () => shell.location().replay !== undefined || parseReplayHref(location.hash) !== undefined;
   // 窄屏（#29）：Console Panel 不显示，Console 改从 Menu 打开
   const narrow = props.narrow ?? mediaQuery(NARROW_QUERY);
   registerShellShortcuts(shortcuts, shell, narrow);
@@ -132,6 +141,7 @@ function Shell(props: ShellOwnProps) {
         alerts={alerts}
         theme={colors.theme()}
         roomView={{ shortcuts }}
+        createView={boot.wrapView(props.createView ?? createSceneView)}
         narrow={narrow}
         bottom={
           <Show when={!narrow()}>
@@ -140,6 +150,12 @@ function Shell(props: ShellOwnProps) {
         }
       />
       <Menu shell={shell} items={narrow() ? [consoleItem, ...menuItems] : menuItems} />
+      <BootScreen
+        progress={boot}
+        hasToken={!!settings.token()}
+        anonymousRoute={replayRoute}
+        openSettings={() => shell.openMenu("server")}
+      />
     </main>
   );
 }
@@ -169,6 +185,7 @@ export function App(props: Partial<ShellProps>) {
             sourceFor={props.sourceFor ?? liveSource}
             {...(props.narrow ? { narrow: props.narrow } : {})}
             {...(props.tickPollMs === undefined ? {} : { tickPollMs: props.tickPollMs })}
+            {...(props.createView ? { createView: props.createView } : {})}
             onImported={onImported}
             lastImport={lastImport()}
           />

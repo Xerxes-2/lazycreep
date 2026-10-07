@@ -304,4 +304,16 @@ export const en: Partial<Record<MessageKey, string>> = {
   "topBar.shard": "Shard",
   "topBar.tick": "Tick {tick}",
   "topBar.cpu": "CPU {cpu} · Memory {memory} KB",
+
+  "boot.progress": "Startup progress",
+  "boot.stage.program": "Loading the app…",
+  "boot.stage.connect": "Connecting to the server…",
+  "boot.stage.auth": "Authenticating…",
+  "boot.stage.map": "Fetching map data…",
+  "boot.stage.frame": "Waiting for the first frame…",
+  "boot.failed.network": "Cannot reach the server. Check the network and retry.",
+  "boot.failed.unauthorized": "The token is invalid or has expired. Enter a new one in the settings.",
+  "boot.retry": "Retry",
+  "boot.enter": "Enter anyway",
+  "boot.openSettings": "Open settings",
 };
