@@ -1,7 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FixtureSource, fixtureBundle } from "./fixture-source.ts";
 import type { RoomFixture } from "./fixture-format.ts";
-import type { ConnectionState, ConsoleEvent, RoomMapUpdate, RoomObjectPatch, RoomTick } from "./source.ts";
+import {
+  SourceError,
+  type ConnectionState,
+  type ConsoleEvent,
+  type RoomMapUpdate,
+  type RoomObjectPatch,
+  type RoomTick,
+} from "./source.ts";
 
 const files = Object.values(
   import.meta.glob<unknown>("../../../fixtures/season/*.json", { eager: true, import: "default" }),
@@ -165,6 +172,26 @@ describe("FixtureSource 一次性数据", () => {
       username: "Xerxes_2",
       rooms: { [SHARD]: ["W13S28", "W12S28", "W15S28", "W17S29", "W17S25", "W12S26"] },
     });
+  });
+
+  it("版本信息带历史 chunk 大小", async () => {
+    expect(await source.getVersion()).toEqual({ package: 247, protocol: 14, historyChunkSize: 100 });
+  });
+
+  it("录到的 401 以 unauthorized 拒绝，和 LiveSource 一样", async () => {
+    const unauthorized = new FixtureSource(
+      fixtureBundle([
+        ...files.filter((f) => (f as { meta: { kind: string } }).meta.kind !== "me"),
+        {
+          meta: { format: 1, kind: "me", recordedAt: "2026-10-08T00:00:00.000Z", server: bundle.server, origin: "test" },
+          status: 401,
+          body: null,
+        },
+      ]),
+    );
+    const error = await unauthorized.getMe().catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(SourceError);
+    expect(error).toMatchObject({ kind: "unauthorized", status: 401 });
   });
 
   it("瓦片 URL 来自 Server 配置", () => {

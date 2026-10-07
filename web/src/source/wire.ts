@@ -1,5 +1,5 @@
 /**
- * 服务器 wire 格式到 Source 类型的转换。FixtureSource 与将来的 LiveSource 共用，
+ * 服务器 wire 格式到 Source 类型的转换。FixtureSource 与 LiveSource 共用，
  * 保证回放与即时数据经过同一套转换。
  */
 import type {
@@ -11,6 +11,7 @@ import type {
   WireRoomPayload,
   WireShards,
   WireTerrain,
+  WireVersion,
 } from "./fixture-format.ts";
 import type {
   ConsoleEvent,
@@ -19,6 +20,7 @@ import type {
   PvpShard,
   RoomTick,
   RoomUser,
+  ServerVersion,
   ShardInfo,
   Terrain,
   UserInfo,
@@ -33,6 +35,10 @@ export function pvpFromWire(wire: WirePvp, interval: number): PvpShard[] {
       .filter((r) => r.lastPvpTime >= time - interval)
       .map((r) => ({ room: r._id, lastPvpTime: r.lastPvpTime })),
   }));
+}
+
+export function versionFromWire(wire: WireVersion): ServerVersion {
+  return { package: wire.package, protocol: wire.protocol, historyChunkSize: wire.serverData.historyChunkSize };
 }
 
 export function nukesFromWire(wire: WireNukes): Nuke[] {

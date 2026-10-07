@@ -17,21 +17,24 @@ import {
   type StreamFrame,
   type TerrainFixture,
   type TimeFixture,
+  type VersionFixture,
 } from "./fixture-format.ts";
-import type {
-  ConnectionState,
-  ConsoleEvent,
-  HistoryChunk,
-  Nuke,
-  PvpShard,
-  RoomMapUpdate,
-  RoomTick,
-  ServerConfig,
-  ShardInfo,
-  Source,
-  Terrain,
-  Unsubscribe,
-  UserInfo,
+import {
+  SourceError,
+  type ConnectionState,
+  type ConsoleEvent,
+  type HistoryChunk,
+  type Nuke,
+  type PvpShard,
+  type RoomMapUpdate,
+  type RoomTick,
+  type ServerConfig,
+  type ServerVersion,
+  type ShardInfo,
+  type Source,
+  type Terrain,
+  type Unsubscribe,
+  type UserInfo,
 } from "./source.ts";
 import {
   consoleEventFromWire,
@@ -42,6 +45,7 @@ import {
   roomTickFromWire,
   shardsFromWire,
   terrainFromWire,
+  versionFromWire,
 } from "./wire.ts";
 
 /** 按种类索引好的一组 fixture，来自同一个 Server。 */
@@ -61,6 +65,7 @@ const KINDS: readonly FixtureKind[] = [
   "shards",
   "terrain",
   "me",
+  "version",
 ];
 
 function isFixtureFile(value: unknown): value is FixtureFile {
@@ -171,7 +176,7 @@ export class FixtureSource implements Source {
     return this.sent;
   }
 
-  /** 取一次性响应的 body；没录到或录到的是错误响应时拒绝。 */
+  /** 取一次性响应的 body；没录到或录到的是错误响应时拒绝（错误按状态码归类，与 LiveSource 一致）。 */
   private async body<F extends Extract<FixtureFile, { body: unknown }>>(
     kind: F["meta"]["kind"],
     what: string,
@@ -179,7 +184,7 @@ export class FixtureSource implements Source {
   ): Promise<NonNullable<F["body"]>> {
     const fixture = this.find<F>(kind, match);
     if (!fixture) throw new Error(`没有录到 ${what}`);
-    if (fixture.body === null) throw new Error(`${what} 录到的是 HTTP ${fixture.status}`);
+    if (fixture.body === null) throw SourceError.fromStatus(fixture.status, what);
     return fixture.body as NonNullable<F["body"]>;
   }
 
@@ -189,6 +194,10 @@ export class FixtureSource implements Source {
 
   async getNukes(): Promise<readonly Nuke[]> {
     return nukesFromWire(await this.body<NukesFixture>("nukes", "核弹列表"));
+  }
+
+  async getVersion(): Promise<ServerVersion> {
+    return versionFromWire(await this.body<VersionFixture>("version", "版本信息"));
   }
 
   async getTime(shard: string): Promise<number> {

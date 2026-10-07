@@ -1,6 +1,6 @@
 /**
  * Source：前端与一切外部数据之间唯一的边界（spec #1 接缝 1）。
- * 实现：FixtureSource（回放 `fixtures/`）；LiveSource 在后续票里实现。
+ * 实现：FixtureSource（回放 `fixtures/`）；LiveSource（HTTP 经同源 Gateway，WebSocket 直连官方）。
  */
 
 /** 一个 Server 的连接配置。路径是相对 Gateway 的同源路径，WebSocket 是绝对地址。 */
@@ -116,6 +116,44 @@ export interface UserInfo {
   readonly rooms: Readonly<Record<string, readonly string[]>>;
 }
 
+export interface ServerVersion {
+  readonly package: number;
+  readonly protocol: number;
+  /** 历史 chunk 的 Tick 数，Replay 按它对齐 base */
+  readonly historyChunkSize: number;
+}
+
+/**
+ * Source 的失败原因：
+ * - unauthorized：token 缺失、无效或已失效（401）
+ * - forbidden：被拒绝（403），例如 Gateway 的 POST 允许名单
+ * - rateLimited：触发速率限制（429）
+ * - http：其他非 2xx
+ * - server：HTTP 200 但响应体带 `error`
+ * - network：请求没有得到响应
+ */
+export type SourceErrorKind = "unauthorized" | "forbidden" | "rateLimited" | "http" | "server" | "network";
+
+export class SourceError extends Error {
+  override readonly name = "SourceError";
+
+  constructor(
+    readonly kind: SourceErrorKind,
+    message: string,
+    readonly status?: number,
+  ) {
+    super(message);
+  }
+
+  /** 按 HTTP 状态码归类；`what` 用于消息。 */
+  static fromStatus(status: number, what: string): SourceError {
+    const kind: SourceErrorKind =
+      status === 401 ? "unauthorized" : status === 403 ? "forbidden" : status === 429 ? "rateLimited" : "http";
+    return new SourceError(kind, `${what}：HTTP ${status}`, status);
+  }
+}
+
+/** 所有返回 Promise 的方法失败时以 SourceError 拒绝。 */
 export interface Source {
   readonly server: ServerConfig;
 
@@ -132,6 +170,7 @@ export interface Source {
   /** 最近 interval 个 Tick 内有战斗的房间，按 Shard 分组。 */
   getPvp(interval: number): Promise<readonly PvpShard[]>;
   getNukes(): Promise<readonly Nuke[]>;
+  getVersion(): Promise<ServerVersion>;
   getTime(shard: string): Promise<number>;
   getShards(): Promise<readonly ShardInfo[]>;
   getTerrain(shard: string, room: string): Promise<Terrain>;

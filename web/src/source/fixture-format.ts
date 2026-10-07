@@ -17,7 +17,8 @@ export type FixtureKind =
   | "time"
   | "shards"
   | "terrain"
-  | "me";
+  | "me"
+  | "version";
 
 export interface FixtureMeta<K extends FixtureKind = FixtureKind> {
   readonly format: typeof FIXTURE_FORMAT_VERSION;
@@ -87,6 +88,13 @@ export interface WireNukes {
   >;
 }
 
+/** `version` 只保留用到的字段（serverData 里的渲染元数据很大）。 */
+export interface WireVersion {
+  readonly package: number;
+  readonly protocol: number;
+  readonly serverData: { readonly historyChunkSize: number };
+}
+
 export interface WireTime {
   readonly time: number;
 }
@@ -131,6 +139,7 @@ export type TimeFixture = ResponseFixture<"time", WireTime>;
 export type ShardsFixture = ResponseFixture<"shards", WireShards>;
 export type TerrainFixture = ResponseFixture<"terrain", WireTerrain>;
 export type MeFixture = ResponseFixture<"me", WireMe>;
+export type VersionFixture = ResponseFixture<"version", WireVersion>;
 
 export type FixtureFile =
   | RoomFixture
@@ -142,7 +151,8 @@ export type FixtureFile =
   | TimeFixture
   | ShardsFixture
   | TerrainFixture
-  | MeFixture;
+  | MeFixture
+  | VersionFixture;
 
 /** 一个 fixture 文件的推荐文件名（相对录制输出目录）。 */
 export function fixtureFileName(meta: {

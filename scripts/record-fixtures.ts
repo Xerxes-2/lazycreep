@@ -18,7 +18,7 @@
  *   --ticks    每个房间录多少个带 gameTime 的 Tick，默认 50
  *   --pvp-interval  PvP 列表的 interval，默认 100
  *   --history-lag   历史 chunk 至少落后当前 Tick 多少，默认 300
- *   --only     逗号分隔的种类子集：me,time,shards,pvp,nukes,terrain,room,roomMap2,history
+ *   --only     逗号分隔的种类子集：version,me,time,shards,pvp,nukes,terrain,room,roomMap2,history
  *   --out      输出目录，默认 fixtures/<server>
  */
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -38,7 +38,7 @@ import {
 } from "../web/src/source/fixture-format.ts";
 import type { ServerConfig } from "../web/src/source/source.ts";
 
-const ALL_KINDS = ["me", "time", "shards", "pvp", "nukes", "terrain", "room", "roomMap2", "history"] as const;
+const ALL_KINDS = ["version", "me", "time", "shards", "pvp", "nukes", "terrain", "room", "roomMap2", "history"] as const;
 
 const { values: args } = parseArgs({
   options: {
@@ -190,6 +190,19 @@ function recordStreams(streams: StreamRecording[], shard: string): Promise<void>
 // ---- 主流程 ----
 
 mkdirSync(outDir, { recursive: true });
+
+if (want("version")) {
+  const res = await api("/version");
+  writeFixture(fixtureFileName({ kind: "version" }), {
+    meta: meta("version", { note: "serverData 只保留 historyChunkSize" }),
+    status: res.status,
+    body: res.body && {
+      package: res.body.package,
+      protocol: res.body.protocol,
+      serverData: { historyChunkSize: res.body.serverData.historyChunkSize },
+    },
+  });
+}
 
 const shardsRes = await api("/game/shards/info");
 const shard = args.shard ?? shardsRes.body?.shards?.[0]?.name ?? fail("无法确定 Shard");
