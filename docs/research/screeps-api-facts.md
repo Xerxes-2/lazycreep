@@ -53,3 +53,9 @@ World map (`/map/:shard`), room view, history replay, overview + per-room/power 
   - Zoomed blocks: `https://d3os7yery2usni.cloudfront.net/map/<shard>/zoom2/<room>.png`, keyed by the block's corner room (`shardSeason/zoom2/E0S0` -> 200, ~10 KB; `E0N0`/`W0N0` -> 403, i.e. not a block corner).
   - `https://screeps.com/assets/map/...` redirects to the store; not a valid path.
 - **No CORS headers** on the CDN. `<img>` usage works cross-origin, but WebGL textures need CORS, so the Gateway must proxy the CDN path as well.
+
+## 10. Token scope probe (observed 2026-10-08 with the user's scoped token)
+- WebSocket: `auth ok` on both `wss://screeps.com/socket/websocket` and `wss://screeps.com/season/socket/websocket` with the same token. Subscribing to `room:<shard>/<room>` and `roomMap2:<shard>/<room>` delivered frames for **foreign** rooms too (season and MMO). So with a token, one connection can stream any room. This settles "same token on season and MMO" for WebSocket.
+- HTTP with this scoped token: MMO `user/memory`, `user/memory-segment`, `user/money-history` -> 200; `auth/me`, `user/overview`, `game/map-stats`, `game/room-status`, `user/code`, `user/messages/index`, `game/market/*` -> 401. **Every** season HTTP endpoint -> 401, including memory, which works on MMO. Cause unknown: either the scope list is per-server or season HTTP rejects scoped tokens. Pending a new token from the user.
+- Public endpoints still answer 200 when a token is attached, so an under-scoped token does not break anonymous calls.
+- Anonymous lookups that remove the need for `auth/me` during fixture recording: `GET /season/api/user/find?username=<name>` returns `_id`; `GET /season/api/user/rooms?id=<id>` returns owned rooms per shard (both 200 without token). The client itself still needs `auth/me` to learn who the token belongs to.
