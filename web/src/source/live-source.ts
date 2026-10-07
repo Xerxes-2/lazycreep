@@ -273,9 +273,14 @@ export class LiveSource implements Source {
     );
   }
 
-  /** Console 命令走 HTTP POST，见 #6。 */
-  async sendConsole(_shard: string, _expression: string): Promise<void> {
-    throw new Error("LiveSource 尚未实现 Console 命令（见 #6）");
+  /**
+   * `POST user/console`，body `{expression, shard}`（字段名同 node-screeps-api 的 userConsole），
+   * 经 Gateway 的允许名单（ADR 0003）。服务器只把命令排进队列；执行结果从 Console 频道回来。
+   */
+  async sendConsole(shard: string, expression: string): Promise<void> {
+    const path = "/user/console";
+    const response = await this.send(this.server.apiRoot + path, {}, true, { expression, ...this.shardQuery(shard) });
+    await this.json<unknown>(response, path);
   }
 
   async getVersion(): Promise<ServerVersion> {

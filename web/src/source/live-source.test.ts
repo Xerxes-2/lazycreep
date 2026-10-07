@@ -207,6 +207,43 @@ describe("LiveSource map-stats 请求", () => {
   });
 });
 
+describe("LiveSource Console 命令", () => {
+  it("是带 token 的 POST user/console，JSON 里是 expression 与 shard（与 node-screeps-api 的 userConsole 一致）", async () => {
+    const { source, seen } = live({
+      token: TOKEN,
+      routes: { "/season/api/user/console": { body: { ok: 1, result: { ok: 1, n: 1 }, insertedCount: 1 } } },
+    });
+    await source.sendConsole(SHARD, "Game.time");
+    expect(seen).toHaveLength(1);
+    expect(seen[0]!.method).toBe("POST");
+    expect(seen[0]!.url.pathname).toBe("/season/api/user/console");
+    expect(seen[0]!.token).toBe(TOKEN);
+    expect(JSON.parse(seen[0]!.body)).toEqual({ expression: "Game.time", shard: SHARD });
+  });
+
+  it("不分 Shard 的 Server 不带 shard", async () => {
+    const privateServer: ServerConfig = { ...SEASON, id: "private", apiRoot: "/api", sharded: false };
+    const { source, seen } = live({
+      server: privateServer,
+      token: TOKEN,
+      routes: { "/api/user/console": { body: { ok: 1 } } },
+    });
+    await source.sendConsole("ignored", "1+1");
+    expect(JSON.parse(seen[0]!.body)).toEqual({ expression: "1+1" });
+  });
+
+  it("被拒绝时按原因归类：403 forbidden、429 rateLimited、响应体带 error 为 server", async () => {
+    const reply = (r: Reply) => live({ token: TOKEN, routes: { "/season/api/user/console": r } }).source;
+    await expect(reply({ status: 403, body: {} }).sendConsole(SHARD, "x")).rejects.toMatchObject({ kind: "forbidden" });
+    await expect(reply({ status: 429, body: {} }).sendConsole(SHARD, "x")).rejects.toMatchObject({
+      kind: "rateLimited",
+    });
+    await expect(reply({ body: { error: "not authorized" } }).sendConsole(SHARD, "x")).rejects.toMatchObject({
+      kind: "server",
+    });
+  });
+});
+
 describe("LiveSource HTTP 请求", () => {
   it("API 请求带 X-Token", async () => {
     const { source, seen } = live({ token: TOKEN });
