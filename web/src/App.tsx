@@ -7,25 +7,26 @@ import { ConsolePanel } from "./console/ConsolePanel.tsx";
 import { AppearanceSettings } from "./customize/AppearanceSettings.tsx";
 import { createColorScheme } from "./customize/color-scheme.ts";
 import { attachShortcuts, createKeybindings, createShortcutCommands } from "./customize/keybindings.ts";
-import { registerPanelShortcuts } from "./customize/panel-shortcuts.ts";
 import type { ImportReport } from "./customize/settings-transfer.ts";
 import { SettingsTransfer } from "./customize/SettingsTransfer.tsx";
 import { ShortcutSettings } from "./customize/ShortcutSettings.tsx";
 import { browserDarkQuery, createUiTheme } from "./customize/ui-theme.ts";
+import { HistoryCacheSettings } from "./replay/HistoryCacheSettings.tsx";
 import { createReplaySettings, mbToBytes, sharedHistoryCache } from "./replay/replay-settings.ts";
 import { I18nProvider, useI18n } from "./i18n";
 import { MapAndRoom } from "./map/MapAndRoom.tsx";
-import type { PanelController, PanelDef } from "./panels/Workspace.tsx";
 import { pageVisibility } from "./power/visibility.ts";
 import { RawReadings } from "./readings/RawReadings.tsx";
 import { SettingsPage, type SourceFactory } from "./settings/SettingsPage.tsx";
 import { createSettings } from "./settings/settings.ts";
+import { ConsoleDock } from "./shell/ConsoleDock.tsx";
+import { Menu, type MenuItemDef } from "./shell/Menu.tsx";
+import { createShellState } from "./shell/shell-state.ts";
+import { registerShellShortcuts } from "./shell/shell-shortcuts.ts";
+import { TopBar } from "./shell/TopBar.tsx";
 import { LiveSource } from "./source/live-source.ts";
 import { sharedSources } from "./source/shared-source.ts";
 import { browserStorage } from "./storage/local-store.ts";
-
-/** MapAndRoom 自带的核心面板（快捷键可切换到的面板） */
-const CORE_PANELS = ["map", "room", "pvp", "details"];
 
 const liveSource: SourceFactory = (server, token) =>
   new LiveSource(server, { ...(token === undefined ? {} : { token }), visibility: pageVisibility() });
@@ -33,7 +34,6 @@ const liveSource: SourceFactory = (server, token) =>
 interface ShellProps {
   readonly sourceFor: SourceFactory;
   readonly narrow?: Accessor<boolean>;
-  readonly onController?: (controller: PanelController) => void;
 }
 
 interface ShellOwnProps extends ShellProps {
@@ -42,8 +42,12 @@ interface ShellOwnProps extends ShellProps {
   readonly lastImport: ImportReport | undefined;
 }
 
+/**
+ * 固定外壳（#24，ADR 0005）：Top Bar、Main View + Sidebar（MapAndRoom）、Console Panel、Menu。
+ * 页面本身不滚动，只有 Menu、Sidebar 区块与 Console Panel 在内部滚动。
+ */
 function Shell(props: ShellOwnProps) {
-  const { locale, setLocale, t } = useI18n();
+  const { t } = useI18n();
   const settings = createSettings(browserStorage());
   const allies = createAllyList(browserStorage());
   const alerts = createAlertSettings(browserStorage());
@@ -53,37 +57,39 @@ function Shell(props: ShellOwnProps) {
   const keybindings = createKeybindings(browserStorage());
   const shortcuts = createShortcutCommands();
   attachShortcuts(document, keybindings, shortcuts);
-  // 全页共享数据源：每个 Server + token 组合只有一个 Source（一条 WebSocket），各面板与告警共用
+  // 全页共享数据源：每个 Server + token 组合只有一个 Source（一条 WebSocket），各处与告警共用
   const sourceFor = sharedSources(props.sourceFor);
+  const shell = createShellState(browserStorage(), settings);
+  registerShellShortcuts(shortcuts, shell);
+  // 导入设置后界面重建：回到导入那一项，显示导入结果
+  if (props.lastImport) shell.openMenu("transfer");
 
   createEffect(() => {
     document.title = t("app.title");
   });
 
-  const toggleLocale = () => setLocale(locale() === "zh-CN" ? "en" : "zh-CN");
-
-  const panels: PanelDef[] = [
+  /** Menu 项，按显示顺序；新增设置项加在这里 */
+  const menuItems: MenuItemDef[] = [
+    { id: "server", title: "shell.menu.server", render: () => <SettingsPage settings={settings} sourceFor={sourceFor} /> },
+    { id: "allies", title: "mapInfo.allies.title", render: () => <AllyListSettings allies={allies} /> },
+    { id: "alerts", title: "alert.settings.title", render: () => <AlertSettingsPanel settings={alerts} /> },
     {
-      id: "settings",
-      title: "settings.title",
-      size: { w: 12, h: 12 },
+      id: "history",
+      title: "replay.cache.title",
       render: () => (
-        <>
-          <SettingsPage settings={settings} sourceFor={sourceFor} />
-          <AllyListSettings allies={allies} />
-          <AlertSettingsPanel settings={alerts} />
-          <AppearanceSettings uiTheme={uiTheme} colors={colors} />
-          <ShortcutSettings bindings={keybindings} />
-          <SettingsTransfer storage={browserStorage()} onImported={props.onImported} lastImport={props.lastImport} />
-        </>
+        <section class="settings">
+          <HistoryCacheSettings />
+        </section>
       ),
     },
-    // Console（#6）：默认不打开，从工具栏 / 标签管理里加入
+    { id: "appearance", title: "customize.appearance.title", render: () => <AppearanceSettings uiTheme={uiTheme} colors={colors} /> },
+    { id: "shortcuts", title: "shortcuts.title", render: () => <ShortcutSettings bindings={keybindings} /> },
     {
-      id: "console",
-      title: "console.title",
-      size: { w: 7, h: 10 },
-      render: () => <ConsolePanel settings={settings} sourceFor={sourceFor} />,
+      id: "transfer",
+      title: "transfer.title",
+      render: () => (
+        <SettingsTransfer storage={browserStorage()} onImported={props.onImported} lastImport={props.lastImport} />
+      ),
     },
     // 开发用原始读数：生产构建不打包
     ...(import.meta.env.DEV
@@ -91,47 +97,34 @@ function Shell(props: ShellOwnProps) {
           {
             id: "readings",
             title: "readings.title",
-            size: { w: 12, h: 9 },
             render: () => <RawReadings settings={settings} sourceFor={sourceFor} />,
-          } satisfies PanelDef,
+          } satisfies MenuItemDef,
         ]
       : []),
   ];
 
   return (
     <main class="shell">
-      <header class="shell__header">
-        <h1>{t("app.title")}</h1>
-        <button
-          type="button"
-          data-action="toggle-locale"
-          aria-label={t("locale.toggleLabel")}
-          onClick={toggleLocale}
-        >
-          {t("locale.toggle")}
-        </button>
-      </header>
+      <TopBar shell={shell} />
       <MapAndRoom
         settings={settings}
         sourceFor={sourceFor}
+        shell={shell}
         allies={allies.set()}
         alerts={alerts}
-        panels={panels}
         theme={colors.theme()}
         roomView={{ shortcuts }}
         {...(props.narrow ? { narrow: props.narrow } : {})}
-        onController={(controller) => {
-          registerPanelShortcuts(shortcuts, controller, [...CORE_PANELS, ...panels.map((p) => p.id)]);
-          props.onController?.(controller);
-        }}
+        bottom={<ConsoleDock shell={shell}>{() => <ConsolePanel settings={settings} sourceFor={sourceFor} />}</ConsoleDock>}
       />
+      <Menu shell={shell} items={menuItems} />
     </main>
   );
 }
 
 /**
  * `sourceFor` 默认连真实 Server（经同源 Gateway）；测试里换成 FixtureSource。
- * `narrow` 默认跟随媒体查询（测试里强制 Monitor Mode）。
+ * `narrow` 默认跟随媒体查询（测试里强制窄屏结构）。
  */
 export function App(props: Partial<ShellProps>) {
   // 导入设置（#5）后整个界面按新存储重建：各功能都在创建时读存储，重建即生效，无需刷新页面
@@ -153,7 +146,6 @@ export function App(props: Partial<ShellProps>) {
           <Shell
             sourceFor={props.sourceFor ?? liveSource}
             {...(props.narrow ? { narrow: props.narrow } : {})}
-            {...(props.onController ? { onController: props.onController } : {})}
             onImported={onImported}
             lastImport={lastImport()}
           />

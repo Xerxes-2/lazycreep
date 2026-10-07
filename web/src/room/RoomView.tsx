@@ -1,7 +1,7 @@
 /**
  * Room View（Live 最小版）：选一个房间，逐 Tick 画出地形、建筑与 creep，并显示当前 Tick。
  * 数据流：Source 房间流 → reduceLiveTick → RoomState → buildRoomScene → SceneView。
- * 放在面板系统里（#2）；开发用开关可以在服务器与录制数据（FixtureSource）之间切换数据来源。
+ * 是 Main View 的一种模式（#24）；开发用开关可以在服务器与录制数据（FixtureSource）之间切换数据来源。
  * 录制数据只在开发构建里可用：生产构建既不打包 `fixtures/` 也不显示开关（#14）。
  */
 import { createEffect, createMemo, createSignal, on, onCleanup, onMount, Show, untrack } from "solid-js";
@@ -67,7 +67,9 @@ export interface RoomViewProps {
   readonly open?: Target | undefined;
   /** 给了就显示“返回地图”按钮（#16） */
   readonly onBack?: (() => void) | undefined;
-  /** 选中对象的详情改画到这个元素里（面板系统的“对象详情”面板，#2）；不给时画在房间旁边 */
+  /** 显示的房间或 Replay 变化时回报（外壳状态记录当前位置，#24）；replayTick 是 Replay 的起始 Tick */
+  readonly onTarget?: ((target: Target | undefined, replayTick: number | undefined) => void) | undefined;
+  /** 选中对象的详情改画到这个元素里（Sidebar 的选中对象区块，#24）；不给时画在房间旁边 */
   readonly detailsMount?: HTMLElement | undefined;
   /** Scene 调色板与着色规则（#5）；变化时重建 Scene。默认 DEFAULT_THEME */
   readonly theme?: Theme | undefined;
@@ -155,6 +157,8 @@ export function RoomView(props: RoomViewProps) {
       setTarget({ shard: opened.shard, room: opened.room });
     },
   });
+
+  createEffect(() => props.onTarget?.(target(), replay.active() ? replay.request()?.tick : undefined));
 
   registerRoomShortcuts(props.shortcuts, { replay, target, liveTick: () => roomState()?.gameTime });
 
@@ -262,7 +266,7 @@ export function RoomView(props: RoomViewProps) {
   onMount(() => {
     const size = () => {
       const width = host.clientWidth || DEFAULT_SIZE;
-      return { width, height: width };
+      return { width, height: host.clientHeight || width };
     };
     let alive = true;
     let created: SceneView | undefined;
@@ -276,6 +280,8 @@ export function RoomView(props: RoomViewProps) {
         setView(made);
         if (typeof ResizeObserver === "function") {
           observer = new ResizeObserver(() => {
+            // 隐藏（display: none）时宽度为 0：保持原尺寸，回来时视口不变
+            if (host.clientWidth === 0) return;
             const { width, height } = size();
             made.resize(width, height);
             setCanvasSize({ width, height });

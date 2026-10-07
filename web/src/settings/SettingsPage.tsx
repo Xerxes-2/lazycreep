@@ -3,7 +3,6 @@ import { useI18n, type MessageKey } from "../i18n";
 import type { Translate } from "../i18n/translator.ts";
 import { SourceError, type ServerConfig, type Source } from "../source/source.ts";
 import type { Settings } from "./settings.ts";
-import { HistoryCacheSettings } from "../replay/HistoryCacheSettings.tsx";
 
 /** 按 Server 与 token 建 Source；应用里是 LiveSource，测试里是 FixtureSource。 */
 export type SourceFactory = (server: ServerConfig, token: string | undefined) => Source;
@@ -293,8 +292,6 @@ export function SettingsPage(props: { settings: Settings; sourceFor: SourceFacto
           </div>
         </Show>
       </fieldset>
-
-      <HistoryCacheSettings />
     </section>
   );
 }

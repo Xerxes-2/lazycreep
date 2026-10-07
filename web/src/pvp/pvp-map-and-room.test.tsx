@@ -38,7 +38,7 @@ async function fakeView(options: SceneViewOptions): Promise<SceneView> {
   };
 }
 
-/** narrow：Monitor Mode（一次只显示一个面板） */
+/** narrow：窄屏结构 */
 function mount(narrow = false) {
   const settings = createSettings(localStorage);
   settings.setToken("token");
@@ -62,6 +62,7 @@ function mount(narrow = false) {
 
 const settle = (assertion: () => void) => vi.waitFor(assertion, { timeout: 3000, interval: 5 });
 const hotspots = () => (mapScene?.primitives ?? []).filter((p) => p.key.startsWith("pvp:")).map((p) => p.key);
+const slot = (view: string) => container.querySelector<HTMLElement>(`.main-view [data-view="${view}"]`)!;
 const row = (room: string) => container.querySelector<HTMLElement>(`.pvp-overview tr[data-room="${room}"]`);
 
 describe("PvP Overview 接入 World Map 与 Room View", () => {
@@ -97,33 +98,24 @@ describe("PvP Overview 接入 World Map 与 Room View", () => {
     expect(row("E13N21")!.querySelector("[data-owner]")!.textContent).toBe("未知");
   });
 
-  it("点列表里的房间进入 Room View（Monitor Mode 下切到 Room View 标签）", async () => {
-    mount(true);
+  it("PvP Overview 在 World Map 的 Sidebar 里；点列表里的房间把 Main View 切到该房间", async () => {
+    mount();
+    expect(container.querySelector('[data-section="map.pvp"] .pvp-overview')).not.toBeNull();
     await settle(() => expect(row("W17N21")).not.toBeNull());
     row("W17N21")!.querySelector<HTMLButtonElement>("[data-action=open-room]")!.click();
-    expect(container.querySelector<HTMLElement>('[data-panel="map"]')!.hidden).toBe(true);
+    expect(slot("map").hidden).toBe(true);
+    expect(slot("room").hidden).toBe(false);
     expect(container.querySelector<HTMLInputElement>("[name=room-view-room]")!.value).toBe("W17N21");
-    expect(container.querySelector<HTMLElement>('[data-panel="room"]')!.hidden).toBe(false);
     expect(container.querySelector("button[data-action=back-to-map]")).not.toBeNull();
   });
 
-  it("桌面布局下点列表里的房间聚焦 Room View 面板，地图仍显示", async () => {
+  it("“回看”把 Main View 切到 Room View 并进入 Replay", async () => {
     mount();
-    await settle(() => expect(row("W17N21")).not.toBeNull());
-    row("W17N21")!.querySelector<HTMLButtonElement>("[data-action=open-room]")!.click();
-    expect(container.querySelector<HTMLElement>('[data-panel="room"]')!.hasAttribute("data-focused")).toBe(true);
-    expect(container.querySelector<HTMLElement>('[data-panel="map"]')!.hidden).toBe(false);
-    expect(container.querySelector<HTMLInputElement>("[name=room-view-room]")!.value).toBe("W17N21");
-  });
-
-  it("桌面上关掉的 Room View 面板在“回看”时重新打开并进入 Replay", async () => {
-    mount();
-    container.querySelector<HTMLElement>('[data-panel="room"] [data-action=close-panel]')!.click();
-    expect(container.querySelector('[data-panel="room"]')).toBeNull();
     await settle(() => expect(row("W17N21")).not.toBeNull());
     row("W17N21")!.querySelector<HTMLButtonElement>("[data-action=replay-battle]")!.click();
+    expect(slot("room").hidden).toBe(false);
     await settle(() => expect(container.querySelector<HTMLInputElement>("[name=room-view-room]")?.value).toBe("W17N21"));
-    await settle(() => expect(container.querySelector('[data-panel="room"] .replay')).not.toBeNull());
+    await settle(() => expect(container.querySelector(".room-view .replay")).not.toBeNull());
   });
 
   it("“回看这场战斗”打开该房间的 Replay，定位到最后战斗前 50 Tick；chunk 未生成时可退到已有历史", async () => {
@@ -132,6 +124,6 @@ describe("PvP Overview 接入 World Map 与 Room View", () => {
     row("W17N21")!.querySelector<HTMLButtonElement>("[data-action=replay-battle]")!.click();
     expect(parseReplayHref(location.hash)).toEqual({ shard: "shardSeason", room: "W17N21", tick: 1025136, latest: true });
     await settle(() => expect(container.querySelector<HTMLInputElement>("[name=room-view-room]")!.value).toBe("W17N21"));
-    expect(container.querySelector<HTMLElement>('[data-panel="map"]')!.hidden).toBe(true);
+    expect(slot("map").hidden).toBe(true);
   });
 });

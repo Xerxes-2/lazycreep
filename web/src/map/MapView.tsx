@@ -4,7 +4,7 @@
  * 交互直接用画布上的 DOM Pointer Events（适配层停了 Pixi 的 ticker，Pixi events 不可靠）：
  * 滚轮 / 双指捏合缩放、拖拽平移；放大到 ENTER_ZOOM 以上后点房间进入 Room View，远看时点击只放大。
  * 视口按 Server + Shard 记在组件里：地图隐藏再显示、切走 Shard 再切回来都保持原样。
- * 放在面板系统的地图面板里（#2）。
+ * 是 Main View 的一种模式（#24）。
  */
 import { createEffect, createMemo, createSignal, For, on, onCleanup, onMount, Show, untrack } from "solid-js";
 import { useI18n } from "../i18n";
@@ -305,7 +305,7 @@ export function MapView(props: MapViewProps) {
   onMount(() => {
     const size = () => {
       const width = host.clientWidth || DEFAULT_WIDTH;
-      return { width, height: Math.round(width * 0.75) };
+      return { width, height: host.clientHeight || Math.round(width * 0.75) };
     };
     setCanvasSize(size());
     let alive = true;

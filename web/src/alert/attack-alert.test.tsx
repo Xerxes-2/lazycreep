@@ -117,14 +117,15 @@ describe("Attack Alert 接入", () => {
     expect(stranger.textContent).not.toContain("volotsyouga");
   });
 
-  it("点横幅进入该房间的 Room View，横幅消失（Monitor Mode 下切到 Room View 标签）", async () => {
+  it("点横幅把 Main View 切到该房间的 Room View，横幅消失", async () => {
     mount({ narrow: true });
     await settle(() => expect(banners()).toContain("stranger:E13N21"));
     container
       .querySelector<HTMLElement>('.attack-alert__item[data-reason="stranger"]')!
       .querySelector<HTMLButtonElement>("[data-action=open-alert-room]")!
       .click();
-    expect(container.querySelector<HTMLElement>('[data-panel="map"]')!.hidden).toBe(true);
+    expect(container.querySelector<HTMLElement>('.main-view [data-view="map"]')!.hidden).toBe(true);
+    expect(container.querySelector<HTMLElement>('.main-view [data-view="room"]')!.hidden).toBe(false);
     expect(container.querySelector<HTMLInputElement>("[name=room-view-room]")!.value).toBe("E13N21");
     expect(banners()).not.toContain("stranger:E13N21");
   });

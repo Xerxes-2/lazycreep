@@ -3,7 +3,7 @@
  * 点房间进入 Room View；“回看”打开该房间的 Replay，从最后战斗 Tick 往前一小段开始。
  *
  * 列表只显示房间所有者：PvP 接口只给房间与 lastPvpTime，“涉及玩家”要读房间数据才知道，
- * 点进 Room View / Replay 后在房间里看。固定布局；面板系统见 #2。
+ * 点进 Room View / Replay 后在房间里看。放在 World Map 的 Sidebar 里（#24）。
  */
 import { For, Show } from "solid-js";
 import { useI18n } from "../i18n";

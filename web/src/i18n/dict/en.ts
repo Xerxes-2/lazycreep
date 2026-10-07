@@ -177,14 +177,16 @@ export const en: Partial<Record<MessageKey, string>> = {
   "alert.settings.cooldown": "Cooldown per room and reason (minutes)",
   "alert.settings.strangerTicks": "Ticks a stranger must stay before alerting",
 
-  // 面板系统（#2）
-  "panels.toolbar": "Panels",
-  "panels.add": "Add panel:",
-  "panels.reset": "Reset layout",
-  "panels.close": "Close {panel}",
-  "panels.tabs": "Panels",
-  "panels.manageTabs": "Choose the panels in the tab bar",
-  "panels.details.hint": "Select an object in the Room View to see its details here.",
+  // 固定外壳（#24）
+  "shell.menu": "Menu",
+  "shell.menu.open": "Open menu",
+  "shell.menu.close": "Close menu",
+  "shell.menu.back": "Back to the menu",
+  "shell.menu.server": "Server and token",
+  "shell.mainView": "Main View",
+  "shell.sidebar": "Sidebar",
+  "shell.sidebar.toggle": "Collapse or expand the Sidebar",
+  "shell.details.hint": "Select an object in the Room View to see its details here.",
   // Console panel (#6)
   "console.title": "Console",
   "console.shard": "Shard",

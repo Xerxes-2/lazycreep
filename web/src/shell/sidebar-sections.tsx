@@ -1,0 +1,77 @@
+/**
+ * 区块表（#24）：Main View 模式 → Sidebar Section 列表，按显示顺序。
+ *
+ * 新增一个区块：写一个 SidebarSectionDef（id 全局唯一，用作折叠状态的存储键；title 是词典键；
+ * render 只调用一次），加进对应模式的数组。区块需要的数据从 SectionContext 取；缺什么就在
+ * SectionContext 里加一个字段，并在 MapAndRoom.tsx 构造 context 的地方给出。
+ *
+ * 两个模式的区块都常驻挂载：不属于当前模式、Sidebar 收起或区块折叠时只是隐藏，
+ * `section.shown()` 为 false（想暂停渲染的区块据此停下）。
+ */
+import type { Accessor, JSX } from "solid-js";
+import type { MessageKey } from "../i18n";
+import { useI18n } from "../i18n";
+import type { OwnershipHub } from "../map/ownership-hub.ts";
+import type { PvpFeed } from "../pvp/pvp-feed.ts";
+import { PvpOverview } from "../pvp/PvpOverview.tsx";
+import type { SourceFactory } from "../settings/SettingsPage.tsx";
+import type { Settings } from "../settings/settings.ts";
+import type { Source } from "../source/source.ts";
+import type { MainViewMode, ShellState } from "./shell-state.ts";
+
+/** 区块可用的页面级数据与动作 */
+export interface SectionContext {
+  /** 外壳状态；跳转一律 shell.navigate(...) */
+  readonly shell: ShellState;
+  readonly settings: Settings;
+  /** 全页共享的 Source 工厂（拿租约，不要自己 new） */
+  readonly sourceFor: SourceFactory;
+  /** 当前 Server + token 的共享 Source */
+  readonly source: Accessor<Source>;
+  readonly ownership: Accessor<OwnershipHub>;
+  readonly pvp: PvpFeed;
+  /** Room View 把选中对象的详情画进这个元素 */
+  readonly setDetailsHost: (el: HTMLElement | undefined) => void;
+}
+
+export interface SectionRender {
+  /** 区块此刻是否在屏幕上（当前模式、Sidebar 打开、区块展开） */
+  readonly shown: Accessor<boolean>;
+}
+
+export interface SidebarSectionDef {
+  readonly id: string;
+  readonly title: MessageKey;
+  readonly render: (ctx: SectionContext, section: SectionRender) => JSX.Element;
+}
+
+function DetailsSection(props: { ctx: SectionContext }) {
+  const { t } = useI18n();
+  return (
+    <div class="details-section">
+      <p class="details-section__hint settings__muted">{t("shell.details.hint")}</p>
+      <div class="details-section__mount" ref={(el) => props.ctx.setDetailsHost(el)} />
+    </div>
+  );
+}
+
+export const SIDEBAR_SECTIONS: Readonly<Record<MainViewMode, readonly SidebarSectionDef[]>> = {
+  room: [
+    // #26：房间信息；#27：Minimap（排在选中对象之前）；#26：显示选项（排在选中对象之后）
+    { id: "room.selected", title: "roomDetails.title", render: (ctx) => <DetailsSection ctx={ctx} /> },
+  ],
+  map: [
+    // #28：房间搜索、图层开关（排在 PvP Overview 之前）；指向房间信息（之后）
+    {
+      id: "map.pvp",
+      title: "pvp.title",
+      render: (ctx) => (
+        <PvpOverview
+          feed={ctx.pvp}
+          onOpenRoom={(target) => ctx.shell.navigate(target)}
+          onReplay={({ tick, ...target }) => ctx.shell.navigate({ ...target, replay: { tick, latest: true } })}
+        />
+      ),
+    },
+  ],
+};

@@ -175,14 +175,16 @@ export const zhCN = {
   "alert.settings.cooldown": "同一房间同一原因的冷却（分钟）",
   "alert.settings.strangerTicks": "陌生人停留多少 Tick 才通知",
 
-  // 面板系统（#2）
-  "panels.toolbar": "面板",
-  "panels.add": "添加面板：",
-  "panels.reset": "恢复默认布局",
-  "panels.close": "关闭{panel}",
-  "panels.tabs": "面板",
-  "panels.manageTabs": "选择标签栏里的面板",
-  "panels.details.hint": "在房间视图里点选对象，详情显示在这里。",
+  // 固定外壳（#24）
+  "shell.menu": "菜单",
+  "shell.menu.open": "打开菜单",
+  "shell.menu.close": "关闭菜单",
+  "shell.menu.back": "返回菜单列表",
+  "shell.menu.server": "Server 与 token",
+  "shell.mainView": "主视图",
+  "shell.sidebar": "侧栏",
+  "shell.sidebar.toggle": "收起或展开侧栏",
+  "shell.details.hint": "在房间视图里点选对象，详情显示在这里。",
   // Console 面板（#6）
   "console.title": "Console",
   "console.shard": "Shard",

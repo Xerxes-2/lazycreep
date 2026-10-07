@@ -16,10 +16,10 @@ import { ALERT_SETTINGS_STORAGE } from "../alert/alert-settings.ts";
 import { ALLY_LIST_STORAGE } from "../allies/ally-list.ts";
 import { CONSOLE_SETTINGS_STORAGE } from "../console/console-settings.ts";
 import { LOCALE_STORAGE } from "../i18n/locale.ts";
-import { LAYOUT_STORAGE } from "../panels/layout-store.ts";
 import { REPLAY_SETTINGS_STORAGE } from "../replay/replay-settings.ts";
 import { ROOM_CAMERA_STORAGE } from "../room/room-camera-store.ts";
 import { CONNECTION_STORAGE } from "../settings/settings.ts";
+import { MAIN_VIEW_STORAGE, SHELL_STORAGE } from "../shell/shell-state.ts";
 import type { StoredKey, StoredKind } from "../storage/local-store.ts";
 import { COLOR_SCHEME_STORAGE } from "./color-scheme.ts";
 import { KEYBINDINGS_STORAGE } from "./keybindings.ts";
@@ -38,11 +38,12 @@ export const STORED_KEYS: readonly StoredKey[] = [
   ALLY_LIST_STORAGE,
   ALERT_SETTINGS_STORAGE,
   REPLAY_SETTINGS_STORAGE,
-  ...LAYOUT_STORAGE,
+  SHELL_STORAGE,
   CONSOLE_SETTINGS_STORAGE,
   ROOM_CAMERA_STORAGE,
   /** 不导出的运行状态 */
   ALERT_MEMORY_STORAGE,
+  MAIN_VIEW_STORAGE,
 ];
 
 const EXPORTED = STORED_KEYS.filter((s) => s.role === "settings");

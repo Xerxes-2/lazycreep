@@ -39,31 +39,288 @@ body {
   color: var(--fg);
 }
 
-.shell {
-  padding: 12px 16px;
-  margin: 0 auto;
+/* ---- 固定外壳（#24，ADR 0005）：页面不滚动，只有 Menu、Sidebar、Console Panel 内部滚动 ---- */
+html,
+body {
+  height: 100%;
+  overflow: hidden;
 }
 
-.shell__header {
+.shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.top-bar {
+  flex: none;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
+  min-height: 44px;
+  padding: 4px 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--muted) 40%, transparent);
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
-.shell__header h1 {
+.top-bar__title {
   margin: 0;
-  font-size: 1.5rem;
+  font-size: 1rem;
+  white-space: nowrap;
 }
 
-.shell__header button {
+.top-bar button {
   font: inherit;
-  padding: 6px 12px;
-  border: 1px solid var(--accent);
+  min-height: 36px;
+  min-width: 36px;
+  padding: 4px 10px;
+  border: 1px solid color-mix(in srgb, var(--muted) 60%, transparent);
   border-radius: 6px;
   background: transparent;
-  color: var(--accent);
+  color: var(--fg);
   cursor: pointer;
+  white-space: nowrap;
+}
+
+.top-bar button[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.top-bar__views {
+  display: flex;
+  gap: 4px;
+}
+
+.top-bar__status {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.shell__body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.shell__main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.main-view {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.main-view__slot {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-view__slot[hidden] {
+  display: none;
+}
+
+.main-view__slot > section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0 8px 8px;
+}
+
+/* 视图的标题由 Top Bar 的 Main View 按钮代替，只留给读屏 */
+.main-view__slot > section > h2:first-child,
+.sidebar-section__body > section > h2:first-child {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Sidebar（#24）：固定宽度，挤压 Main View */
+.sidebar {
+  flex: 0 0 260px;
+  width: 260px;
+  min-height: 0;
+  overflow-y: auto;
+  border-left: 1px solid color-mix(in srgb, var(--muted) 40%, transparent);
+}
+
+.sidebar[hidden] {
+  display: none;
+}
+
+.sidebar-section[hidden],
+.sidebar-section__body[hidden] {
+  display: none;
+}
+
+.sidebar-section__title {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.sidebar-section__title button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 36px;
+  padding: 4px 10px;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--muted) 30%, transparent);
+  background: color-mix(in srgb, var(--muted) 10%, transparent);
+  color: var(--fg);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sidebar-section__title button::before {
+  content: "▾";
+  color: var(--muted);
+}
+
+.sidebar-section__title button[aria-expanded="false"]::before {
+  content: "▸";
+}
+
+.sidebar-section__body {
+  padding: 8px 10px;
+}
+
+.details-section:has(.room-details) .details-section__hint {
+  display: none;
+}
+
+.details-section .room-details {
+  position: static;
+  max-height: none;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+}
+
+/* Console Panel（#24）：Main View 底部，高度来自外壳状态 */
+.console-dock {
+  flex: none;
+  max-height: 60%;
+  overflow: auto;
+  padding: 6px 8px;
+  border-top: 1px solid color-mix(in srgb, var(--muted) 40%, transparent);
+}
+
+.console-dock[hidden] {
+  display: none;
+}
+
+/* Menu（#24）：左侧滑出层 */
+.menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgb(0 0 0 / 30%);
+}
+
+.menu {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 51;
+  display: flex;
+  flex-direction: column;
+  width: min(480px, 100vw);
+  background: var(--bg);
+  box-shadow: 4px 0 16px rgb(0 0 0 / 25%);
+}
+
+.menu__header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 4px 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--muted) 40%, transparent);
+}
+
+.menu__title {
+  flex: 1;
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.menu__header button,
+.menu__items button {
+  font: inherit;
+  min-height: 44px;
+  min-width: 44px;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.menu__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 12px 12px;
+}
+
+.menu__items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.menu__items button {
+  width: 100%;
+  padding: 0 4px;
+  text-align: left;
+  border-bottom: 1px solid color-mix(in srgb, var(--muted) 25%, transparent);
+}
+
+/* 菜单项的标题已显示在层头部 */
+.menu__content > section > h2:first-child {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* 窄屏（#29 前的过渡）：Sidebar 堆在 Main View 下方，限高并内部滚动 */
+.shell__body[data-layout="narrow"] {
+  flex-direction: column;
+}
+
+.shell__body[data-layout="narrow"] .sidebar {
+  flex: 0 0 auto;
+  width: auto;
+  max-height: 40%;
+  border-left: 0;
+  border-top: 1px solid color-mix(in srgb, var(--muted) 40%, transparent);
 }
 
 .shell__tagline {
@@ -243,14 +500,17 @@ body {
 }
 
 .room-view__canvas {
+  position: relative;
   width: 100%;
-  max-width: 720px;
-  aspect-ratio: 1;
+  height: 100%;
 }
 
 .room-view__canvas canvas {
+  position: absolute;
+  inset: 0;
   display: block;
-  max-width: 100%;
+  width: 100%;
+  height: 100%;
 }
 
 /* Replay（#15）：控制与时间轴按触摸尺寸设计 */
@@ -307,13 +567,19 @@ body {
 }
 
 .world-map__canvas {
+  position: relative;
+  flex: 1;
+  min-height: 0;
   width: 100%;
-  margin-top: 12px;
+  margin-top: 8px;
 }
 
 .world-map__canvas canvas {
+  position: absolute;
+  inset: 0;
   display: block;
-  max-width: 100%;
+  width: 100%;
+  height: 100%;
   touch-action: none;
   cursor: grab;
 }
@@ -427,14 +693,17 @@ body {
 /* ---- Room View 交互（#12）：边缘箭头、详情卡 ---- */
 
 .room-view__stage {
+  flex: 1;
+  min-height: 0;
   display: grid;
+  grid-template-rows: minmax(0, 1fr);
   gap: 12px;
 }
 
 .room-view__frame {
   position: relative;
+  min-height: 0;
   width: 100%;
-  max-width: 720px;
 }
 
 .room-view__canvas canvas {
@@ -576,207 +845,6 @@ body {
   cursor: pointer;
 }
 
-/* ---- 面板系统（#2） ---- */
-.workspace {
-  --tabbar-h: calc(56px + env(safe-area-inset-bottom));
-  margin-top: 12px;
-}
-
-.workspace__toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.workspace__toolbar button,
-.panel__close {
-  font: inherit;
-  padding: 4px 10px;
-  border: 1px solid color-mix(in srgb, var(--muted) 60%, transparent);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--fg);
-  cursor: pointer;
-}
-
-/* 桌面：12 列网格，行高与间距与 Workspace.tsx 的 ROW_HEIGHT / GRID_GAP 一致 */
-.workspace[data-layout="desktop"] .workspace__panels {
-  display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
-  grid-auto-rows: 40px;
-  gap: 8px;
-}
-
-.panel {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-  border: 1px solid color-mix(in srgb, var(--muted) 40%, transparent);
-  border-radius: 8px;
-  background: var(--bg);
-  transition: box-shadow 0.3s;
-}
-
-.panel[hidden] {
-  display: none;
-}
-
-.panel[data-focused] {
-  box-shadow: 0 0 0 2px var(--accent);
-}
-
-.panel__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 4px 4px 4px 12px;
-  border-bottom: 1px solid color-mix(in srgb, var(--muted) 30%, transparent);
-  font-weight: 600;
-  cursor: move;
-  touch-action: none;
-  user-select: none;
-  -webkit-user-select: none;
-}
-
-.panel__close {
-  padding: 0 10px;
-  border: 0;
-  font-size: 1.2em;
-  color: var(--muted);
-}
-
-.panel__body {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  padding: 0 12px 12px;
-}
-
-/* 面板标题栏已显示名称：面板内第一个区块的标题只留给读屏 */
-.panel__body > :first-child > h2:first-child {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
-.panel__resize {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  width: 16px;
-  height: 16px;
-  cursor: nwse-resize;
-  touch-action: none;
-  background: linear-gradient(135deg, transparent 50%, color-mix(in srgb, var(--muted) 60%, transparent) 50%);
-  border-bottom-right-radius: 8px;
-}
-
-.details-panel:has(.room-details) .details-panel__hint {
-  display: none;
-}
-
-.details-panel .room-details {
-  position: static;
-  max-height: none;
-  padding: 0;
-  border: 0;
-  box-shadow: none;
-}
-
-/* Monitor Mode：单面板 + 底部标签栏，触摸尺寸 */
-.workspace[data-layout="monitor"] {
-  padding-bottom: var(--tabbar-h);
-}
-
-.workspace[data-layout="monitor"] .panel {
-  border: 0;
-}
-
-.workspace[data-layout="monitor"] .panel__header {
-  cursor: default;
-  padding: 8px 0;
-  font-size: 1.1rem;
-}
-
-.workspace[data-layout="monitor"] .panel__body {
-  padding: 0;
-  overflow: visible;
-}
-
-.workspace[data-layout="monitor"] .room-details {
-  bottom: var(--tabbar-h);
-}
-
-.workspace__tabs {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 20;
-  display: flex;
-  height: var(--tabbar-h);
-  padding-bottom: env(safe-area-inset-bottom);
-  border-top: 1px solid color-mix(in srgb, var(--muted) 50%, transparent);
-  background: var(--bg);
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.workspace__tabs button {
-  flex: 1 1 auto;
-  min-width: 48px;
-  min-height: 48px;
-  padding: 0 6px;
-  white-space: nowrap;
-  font-size: 0.9rem;
-  border: 0;
-  border-top: 3px solid transparent;
-  background: none;
-  color: var(--muted);
-  font: inherit;
-  cursor: pointer;
-}
-
-.workspace__tabs button[aria-selected="true"] {
-  border-top-color: var(--accent);
-  color: var(--fg);
-  font-weight: 600;
-}
-
-.workspace__tabs .workspace__more {
-  flex: 0 0 44px;
-  font-size: 1.3em;
-}
-
-.workspace__tab-manager {
-  position: fixed;
-  right: 8px;
-  bottom: calc(var(--tabbar-h) + 8px);
-  z-index: 21;
-  display: grid;
-  gap: 4px;
-  padding: 8px 12px;
-  border: 1px solid color-mix(in srgb, var(--muted) 50%, transparent);
-  border-radius: 8px;
-  background: var(--bg);
-  box-shadow: 0 4px 16px rgb(0 0 0 / 0.25);
-}
-
-.workspace__tab-manager label {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 44px;
-}
-
 /* Console 面板（#6） */
 .console-panel {
   display: flex;
@@ -856,24 +924,6 @@ body {
   font-size: 0.85em;
 }
 
-/* Monitor Mode：输出区限高，发送栏贴在标签栏上方；16px 字号避免手机输入时自动放大 */
-.workspace[data-layout="monitor"] .console-panel__output {
-  max-height: 55vh;
-}
-
-.workspace[data-layout="monitor"] .console-panel__send {
-  position: sticky;
-  bottom: var(--tabbar-h);
-  padding: 6px 0;
-  background: var(--bg);
-}
-
-.workspace[data-layout="monitor"] .console-panel__send input,
-.workspace[data-layout="monitor"] .console-panel__send button {
-  min-height: 44px;
-  font-size: 16px;
-}
-
 /* 外观、快捷键与设置导入导出（#5） */
 .customize__palette {
   display: flex;
@@ -930,4 +980,11 @@ body {
 
 .customize__file input[type="file"] {
   margin-left: 6px;
+}
+
+/* 窄屏：16px 字号避免手机输入时自动放大 */
+.shell__body[data-layout="narrow"] .console-panel__send input,
+.shell__body[data-layout="narrow"] .console-panel__send button {
+  min-height: 44px;
+  font-size: 16px;
 }

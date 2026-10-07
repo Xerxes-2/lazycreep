@@ -1,5 +1,5 @@
 /**
- * 桌面布局与 Monitor Mode 的断点（#2）：手机、竖屏平板进入 Monitor Mode。
+ * 桌面结构与窄屏结构的断点（#2 起，#24 沿用）：手机、竖屏平板用窄屏结构（Monitor Mode 的承诺范围）。
  */
 import { createSignal, onCleanup, type Accessor } from "solid-js";
 

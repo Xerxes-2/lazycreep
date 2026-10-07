@@ -1,7 +1,7 @@
 /**
  * 快捷键（#5）：动作目录、默认键位、用户重绑（`msc.keys`，只存与默认不同的部分）与按键分发。
  *
- * - 动作的执行者通过 ShortcutCommands.register 登记：App 登记面板切换（PanelController），
+ * - 动作的执行者通过 ShortcutCommands.register 登记：App 登记外壳动作（shell/shell-shortcuts.ts），
  *   Room View 登记 Live / Replay 与播放控制。没有执行者的动作按下时什么也不做，也不阻止默认行为。
  * - 焦点在输入框、文本区、下拉框或可编辑元素里时不拦截；按钮等控件上的空格 / 回车交给控件本身。
  * - 每个动作至多一个键；同一个键绑给多个动作即冲突（conflicts），分发时取动作目录里靠前的那个。
@@ -13,7 +13,7 @@ import { isRecord, readJson, writeJson, type KeyValueStorage, type StoredKey } f
 export const KEYBINDINGS_KEY = "msc.keys";
 export const KEYBINDINGS_STORAGE: StoredKey = { key: KEYBINDINGS_KEY, kind: "json-object", role: "settings" };
 
-/** 动作目录（显示顺序）；面板动作的 panel 是 PanelController.focus 的 id */
+/** 动作目录（显示顺序）；panel 动作是 #2 留下的数字键，暂由外壳映射（#30 重做目录） */
 export const SHORTCUT_ACTIONS = [
   { id: "panel.map", title: "shortcuts.action.panel.map", panel: "map" },
   { id: "panel.room", title: "shortcuts.action.panel.room", panel: "room" },

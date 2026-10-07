@@ -3,7 +3,7 @@ import { createRoot } from "solid-js";
 import { createAllyList } from "../allies/ally-list.ts";
 import { createAlertSettings } from "../alert/alert-settings.ts";
 import { createLocale } from "../i18n/locale.ts";
-import { createLayoutStore } from "../panels/layout-store.ts";
+import { createShellState } from "../shell/shell-state.ts";
 import { createReplaySettings } from "../replay/replay-settings.ts";
 import { cameraKey, saveCamera } from "../room/room-camera-store.ts";
 import { createSettings } from "../settings/settings.ts";
@@ -44,13 +44,11 @@ function customizeEverything() {
     createAllyList(localStorage).add("Friend");
     createAlertSettings(localStorage, fakeNotifications).update({ nuke: false, cooldownMinutes: 7 });
     createReplaySettings(localStorage).setCacheLimitMb(64);
-    const layout = createLayoutStore(
-      localStorage,
-      { ids: ["map", "room"], size: () => ({ w: 6, h: 8 }) },
-      { desktop: ["map", "room"], monitor: ["map", "room"] },
-    );
-    layout.closePanel("room");
-    layout.showTab("room");
+    const shell = createShellState(localStorage, settings);
+    shell.setSidebarOpen(false);
+    shell.setSectionCollapsed("map.pvp", true);
+    shell.setConsoleOpen(true);
+    shell.setConsoleHeight(400);
     saveCamera(localStorage, cameraKey("season", "shardSeason", "W13S28"), { cx: 10, cy: 20, span: 15 });
   });
 }
