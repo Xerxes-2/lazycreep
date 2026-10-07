@@ -17,6 +17,9 @@ Researched 2026-10-08 by a background agent. Sources: official docs, screepers/n
 - Channels: `room:<shard>/<room>`, `roomMap2:<shard>/<room>`, `mapVisual:<userId>/<shard>`, `user:<id>/console`, `/cpu`, `/money`, `/resources`, `/code`, `/set-active-branch`, `/newMessage`, `/message:<otherUserId>`, `/memory/<shard>/<path>`, `/steam-purchase`. Shardless private servers omit `<shard>/`. https://github.com/screepers/node-screeps-api/blob/master/src/socket/user.ts
 - Room payload: `{gameTime, info:{mode}, objects:{id: obj|null}, users:{...}, visual}`; first event full, subsequent events only modified properties; `null` = object gone. `roomMap2` payload `{w,r,pb,p,s,c,m,k,<userId>:[[x,y],...]}`. https://github.com/screepers/node-screeps-api/blob/master/src/socket/base.ts
 - Simultaneous room-subscription cap: **not found in any primary source**; official client subscribes one `room:` plus `roomMap2:` tiles. The "~2 rooms" claim is unverified.
+- Observed 2026-10-08 (season, authenticated, #8 fixture recording): subscribing 6 `room:` channels on one connection delivers each room's first frame, then most later ticks arrive as `["err@room:<shard>/<room>", "subscribe limit reached"]` instead of data. 2 `room:` + 2 `roomMap2:` on one connection ran 50 ticks with no error frames.
+- Observed: the first `room:` frame after subscribing is the full state but carries **no `gameTime`** (keys `objects, users, flags, info, decorations`); every later frame has `gameTime`, `info`, `visual` (`""` when the tick drew nothing). `users` holds every user seen in the room (incl. Invader `2`, Source Keeper `3`) with `_id`, `username`, `badge`.
+- Observed: history chunk objects carry the same properties as the live first frame plus internal extras such as `_upgraded`.
 
 ## 3. Season server
 - Base `https://screeps.com/season/api/...`; shard name `shardSeason` (observed). `/season/api/game/time` requires `?shard=shardSeason`. PTR at `/ptr/`.

@@ -1,0 +1,5 @@
+{
+"meta":{"format":1,"kind":"pvp","recordedAt":"2026-10-07T17:33:16.512Z","server":{"id":"season","name":"Season","apiRoot":"/season/api","socketUrl":"wss://screeps.com/season/socket/websocket","sharded":true,"tileRoot":"/map-tiles","historyRoot":"/room-history"},"origin":"https://screeps.com","interval":100},
+"status":200,
+"body":{"pvp":{"shardSeason":{"time":1025187,"rooms":[{"_id":"E13N21","lastPvpTime":1025187},{"_id":"W17N21","lastPvpTime":1025186},{"_id":"W7N15","lastPvpTime":1025186},{"_id":"E26N3","lastPvpTime":1025186},{"_id":"W5N29","lastPvpTime":1025185},{"_id":"W15S8","lastPvpTime":1025182},{"_id":"W17N17","lastPvpTime":1025161},{"_id":"W29S2","lastPvpTime":1025147},{"_id":"E26N9","lastPvpTime":1025143},{"_id":"W20S28","lastPvpTime":1025140},{"_id":"W6N14","lastPvpTime":1025139},{"_id":"W25S25","lastPvpTime":1025127},{"_id":"W15N15","lastPvpTime":1025120},{"_id":"W17S22","lastPvpTime":1025106},{"_id":"W28S2","lastPvpTime":1025095},{"_id":"E18S19","lastPvpTime":1025095}]}}}
+}
