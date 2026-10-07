@@ -1,0 +1,14 @@
+{
+  "name": "my-screeps-client",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --filter web dev",
+    "build": "pnpm --filter web build",
+    "preview": "pnpm --filter web preview",
+    "test": "pnpm --filter web test",
+    "test:live": "pnpm --filter web test:live",
+    "typecheck": "pnpm --filter web typecheck",
+    "record": "node --env-file-if-exists=.env.local scripts/record-fixtures.ts"
+  }
+}

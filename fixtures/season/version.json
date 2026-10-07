@@ -1,0 +1,5 @@
+{
+"meta":{"format":1,"kind":"version","recordedAt":"2026-10-07T17:48:37.104Z","server":{"id":"season","name":"Season","apiRoot":"/season/api","socketUrl":"wss://screeps.com/season/socket/websocket","sharded":true,"tileRoot":"/map-tiles","historyRoot":"/room-history"},"origin":"https://screeps.com","note":"serverData 只保留 historyChunkSize"},
+"status":200,
+"body":{"package":247,"protocol":14,"serverData":{"historyChunkSize":100}}
+}

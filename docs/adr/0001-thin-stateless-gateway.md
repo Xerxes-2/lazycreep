@@ -7,7 +7,7 @@ screeps.com 的 HTTP API 与 room-history 文件不返回 CORS 头，浏览器�
 
 ## Considered Options
 
-- **厚 Gateway**：服务端持有 token、统一维护一条上游 WebSocket 并向各设备分发。能做应用关闭时的 Attack Alert 推送与多设备设置同步，但引入有状态服务与自建认证。第一版不需要这两项，故不选；检测敌情的逻辑写成独立模块，日后可迁入服务端。
+- **厚 Gateway**：Gateway 持有 token、统一维护一条上游 WebSocket 并向各设备分发。能做应用关闭时的 Attack Alert 推送与多设备设置同步，但引入有状态服务与自建认证。第一版不需要这两项，故不选；检测敌情的逻辑写成独立模块，日后可迁入 Gateway。
 - **原生壳（Tauri / Capacitor）绕过 CORS**：无法以 PWA 形式覆盖 iPadOS，且四个平台各需打包，成本过高。
 
 ## Consequences

@@ -1,0 +1,415 @@
+/**
+ * World Map 页面（基础版，#16）：当前 Shard 的整张地图，地形瓦片 + 所有权着色。
+ * 数据流：Source（world-size、me、map-stats 经所有权加载器）→ MapState → buildMapScene → SceneView。
+ * 交互直接用画布上的 DOM Pointer Events（适配层停了 Pixi 的 ticker，Pixi events 不可靠）：
+ * 滚轮 / 双指捏合缩放、拖拽平移；放大到 ENTER_ZOOM 以上后点房间进入 Room View，远看时点击只放大。
+ * 视口按 Server + Shard 记在组件里：地图隐藏再显示、切走 Shard 再切回来都保持原样。
+ * 放在面板系统的地图面板里（#2）。
+ */
+import { createEffect, createMemo, createSignal, For, on, onCleanup, onMount, Show, untrack } from "solid-js";
+import { useI18n } from "../i18n";
+import { useVisible } from "../power/use-visible.ts";
+import type { VisibilitySignal } from "../power/visibility.ts";
+import { createSceneView, type SceneView, type SceneViewOptions, type Viewport } from "../scene/pixi-scene-view.ts";
+import type { Scene } from "../scene/scene.ts";
+import { DEFAULT_THEME, type Theme } from "../scene/theme.ts";
+import { errorMessage, type SourceFactory } from "../settings/SettingsPage.tsx";
+import type { Settings } from "../settings/settings.ts";
+import type { ShardInfo, Source } from "../source/source.ts";
+import { attachGestures } from "../scene/pointer-gestures.ts";
+import { panBy, screenToWorld } from "../scene/scene-camera.ts";
+import { centerOn, fitCamera, sceneRect, sceneZoom, visibleRect, zoomAt } from "./map-camera.ts";
+import { buildMapScene, MAP_LAYERS, type MapLayerPainter } from "./map-scene.ts";
+import { applyMapStats, mapStateFrom, roomAtWorld, type MapState } from "./map-state.ts";
+import { createOwnershipLoader } from "./ownership-loader.ts";
+import type { OwnershipHub } from "./ownership-hub.ts";
+import { findRoom, useMapInfo } from "./use-map-info.ts";
+
+/** 每个房间至少这么多 CSS 像素时，点击房间进入 Room View */
+export const ENTER_ZOOM = 32;
+/** 搜索房间后至少放大到这么多 CSS 像素每房间（够显示矿物与 Power Bank） */
+const SEARCH_ZOOM = 64;
+const DEFAULT_WIDTH = 600;
+
+export interface MapTarget {
+  readonly shard: string;
+  readonly room: string;
+}
+
+export interface MapViewProps {
+  readonly settings: Settings;
+  readonly sourceFor: SourceFactory;
+  /** 点击房间进入 Room View */
+  readonly onOpenRoom: (target: MapTarget) => void;
+  /** 默认是 Pixi 适配层；测试里换成记录 Scene 的假实现 */
+  readonly createView?: (options: SceneViewOptions) => Promise<SceneView>;
+  readonly visibility?: VisibilitySignal;
+  /** 视口停止变化多久后才取所有权，默认 600 毫秒 */
+  readonly settleMs?: number;
+  /**
+   * 与其他功能共用的所有权缓存与额度（#3）；须与本组件的 Server + token 一致。
+   * 不给时组件自建一个加载器。
+   */
+  readonly ownership?: OwnershipHub;
+  /** 叠加在默认图层之上的额外图层（例如 PvP 热点）；按 Shard 给出，变化时重建 Scene */
+  readonly overlays?: (shard: string) => readonly MapLayerPainter[];
+  /** Ally List（#17）：玩家用户名，不分大小写 */
+  readonly allies?: ReadonlySet<string>;
+  /** 地图是否在前台；false 时（例如 Room View 打开）不订阅 roomMap2。默认 true */
+  readonly active?: boolean;
+  /** Scene 调色板与着色规则（#5）；变化时重建 Scene。默认 DEFAULT_THEME */
+  readonly theme?: Theme | undefined;
+}
+
+export function MapView(props: MapViewProps) {
+  const { t } = useI18n();
+  /** Server + Shard → 视口；组件存活期间保留（进入 Room View 时页面只隐藏地图、不卸载） */
+  const savedCameras = new Map<string, Viewport>();
+  const settings = props.settings;
+  const visible = useVisible(props.visibility);
+
+  const source = createMemo(() => {
+    const created = props.sourceFor(settings.server(), settings.token() || undefined);
+    onCleanup(() => created.close());
+    return created;
+  });
+
+  const [shards, setShards] = createSignal<readonly ShardInfo[]>();
+  const [loadError, setLoadError] = createSignal<string>();
+  const [ownershipError, setOwnershipError] = createSignal<string>();
+
+  createEffect(() => {
+    const src = source();
+    setShards(undefined);
+    setLoadError(undefined);
+    if (!src.server.sharded) return;
+    let alive = true;
+    src.getShards().then(
+      (list) => alive && setShards(list),
+      (error: unknown) => alive && setLoadError(errorMessage(t, error)),
+    );
+    onCleanup(() => (alive = false));
+  });
+
+  /** 选过且仍存在的 Shard，否则第一个；不分 Shard 的 Server 为空串；还不知道时 undefined */
+  const shard = createMemo<string | undefined>(() => {
+    if (!source().server.sharded) return "";
+    const list = shards();
+    if (!list) return undefined;
+    const chosen = settings.shard();
+    return chosen !== undefined && list.some((s) => s.name === chosen) ? chosen : list[0]?.name;
+  });
+
+  const [me, setMe] = createSignal<string>();
+  createEffect(() => {
+    const src = source();
+    setMe(undefined);
+    if (!settings.token()) return;
+    let alive = true;
+    src.getMe().then(
+      (user) => alive && setMe(user.id),
+      () => undefined,
+    );
+    onCleanup(() => (alive = false));
+  });
+
+  const [mapState, setMapState] = createSignal<MapState>();
+  createEffect(() => {
+    const src = source();
+    const current = shard();
+    setMapState(undefined);
+    if (current === undefined) return;
+    let alive = true;
+    src.getWorldSize(current).then(
+      (size) => {
+        if (!alive) return;
+        setMapState(
+          mapStateFrom({
+            shard: current,
+            size,
+            tiles: { room: (room) => src.tileUrl(current, room), block: (room) => src.blockTileUrl(current, room) },
+            me: untrack(me),
+          }),
+        );
+        const known = props.ownership?.stats(current);
+        if (known) setMapState((state) => state && applyMapStats(state, known));
+      },
+      (error: unknown) => alive && setLoadError(errorMessage(t, error)),
+    );
+    onCleanup(() => (alive = false));
+  });
+  createEffect(
+    on(me, (id) => setMapState((state) => (state && state.me !== id ? { ...state, ...(id ? { me: id } : {}) } : state))),
+  );
+
+  // 所有权：每个 Source（即每个 Server + token）一个加载器，限额按 Server 计
+  const loader = createMemo(() => {
+    const src: Source = source();
+    setOwnershipError(undefined);
+    const shared = props.ownership;
+    if (shared) {
+      onCleanup(
+        shared.subscribe(
+          (stats) => setMapState((state) => state && applyMapStats(state, stats)),
+          (error) => setOwnershipError(errorMessage(t, error)),
+        ),
+      );
+      return shared;
+    }
+    const created = createOwnershipLoader({
+      fetch: (s, rooms) => src.getMapStats(s, rooms),
+      onStats: (stats) => setMapState((state) => state && applyMapStats(state, stats)),
+      onError: (error) => setOwnershipError(errorMessage(t, error)),
+    });
+    onCleanup(() => created.dispose());
+    return created;
+  });
+
+  // ---- 画布与视口 ----
+
+  let host!: HTMLDivElement;
+  const [view, setView] = createSignal<SceneView>();
+  const [viewError, setViewError] = createSignal<string>();
+  const [canvasSize, setCanvasSize] = createSignal({ width: DEFAULT_WIDTH, height: DEFAULT_WIDTH * 0.75 });
+  const [camera, setCamera] = createSignal<Viewport>();
+
+  const cameraKey = () => {
+    const state = mapState();
+    return state ? `${source().server.id}/${state.shard}` : undefined;
+  };
+
+  // 换了地图（Server / Shard / 尺寸）时恢复记住的视口，否则整张放进画布
+  createEffect(
+    on(mapState, (state, previous) => {
+      if (!state) return setCamera(undefined);
+      if (previous && previous.shard === state.shard && previous.size === state.size) return;
+      const key = cameraKey()!;
+      const { width, height } = untrack(canvasSize);
+      setCamera(savedCameras.get(key) ?? fitCamera(state.size, width, height));
+    }),
+  );
+  createEffect(() => {
+    const cam = camera();
+    const key = untrack(cameraKey);
+    if (cam && key) savedCameras.set(key, cam);
+    if (cam) view()?.setViewport(cam);
+  });
+
+  const minScale = () => {
+    const state = mapState();
+    if (!state) return 0.1;
+    const { width, height } = canvasSize();
+    return fitCamera(state.size, width, height).scale / 2;
+  };
+
+  // Scene 只随“对齐后的可见区域 + 缩放档”变化；视口细微变化只重画
+  const sceneInput = createMemo(
+    () => {
+      const cam = camera();
+      if (!cam) return undefined;
+      const { width, height } = canvasSize();
+      return { rect: sceneRect(visibleRect(cam, width, height)), zoom: sceneZoom(cam.scale) };
+    },
+    undefined,
+    {
+      equals: (a, b) =>
+        a === b ||
+        (!!a &&
+          !!b &&
+          a.zoom === b.zoom &&
+          a.rect.x0 === b.rect.x0 &&
+          a.rect.y0 === b.rect.y0 &&
+          a.rect.x1 === b.rect.x1 &&
+          a.rect.y1 === b.rect.y1),
+    },
+  );
+
+  useMapInfo({
+    source,
+    mapState,
+    setMapState,
+    allies: () => props.allies,
+    focus: sceneInput,
+    enabled: () => !!settings.token() && visible() && props.active !== false,
+  });
+
+  // 页面不可见时不构建新 Scene（#14）
+  const scene = createMemo<Scene | undefined>((previous) => {
+    if (!visible()) return previous;
+    const state = mapState();
+    const input = sceneInput();
+    if (!state || !input) return undefined;
+    const layers = props.overlays ? [...MAP_LAYERS, ...props.overlays(state.shard)] : MAP_LAYERS;
+    return buildMapScene(state, { theme: props.theme ?? DEFAULT_THEME, zoom: input.zoom, visible: input.rect }, layers);
+  });
+
+  createEffect(() => {
+    const v = view();
+    const s = scene();    if (v && s) v.show(s);
+  });
+
+  // 视口停下来一段时间后才取所有权：拖动、缩放过程中不发请求
+  let settleTimer: ReturnType<typeof setTimeout> | undefined;
+  createEffect(() => {
+    const cam = camera();
+    const state = mapState();
+    const current = loader();
+    clearTimeout(settleTimer);
+    if (!cam || !state || !settings.token() || !visible()) return;
+    const { width, height } = canvasSize();
+    settleTimer = setTimeout(() => {
+      if (dragging()) return;
+      current.request(state.shard, state.size, visibleRect(cam, width, height));
+    }, props.settleMs ?? 600);
+  });
+  onCleanup(() => clearTimeout(settleTimer));
+
+  // ---- 指针交互（手势识别在 scene/pointer-gestures.ts，与 Room View 共用） ----
+
+  const [dragging, setDragging] = createSignal(false);
+
+  const update = (change: (cam: Viewport) => Viewport) => {
+    const cam = camera();
+    if (cam) setCamera(change(cam));
+  };
+
+  const click = (point: { x: number; y: number }) => {
+    const cam = camera();
+    const state = mapState();
+    if (!cam || !state) return;
+    if (cam.scale < ENTER_ZOOM) {
+      setCamera(zoomAt(cam, point.x, point.y, 2, minScale()));
+      return;
+    }
+    const world = screenToWorld(cam, point.x, point.y);
+    const room = roomAtWorld(state, world.x, world.y);
+    if (room) props.onOpenRoom({ shard: state.shard, room });
+  };
+
+  // 房间名搜索：居中到该房间，并至少放大到能看清图标
+  const [searchText, setSearchText] = createSignal("");
+  const [searchMiss, setSearchMiss] = createSignal<string>();
+  const onSearch = (event: Event) => {
+    event.preventDefault();
+    const state = mapState();
+    const cam = camera();
+    if (!state || !cam) return;
+    const text = searchText().trim();
+    const at = findRoom(state, text);
+    setSearchMiss(at ? undefined : text);
+    if (!at) return;
+    const { width, height } = canvasSize();
+    setCamera(centerOn(at.x, at.y, width, height, Math.max(cam.scale, SEARCH_ZOOM)));
+  };
+
+  onMount(() => {
+    const size = () => {
+      const width = host.clientWidth || DEFAULT_WIDTH;
+      return { width, height: Math.round(width * 0.75) };
+    };
+    setCanvasSize(size());
+    let alive = true;
+    let created: SceneView | undefined;
+    let observer: ResizeObserver | undefined;
+    let detachGestures: (() => void) | undefined;
+    (props.createView ?? createSceneView)(size()).then(
+      (made) => {
+        if (!alive) return made.destroy();
+        created = made;
+        const canvas = made.canvas;
+        canvas.style.touchAction = "none";
+        detachGestures = attachGestures(canvas, {
+          pan: (dx, dy) => update((cam) => panBy(cam, dx, dy)),
+          zoom: (x, y, factor) => update((cam) => zoomAt(cam, x, y, factor, minScale())),
+          tap: (x, y) => click({ x, y }),
+          end: () => {},
+          press: setDragging,
+        });
+        host.append(canvas);
+        setView(made);
+        const cam = untrack(camera);
+        if (cam) made.setViewport(cam);
+        if (typeof ResizeObserver === "function") {
+          observer = new ResizeObserver(() => {
+            // 隐藏（display: none）时宽度为 0：保持原尺寸，回来时视口不变
+            if (host.clientWidth === 0) return;
+            const next = size();
+            setCanvasSize(next);
+            made.resize(next.width, next.height);
+          });
+          observer.observe(host);
+        }
+      },
+      (error: unknown) => alive && setViewError(error instanceof Error ? error.message : String(error)),
+    );
+    onCleanup(() => {
+      alive = false;
+      observer?.disconnect();
+      detachGestures?.();
+      created?.canvas.remove();
+      created?.destroy();
+    });
+  });
+
+  return (
+    <section class="world-map" aria-labelledby="world-map-title">
+      <h2 id="world-map-title">{t("worldMap.title")}</h2>
+      <div class="world-map__bar">
+        <Show when={source().server.sharded}>
+          <label>
+            {t("worldMap.shard")}
+            <select name="world-map-shard" onChange={(e) => settings.setShard(e.currentTarget.value)}>
+              <For each={shards() ?? []}>
+                {(info) => (
+                  <option value={info.name} selected={info.name === shard()}>
+                    {info.name}
+                  </option>
+                )}
+              </For>
+            </select>
+          </label>
+        </Show>
+        <form class="world-map__search" role="search" onSubmit={onSearch}>
+          <input
+            name="world-map-search"
+            aria-label={t("mapInfo.search")}
+            placeholder={t("mapInfo.search.placeholder")}
+            autocomplete="off"
+            size={8}
+            value={searchText()}
+            onInput={(e) => setSearchText(e.currentTarget.value)}
+          />
+        </form>
+        <span class="world-map__hint">{t("worldMap.hint")}</span>
+      </div>
+      <Show when={searchMiss()}>
+        {(room) => (
+          <p class="settings__error" role="alert">
+            {t("mapInfo.search.notFound", { room: room() })}
+          </p>
+        )}
+      </Show>
+      <Show when={!mapState() && !loadError()}>
+        <p class="settings__muted">{t("worldMap.loading")}</p>
+      </Show>
+      <Show when={!settings.token()}>
+        <p class="settings__muted">{t("worldMap.noToken")}</p>
+      </Show>
+      <Show when={loadError() ?? viewError()}>
+        {(message) => (
+          <p class="settings__error" role="alert">
+            {message()}
+          </p>
+        )}
+      </Show>
+      <Show when={ownershipError()}>
+        {(message) => (
+          <p class="settings__error" role="alert">
+            {t("worldMap.ownershipError", { message: message() })}
+          </p>
+        )}
+      </Show>
+      <div class="world-map__canvas" ref={host} />
+    </section>
+  );
+}
