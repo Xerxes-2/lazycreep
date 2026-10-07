@@ -6,10 +6,13 @@
  * - 陌生人：为每个我的房间订阅 roomMap2（实测同一连接 100 个无错，不必轮换），
  *   订阅声明 keepWhileHidden：页面不可见时也保留（系统通知在那时最有用），只是不渲染
  * - 玩家名：roomMap2 只给用户 id，按需 `getUsername` 查一次后缓存，用来对照 Ally List
+ * - 冷却与已告警记录（AlertMemory）按 Server 存在本地，刷新后沿用（alert-memory.ts）
  */
 import { createEffect, createMemo, createSignal, onCleanup, untrack, type Accessor } from "solid-js";
 import type { PvpFeed } from "../pvp/pvp-feed.ts";
 import type { Source, Unsubscribe, UserInfo } from "../source/source.ts";
+import type { KeyValueStorage } from "../storage/local-store.ts";
+import { loadAlertMemory, saveAlertMemory } from "./alert-memory.ts";
 import { NOT_PLAYERS, createAlertDetector, myRoomsFrom, type Alert, type AlertConfig, type AlertContext } from "./alert-detector.ts";
 
 /** 用户信息（我的房间）的刷新间隔：新占或丢失的房间 10 分钟内跟上 */
@@ -23,6 +26,8 @@ export interface AttackAlertOptions {
   readonly allies: Accessor<ReadonlySet<string>>;
   readonly config: Accessor<AlertConfig>;
   readonly onAlert: (alert: Alert) => void;
+  /** 告警记忆的存储；undefined 时只在内存里（刷新即忘） */
+  readonly storage: KeyValueStorage | undefined;
   readonly now?: () => number;
   readonly meRefreshMs?: number;
 }
@@ -69,9 +74,24 @@ export function createAttackAlert(options: AttackAlertOptions): AttackAlert {
     { equals: (a, b) => roomsKey(a) === roomsKey(b) },
   );
 
+  // 每个 Server 一份记忆；判定器随 Source 换（Server 或 token 变化）而重建，记忆从本地读回
   const detector = createMemo(() => {
-    options.source();
-    return createAlertDetector();
+    const serverId = options.source().server.id;
+    const memory = loadAlertMemory(options.storage, serverId, now());
+    const inner = createAlertDetector(memory);
+    const save = () => saveAlertMemory(options.storage, serverId, memory, now());
+    return {
+      feed: (...args: Parameters<typeof inner.feed>) => {
+        const alerts = inner.feed(...args);
+        save();
+        return alerts;
+      },
+      roomMap: (...args: Parameters<typeof inner.roomMap>) => {
+        const alerts = inner.roomMap(...args);
+        if (alerts.length > 0) save();
+        return alerts;
+      },
+    };
   });
 
   const context = (): AlertContext => ({

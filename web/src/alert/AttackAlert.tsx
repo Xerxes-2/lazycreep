@@ -7,6 +7,7 @@ import { useI18n, type MessageKey } from "../i18n";
 import type { Translate } from "../i18n/translator.ts";
 import type { PvpFeed } from "../pvp/pvp-feed.ts";
 import type { Source } from "../source/source.ts";
+import { browserStorage, type KeyValueStorage } from "../storage/local-store.ts";
 import type { Alert } from "./alert-detector.ts";
 import type { AlertSettings } from "./alert-settings.ts";
 import { createAttackAlert } from "./attack-alert.ts";
@@ -24,6 +25,8 @@ export interface AttackAlertProps {
   readonly settings: AlertSettings;
   /** 进入该房间的 Room View（MapAndRoom 的外部打开入口） */
   readonly onOpen: (target: AlertTarget) => void;
+  /** 告警记忆（冷却、已告警记录）的存储；默认浏览器 localStorage */
+  readonly storage?: KeyValueStorage;
   readonly now?: () => number;
 }
 
@@ -71,6 +74,7 @@ export function AttackAlert(props: AttackAlertProps) {
     enabled: props.enabled,
     allies: props.allies,
     config: props.settings.config,
+    storage: props.storage ?? browserStorage(),
     ...(props.now ? { now: props.now } : {}),
     onAlert(alert) {
       const { title, body } = alertText(t, alert);

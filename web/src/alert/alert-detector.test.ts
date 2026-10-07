@@ -4,11 +4,13 @@ import type { RoomMapUpdate } from "../source/source.ts";
 import { PVP_FETCH_INTERVAL, type PvpFeedData } from "../pvp/pvp-overview.ts";
 import {
   DEFAULT_ALERT_CONFIG,
+  FRESH_PVP_TICKS,
   createAlertDetector,
   myRoomsFrom,
   type AlertConfig,
   type AlertContext,
 } from "./alert-detector.ts";
+import { emptyAlertMemory } from "./alert-memory.ts";
 
 const files = Object.values(
   import.meta.glob<unknown>("../../../fixtures/season/*.json", { eager: true, import: "default" }),
@@ -178,6 +180,52 @@ describe("陌生人停留触发", () => {
   it("不知道玩家名时照样告警（只缺名字）", () => {
     const alerts = play(frames, "E13N21", ctx(["E13N21"], { usernames: {} }), config({ strangerTicks: 30 }));
     expect(alerts).toEqual([{ shard: SHARD, room: "E13N21", reason: "stranger", users: [{ id: DUMP_TABLE }], ticks: 30 }]);
+  });
+});
+
+describe("首次打开与刷新（告警记忆）", () => {
+  it("首次打开：最后战斗早于“服务器 Tick − FRESH_PVP_TICKS”的视为旧战斗，不告警；之后有新战斗照常告警", async () => {
+    const data = await feed();
+    const time = data.pvp.find((s) => s.shard === SHARD)!.time;
+    const detector = createAlertDetector();
+    const c = ctx(["E13N21"]);
+    expect(detector.feed(bump(data, "E13N21", time - FRESH_PVP_TICKS - 1), c, config(), 0)).toEqual([]);
+    expect(detector.feed(bump(data, "E13N21", time + 1), c, config(), MIN)).toEqual([
+      { shard: SHARD, room: "E13N21", reason: "pvp", lastPvpTime: time + 1 },
+    ]);
+  });
+
+  it("首次打开：阈值以内的战斗算正在进行，照常告警", async () => {
+    const data = await feed();
+    const time = data.pvp.find((s) => s.shard === SHARD)!.time;
+    const alerts = createAlertDetector().feed(bump(data, "E13N21", time - FRESH_PVP_TICKS), ctx(["E13N21"]), config(), 0);
+    expect(alerts.map((a) => a.reason)).toEqual(["pvp"]);
+  });
+
+  it("沿用同一份记忆新建判定器（刷新页面）：冷却、已告警的战斗与核弹都保留", async () => {
+    const data = await feed();
+    const memory = emptyAlertMemory();
+    const c = ctx(["E13N21", "W17N21"]);
+    expect(createAlertDetector(memory).feed(data, c, config(), 0).map((a) => a.reason).sort()).toEqual(["nuke", "pvp", "pvp"]);
+
+    const reloaded = createAlertDetector(memory);
+    expect(reloaded.feed(data, c, config(), MIN)).toEqual([]);
+    // 冷却内战斗更新了也不报；冷却过后才报
+    const later = bump(data, "E13N21", 1025190);
+    expect(reloaded.feed(later, c, config({ cooldownMinutes: 15 }), 10 * MIN)).toEqual([]);
+    expect(reloaded.feed(later, c, config({ cooldownMinutes: 15 }), 16 * MIN).map((a) => a.room)).toEqual(["E13N21"]);
+  });
+
+  it("不是首次打开（记忆里已有该 Shard）时，关页期间发生、还在列表里的战斗会补报", async () => {
+    const data = await feed();
+    const time = data.pvp.find((s) => s.shard === SHARD)!.time;
+    const memory = emptyAlertMemory();
+    const c = ctx(["E13N21"]);
+    expect(createAlertDetector(memory).feed(bump(data, "E13N21", time - 1000), c, config(), 0)).toEqual([]);
+    // 关页 30 分钟：期间 E13N21 打过一仗，重新打开时已过去 500 Tick
+    const reopened = bump({ ...data, pvp: data.pvp.map((s) => ({ ...s, time: time + 600 })) }, "E13N21", time + 100);
+    const alerts = createAlertDetector(memory).feed(reopened, c, config(), 30 * MIN);
+    expect(alerts).toEqual([{ shard: SHARD, room: "E13N21", reason: "pvp", lastPvpTime: time + 100 }]);
   });
 });
 

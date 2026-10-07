@@ -11,6 +11,7 @@
  * - 导入只写存储；让页面生效由调用方负责（App 重建整个界面，见 App.tsx）。
  */
 
+import { ALERT_MEMORY_STORAGE } from "../alert/alert-memory.ts";
 import { ALERT_SETTINGS_STORAGE } from "../alert/alert-settings.ts";
 import { ALLY_LIST_STORAGE } from "../allies/ally-list.ts";
 import { CONSOLE_SETTINGS_STORAGE } from "../console/console-settings.ts";
@@ -40,6 +41,8 @@ export const STORED_KEYS: readonly StoredKey[] = [
   ...LAYOUT_STORAGE,
   CONSOLE_SETTINGS_STORAGE,
   ROOM_CAMERA_STORAGE,
+  /** 不导出的运行状态 */
+  ALERT_MEMORY_STORAGE,
 ];
 
 const EXPORTED = STORED_KEYS.filter((s) => s.role === "settings");

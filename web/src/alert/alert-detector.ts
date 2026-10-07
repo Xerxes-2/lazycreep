@@ -7,9 +7,15 @@
  * - stranger：非我、非盟友、非 NPC 的玩家在我的房间停留满 strangerTicks（按 roomMap2 帧计，每 Tick 一帧）
  *
  * 同一房间同一原因在冷却窗口内只告警一次；冷却内被压下的事件不作废，冷却过后仍成立就再告警。
+ * 冷却与“已告警过什么”记在 AlertMemory 里，由调用方持久化（alert-memory.ts），刷新页面后沿用。
+ *
+ * 首次打开（记忆里没有该 Shard）：最后战斗早于“第一轮数据里该 Shard 的服务器 Tick − FRESH_PVP_TICKS”
+ * 的视为打开前的旧战斗，不告警。之后（包括刷新）以这条基线和已告警的战斗为准，
+ * 所以关页期间打过、仍在 PvP 列表里的战斗重新打开时会补报一次。
  */
 import type { PvpFeedData, PvpShardGroup } from "../pvp/pvp-overview.ts";
 import type { RoomMapUpdate, UserInfo } from "../source/source.ts";
+import { emptyAlertMemory, type AlertMemory } from "./alert-memory.ts";
 
 export type AlertReason = "pvp" | "nuke" | "stranger";
 
@@ -37,6 +43,12 @@ export const DEFAULT_ALERT_CONFIG: AlertConfig = {
   cooldownMinutes: 15,
   strangerTicks: 60,
 };
+
+/**
+ * 首次打开时，最后战斗距当前服务器 Tick 不超过这么多 Tick 的算“正在进行”，照常告警。
+ * PvP 列表每 10 秒一轮（赛季服约 3 秒一 Tick），10 Tick 覆盖一轮多的间隔。
+ */
+export const FRESH_PVP_TICKS = 10;
 
 /** 缺席不超过这么多帧不清零：边界上进进出出的 creep 仍算在场 */
 export const ABSENCE_GRACE_TICKS = 5;
@@ -93,12 +105,9 @@ function isAlly(context: AlertContext, userId: string): boolean {
   return false;
 }
 
-export function createAlertDetector(): AlertDetector {
-  /** `shard/room/reason` → 上次告警时刻 */
-  const lastAlert = new Map<string, number>();
-  /** `shard/room` → 上次告警的 lastPvpTime */
-  const pvpAlerted = new Map<string, number>();
-  const nukesAlerted = new Set<string>();
+/** memory 由调用方持有并持久化；判定器就地更新它 */
+export function createAlertDetector(memory: AlertMemory = emptyAlertMemory()): AlertDetector {
+  const { lastAlert, pvpAlerted, nukesAlerted, watched } = memory;
   /** `shard/room` → 用户 id → 在场情况 */
   const presence = new Map<string, Map<string, Presence>>();
 
@@ -118,12 +127,15 @@ export function createAlertDetector(): AlertDetector {
       const alerts: Alert[] = [];
       if (config.pvp) {
         for (const shard of data.pvp) {
+          // since：这个 Tick 及以前的战斗都算旧的
+          const since = watched.get(shard.shard)?.since ?? shard.time - FRESH_PVP_TICKS - 1;
+          watched.set(shard.shard, { since, at: now });
           for (const entry of shard.rooms) {
             if (!mine(context, shard.shard, entry.room)) continue;
             const key = roomKey(shard.shard, entry.room);
-            if (entry.lastPvpTime <= (pvpAlerted.get(key) ?? -Infinity)) continue;
+            if (entry.lastPvpTime <= Math.max(since, pvpAlerted.get(key)?.tick ?? -Infinity)) continue;
             if (!take(shard.shard, entry.room, "pvp", config, now)) continue;
-            pvpAlerted.set(key, entry.lastPvpTime);
+            pvpAlerted.set(key, { tick: entry.lastPvpTime, at: now });
             alerts.push({ shard: shard.shard, room: entry.room, reason: "pvp", lastPvpTime: entry.lastPvpTime });
           }
         }
@@ -140,7 +152,7 @@ export function createAlertDetector(): AlertDetector {
         for (const nukes of fresh.values()) {
           const first = [...nukes].sort((a, b) => a.landTime - b.landTime)[0]!;
           if (!take(first.shard, first.room, "nuke", config, now)) continue;
-          for (const nuke of nukes) nukesAlerted.add(nuke.id);
+          for (const nuke of nukes) nukesAlerted.set(nuke.id, now);
           alerts.push({
             shard: first.shard,
             room: first.room,

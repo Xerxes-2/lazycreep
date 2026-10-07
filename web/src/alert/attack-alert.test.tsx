@@ -159,6 +159,21 @@ describe("Attack Alert 接入", () => {
     expect(shown.length).toBe(before);
   });
 
+  it("刷新页面后，冷却窗口内同一房间同一原因不再告警", async () => {
+    const first = mount({ permission: "granted" });
+    await settle(() =>
+      expect(first.shown.map((n) => n.tag)).toEqual(
+        expect.arrayContaining(["shardSeason/E13N21/pvp", "shardSeason/W17N21/nuke", "shardSeason/E13N21/stranger"]),
+      ),
+    );
+    dispose?.();
+    container.replaceChildren();
+
+    const second = mount({ permission: "granted" });
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    expect(second.shown).toEqual([]);
+  });
+
   it("盟友不触发陌生人告警", async () => {
     // 陌生人告警只依赖 Ally List；名单里有 dump_table（大小写不同）
     const settings = createSettings(localStorage);
