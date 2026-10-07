@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LiveSource, type SocketFactory, type SocketHandlers } from "./live-source.ts";
 import { SERVER_PRESETS } from "./servers.ts";
 import type { ConnectionState, ConsoleEvent, CpuUpdate, RoomTick, ServerConfig, StreamError } from "./source.ts";
+import { manualVisibility, type VisibilitySignal } from "../power/visibility.ts";
 
 const SEASON = SERVER_PRESETS.season;
 const SHARD = "shardSeason";
@@ -63,7 +64,7 @@ class FakeSocket {
 }
 
 /** token 传 null 表示不给 token。 */
-function harness(server: ServerConfig = SEASON, token: string | null = TOKEN) {
+function harness(server: ServerConfig = SEASON, token: string | null = TOKEN, visibility?: VisibilitySignal) {
   const sockets: FakeSocket[] = [];
   const socket: SocketFactory = (url, handlers) => {
     const fake = new FakeSocket(url, handlers);
@@ -80,6 +81,7 @@ function harness(server: ServerConfig = SEASON, token: string | null = TOKEN) {
     baseUrl: "http://gateway.test",
     fetch,
     socket,
+    ...(visibility ? { visibility } : {}),
   });
   const states: ConnectionState[] = [];
   source.onConnection((state) => states.push(state));
@@ -417,5 +419,79 @@ describe("LiveSource WebSocket：断线重连", () => {
     source.close();
     expect(last().closedByClient).toBe(true);
     expect(states).toEqual(["disconnected", "connecting", "authenticated", "disconnected"]);
+  });
+});
+
+describe("LiveSource WebSocket：页面不可见时省电（#14）", () => {
+  const map = `roomMap2:${SHARD}/W13S28`;
+  const room = `room:${SHARD}/W13S28`;
+  const user = (topic: string) => `user:${USER_ID}/${topic}`;
+
+  async function watching() {
+    const visibility = manualVisibility(true);
+    const h = harness(SEASON, TOKEN, visibility);
+    const got: string[] = [];
+    h.source.subscribeRoom(SHARD, "W13S28", () => got.push("room"));
+    h.source.subscribeRoomMap(SHARD, "W13S28", () => got.push("map"));
+    h.source.subscribeConsole(() => got.push("console"));
+    h.source.subscribeCpu(() => got.push("cpu"));
+    h.last().accept();
+    await vi.waitFor(() => expect(h.last().commands).toHaveLength(4));
+    h.last().sent.length = 0;
+    return { ...h, visibility, got };
+  }
+
+  it("隐藏时退订 roomMap2 与用户频道，保留当前房间；回到前台重订阅", async () => {
+    const { visibility, last, got } = await watching();
+    visibility.set(false);
+    expect(last().commands.sort()).toEqual(
+      [`unsubscribe ${map}`, `unsubscribe ${user("console")}`, `unsubscribe ${user("cpu")}`].sort(),
+    );
+    // 退订生效前到达的残余帧不再投递；房间流照常
+    last().event(map, { w: [] });
+    last().event(user("cpu"), { cpu: 1, memory: 1 });
+    last().event(room, roomFrame(1));
+    expect(got).toEqual(["room"]);
+
+    last().sent.length = 0;
+    visibility.set(true);
+    expect(last().commands.sort()).toEqual(
+      [`subscribe ${map}`, `subscribe ${user("console")}`, `subscribe ${user("cpu")}`].sort(),
+    );
+    last().event(map, { w: [] });
+    last().event(user("cpu"), { cpu: 1, memory: 1 });
+    expect(got).toEqual(["room", "map", "cpu"]);
+  });
+
+  it("隐藏期间新建的 roomMap2 订阅等回到前台才发出", async () => {
+    const { source, visibility, last } = await watching();
+    visibility.set(false);
+    last().sent.length = 0;
+    source.subscribeRoomMap(SHARD, "W12S28", () => {});
+    expect(last().commands).toEqual([]);
+    visibility.set(true);
+    expect(last().commands).toContain(`subscribe roomMap2:${SHARD}/W12S28`);
+  });
+
+  it("隐藏期间退订的频道回到前台不再订阅", async () => {
+    const visibility = manualVisibility(true);
+    const { source, last } = harness(SEASON, TOKEN, visibility);
+    source.subscribeRoom(SHARD, "W13S28", () => {});
+    const off = source.subscribeRoomMap(SHARD, "W13S28", () => {});
+    last().accept();
+    visibility.set(false);
+    off();
+    last().sent.length = 0;
+    visibility.set(true);
+    expect(last().commands).toEqual([]);
+  });
+
+  it("close 之后不再响应可见性变化", async () => {
+    const { source, visibility, last } = await watching();
+    source.close();
+    last().sent.length = 0;
+    visibility.set(false);
+    visibility.set(true);
+    expect(last().sent).toEqual([]);
   });
 });

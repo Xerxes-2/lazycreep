@@ -34,6 +34,7 @@ import {
   type Unsubscribe,
   type UserInfo,
 } from "./source.ts";
+import type { VisibilitySignal } from "../power/visibility.ts";
 import { browserSocket, ChannelSocket, type ReconnectOptions, type SocketFactory } from "./socket.ts";
 import {
   consoleEventFromWire,
@@ -58,6 +59,17 @@ export interface LiveSourceOptions {
   /** 建立 WebSocket；测试里换成假 socket。 */
   readonly socket?: SocketFactory;
   readonly reconnect?: ReconnectOptions;
+  /**
+   * 页面可见性（#14）：不可见时退订 roomMap2 与用户频道（Console、CPU），只保留当前房间；
+   * 回到前台后重订阅。不给时一直视为可见。
+   */
+  readonly visibility?: VisibilitySignal;
+}
+
+/** 页面不可见时会被暂停的一条频道订阅。 */
+interface PausableStream {
+  off: Unsubscribe | undefined;
+  readonly start: () => void;
 }
 
 /** 当前那条房间订阅：同一房间可有多个监听者。 */
@@ -77,6 +89,9 @@ export class LiveSource implements Source {
   private readonly socket: ChannelSocket;
   private room: RoomSubscription | undefined;
   private userId: Promise<string> | undefined;
+  private readonly pausable = new Set<PausableStream>();
+  private hidden: boolean;
+  private readonly offVisibility: Unsubscribe | undefined;
 
   constructor(server: ServerConfig, options: LiveSourceOptions = {}) {
     this.server = server;
@@ -84,6 +99,36 @@ export class LiveSource implements Source {
     this.baseUrl = options.baseUrl;
     this.fetchImpl = options.fetch ?? globalThis.fetch.bind(globalThis);
     this.socket = new ChannelSocket(server.socketUrl, this.token, options.socket ?? browserSocket, options.reconnect);
+    this.hidden = options.visibility ? !options.visibility.visible() : false;
+    this.offVisibility = options.visibility?.subscribe((visible) => this.setHidden(!visible));
+  }
+
+  private setHidden(hidden: boolean) {
+    if (hidden === this.hidden) return;
+    this.hidden = hidden;
+    for (const entry of this.pausable) {
+      if (hidden) {
+        entry.off?.();
+        entry.off = undefined;
+      } else entry.start();
+    }
+  }
+
+  /** 非必要频道：页面不可见期间不在服务器上订阅。 */
+  private pausableStream<T>(channel: string, listener: (data: T) => void, onError?: StreamErrorListener): Unsubscribe {
+    const entry: PausableStream = {
+      off: undefined,
+      start: () => {
+        entry.off = this.stream(channel, listener, onError);
+      },
+    };
+    this.pausable.add(entry);
+    if (!this.hidden) entry.start();
+    return () => {
+      if (!this.pausable.delete(entry)) return;
+      entry.off?.();
+      entry.off = undefined;
+    };
   }
 
   private url(path: string, query: Query = {}): string {
@@ -176,7 +221,7 @@ export class LiveSource implements Source {
     listener: (update: RoomMapUpdate) => void,
     onError?: StreamErrorListener,
   ): Unsubscribe {
-    return this.stream(this.roomChannel("roomMap2", shard, room), listener, onError);
+    return this.pausableStream(this.roomChannel("roomMap2", shard, room), listener, onError);
   }
 
   /** `user:<id>/<topic>`：id 取自 token 所属用户，取到之前先不订阅。 */
@@ -186,7 +231,7 @@ export class LiveSource implements Source {
     const userId = (this.userId ??= this.api<{ _id: string }>("/auth/me").then((me) => me._id));
     userId.then(
       (id) => {
-        if (!cancelled) off = this.stream(`user:${id}/${topic}`, listener, onError);
+        if (!cancelled) off = this.pausableStream(`user:${id}/${topic}`, listener, onError);
       },
       (error: unknown) => {
         if (this.userId === userId) this.userId = undefined;
@@ -264,6 +309,8 @@ export class LiveSource implements Source {
   /** 中止进行中的请求，断开 WebSocket 并停止重连。 */
   close(): void {
     this.aborter.abort();
+    this.offVisibility?.();
+    this.pausable.clear();
     this.socket.close();
     this.room = undefined;
   }
