@@ -1,5 +1,7 @@
 import { createEffect } from "solid-js";
 import { createAllyList } from "./allies/ally-list.ts";
+import { AlertSettingsPanel } from "./alert/AlertSettingsPanel.tsx";
+import { createAlertSettings } from "./alert/alert-settings.ts";
 import { AllyListSettings } from "./allies/AllyListSettings.tsx";
 import { I18nProvider, useI18n } from "./i18n";
 import { MapAndRoom } from "./map/MapAndRoom.tsx";
@@ -24,6 +26,7 @@ function Shell(props: { sourceFor: SourceFactory }) {
   const { locale, setLocale, t } = useI18n();
   const settings = createSettings(browserStorage());
   const allies = createAllyList(browserStorage());
+  const alerts = createAlertSettings(browserStorage());
 
   createEffect(() => {
     document.title = t("app.title");
@@ -47,7 +50,8 @@ function Shell(props: { sourceFor: SourceFactory }) {
       <p class="shell__tagline">{t("app.tagline")}</p>
       <SettingsPage settings={settings} sourceFor={props.sourceFor} />
       <AllyListSettings allies={allies} />
-      <MapAndRoom settings={settings} sourceFor={props.sourceFor} allies={allies.set()} />
+      <AlertSettingsPanel settings={alerts} />
+      <MapAndRoom settings={settings} sourceFor={props.sourceFor} allies={allies.set()} alerts={alerts} />
       <RawReadings settings={settings} sourceFor={props.sourceFor} />
     </main>
   );

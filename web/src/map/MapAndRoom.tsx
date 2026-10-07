@@ -4,8 +4,11 @@
  * PvP Overview（#3）放在最下面：点房间同样进入 Room View，热点画在地图上；
  * 地图与 PvP Overview 共用一个 OwnershipHub（同一份 map-stats 缓存与额度）。
  */
-import { createMemo, createSignal, onCleanup } from "solid-js";
-import type { VisibilitySignal } from "../power/visibility.ts";
+import { createMemo, createSignal, onCleanup, Show } from "solid-js";
+import { pageVisibility, type VisibilitySignal } from "../power/visibility.ts";
+import { AttackAlert } from "../alert/AttackAlert.tsx";
+import type { AlertSettings } from "../alert/alert-settings.ts";
+import { visibleOrKept } from "../alert/keep-awake.ts";
 import { createPvpFeed } from "../pvp/pvp-feed.ts";
 import { pvpMapLayers } from "../pvp/pvp-map-layer.ts";
 import { PvpOverview } from "../pvp/PvpOverview.tsx";
@@ -28,6 +31,8 @@ export interface MapAndRoomProps {
   readonly roomView?: Partial<RoomViewProps>;
   /** PvP 轮询用的页面可见性；默认 pageVisibility()（测试用） */
   readonly visibility?: VisibilitySignal;
+  /** Attack Alert（#4）的设置；不给时不告警 */
+  readonly alerts?: AlertSettings;
 }
 
 export function MapAndRoom(props: MapAndRoomProps) {
@@ -48,11 +53,16 @@ export function MapAndRoom(props: MapAndRoomProps) {
     onCleanup(() => hub.dispose());
     return hub;
   });
+  // Attack Alert 需要 PvP / 核弹时，页面隐藏也继续轮询（#4 对 #14 规则的调整）
+  const alertsNeedFeed = () => {
+    const config = props.alerts?.config();
+    return !!props.settings.token() && !!config && (config.pvp || config.nuke);
+  };
   const pvp = createPvpFeed({
     source,
     ownership,
     canLookup: () => !!props.settings.token(),
-    ...(props.visibility ? { visibility: props.visibility } : {}),
+    visibility: visibleOrKept(props.visibility ?? pageVisibility(), alertsNeedFeed),
   });
   /** 从 PvP Overview 进入房间：地图也切到那个 Shard，返回地图时能看到它 */
   const openFromPvp = (target: MapTarget) => {
@@ -94,6 +104,18 @@ export function MapAndRoom(props: MapAndRoomProps) {
             : undefined
         }
       />
+      <Show when={props.alerts}>
+        {(alerts) => (
+          <AttackAlert
+            source={source}
+            feed={pvp}
+            enabled={() => !!props.settings.token()}
+            allies={() => props.allies ?? new Set()}
+            settings={alerts()}
+            onOpen={openFromPvp}
+          />
+        )}
+      </Show>
       <PvpOverview
         feed={pvp}
         onOpenRoom={openFromPvp}

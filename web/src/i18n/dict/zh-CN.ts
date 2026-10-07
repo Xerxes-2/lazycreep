@@ -155,6 +155,25 @@ export const zhCN = {
   "error.server": "服务器返回错误：{message}",
   "error.network": "无法连接 Gateway。",
   "error.unknown": "未知错误：{message}",
+
+  "alert.pvp.title": "遇袭：{room} 发生战斗",
+  "alert.pvp.body": "最后一次交火在 Tick {tick}",
+  "alert.nuke.title": "核弹瞄准 {room}",
+  "alert.nuke.body": "{count} 枚，来自 {from}，Tick {tick} 落地",
+  "alert.stranger.title": "陌生人停留在 {room}",
+  "alert.stranger.body": "{names} 已停留 {ticks} Tick",
+  "alert.dismiss": "关闭这条遇袭通知",
+  "alert.settings.title": "遇袭通知",
+  "alert.settings.hint": "应用打开时（含标签页在后台）监视我所有 Shard 上的房间；授权后用系统通知，否则在页面顶部显示横幅。点通知进入该房间。",
+  "alert.settings.enable": "启用系统通知",
+  "alert.settings.granted": "系统通知已启用",
+  "alert.settings.denied": "系统通知已被浏览器拒绝，只能显示页内横幅；可在浏览器的站点设置里重新允许。",
+  "alert.settings.unsupported": "此浏览器不支持系统通知，只显示页内横幅。",
+  "alert.settings.pvp": "我的房间发生战斗（PvP 列表）",
+  "alert.settings.nuke": "核弹瞄准我的房间",
+  "alert.settings.stranger": "陌生人在我的房间停留（排除路过侦察）",
+  "alert.settings.cooldown": "同一房间同一原因的冷却（分钟）",
+  "alert.settings.strangerTicks": "陌生人停留多少 Tick 才通知",
 } as const satisfies Record<string, string>;
 
 export type MessageKey = keyof typeof zhCN;
