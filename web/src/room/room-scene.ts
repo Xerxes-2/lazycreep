@@ -6,6 +6,7 @@ import type { Primitive, Scene } from "../scene/scene.ts";
 import type { Theme } from "../scene/theme.ts";
 import type { Terrain } from "../source/source.ts";
 import { LAYER, center, num, type ObjectPainter, type ObjectPainters, type PaintContext, type PrimitiveDraft } from "./room-paint.ts";
+import { barsVisible, extraBars, ownerColorRule, selectionHighlight } from "./room-detail-rules.ts";
 import { ROOM_OBJECT_PAINTERS } from "./room-painters.ts";
 import type { RoomState } from "./room-state.ts";
 import { roomVisualPrimitives } from "./room-visual.ts";
@@ -25,6 +26,10 @@ export interface RoomSceneView {
   /** 画布上 1 格对应的像素数，默认 1 */
   readonly zoom?: number;
   readonly selectedId?: string | undefined;
+  /** 当前用户 id，按玩家着色用；未知时所有玩家都按陌生人着色 */
+  readonly me?: string | undefined;
+  /** Ally List（用户名，不分大小写），默认空 */
+  readonly allies?: ReadonlySet<string> | undefined;
 }
 
 /** 未知类型：洋红虚框 + 类型名 */
@@ -98,7 +103,7 @@ export function buildRoomScene(
     zoom: view.zoom ?? 1,
     selectedId: view.selectedId,
     users: room.state.users,
-    ownerColor: (user) => (typeof user === "string" ? theme.owned : theme.neutral),
+    ownerColor: ownerColorRule(theme, room.state.users, { me: view.me, allies: view.allies }),
   };
 
   const primitives: Primitive[] = room.terrain ? terrainPrimitives(room.terrain, theme) : [];
@@ -106,7 +111,12 @@ export function buildRoomScene(
     if (num(obj, "x") === undefined || num(obj, "y") === undefined) continue;
     const type = obj["type"];
     const paint = (typeof type === "string" && Object.hasOwn(painters, type) && painters[type]) || placeholder;
-    for (const { part, ...draft } of paint(obj, ctx)) {
+    const painted = paint(obj, ctx);
+    const drafts = [...painted, ...extraBars(obj, painted, ctx)];
+    if (id === ctx.selectedId) drafts.push(selectionHighlight(obj, ctx));
+    const showBars = barsVisible(ctx, id);
+    for (const { part, ...draft } of drafts) {
+      if (!showBars && draft.kind === "bar") continue;
       primitives.push({ ...draft, key: `${id}/${part}`, objectId: id } as Primitive);
     }
   }

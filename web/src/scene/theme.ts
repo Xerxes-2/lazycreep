@@ -9,8 +9,12 @@ export interface Theme {
   readonly terrainWall: Color;
   readonly terrainSwamp: Color;
 
-  /** 有主对象：暂时只有一种颜色，按玩家着色属于后续规则 */
+  /** 我方对象 */
   readonly owned: Color;
+  /** 盟友（Ally List 里的玩家） */
+  readonly ally: Color;
+  /** 陌生玩家：按玩家 id 稳定地挑一种 */
+  readonly strangers: readonly Color[];
   /** 无主或主人未知 */
   readonly neutral: Color;
 
@@ -29,6 +33,8 @@ export interface Theme {
   readonly label: Color;
   readonly labelOutline: Color;
   readonly placeholder: Color;
+  /** 选中对象的高亮框 */
+  readonly selection: Color;
 }
 
 /** 深色简约几何画风 */
@@ -38,6 +44,8 @@ export const DEFAULT_THEME: Theme = {
   terrainSwamp: 0x2c3a1e,
 
   owned: 0x5d9cec,
+  ally: 0x6ccf8e,
+  strangers: [0xe5534b, 0xf0883e, 0xd16dd1, 0xe0b040, 0xff7b9c, 0xb08a5a],
   neutral: 0x9e9e9e,
 
   structure: 0x3c3c3c,
@@ -55,4 +63,5 @@ export const DEFAULT_THEME: Theme = {
   label: 0xffffff,
   labelOutline: 0x000000,
   placeholder: 0xff4fd8,
+  selection: 0xffffff,
 };

@@ -126,7 +126,7 @@ describe("buildRoomScene：对象", () => {
   it("creep 带血条，按 hits / hitsMax 填充", () => {
     const scene = buildRoomScene(
       { state: stateWith({ c: { _id: "c", type: "creep", x: 1, y: 1, user: "me", hits: 30, hitsMax: 120 } }) },
-      view,
+      { ...view, zoom: 100 },
     );
     const bar = ofObject(scene, "c").find((p) => p.kind === "bar");
     expect(bar).toMatchObject({ kind: "bar", value: 0.25 });
