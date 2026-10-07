@@ -11,9 +11,13 @@
  *   额度用完或被限流（429）时暂停，额度恢复后自动补上最后的区域
  *
  * 调用方应只在视口稳定后调用 request（例如拖动 / 缩放结束后一小段时间），见 MapView。
+ *
+ * 按房间补查（requestRooms，PvP Overview 等用）：与地图共用同一份扇区缓存与每小时额度，
+ * 但排在地图的可见区域之后，只用额度里留给地图（backgroundReserve）之外的部分，
+ * 结果按更长的有效期（backgroundTtlMs）算；每个 Shard 一次请求，依次取。
  */
 import { SourceError, type MapStats, type WorldSize } from "../source/source.ts";
-import { roomName, worldOffset } from "./map-state.ts";
+import { parseRoomName, roomName, worldOffset } from "./map-state.ts";
 import type { WorldRect } from "./map-scene.ts";
 
 export interface OwnershipLoaderOptions {
@@ -29,11 +33,22 @@ export interface OwnershipLoaderOptions {
   readonly maxRoomsPerRequest?: number;
   /** 被限流后暂停多久，默认 15 分钟 */
   readonly rateLimitBackoffMs?: number;
+  /** 按房间补查时缓存的有效期，默认 60 分钟 */
+  readonly backgroundTtlMs?: number;
+  /** 每小时额度里留给地图、补查不能用的次数，默认 10 */
+  readonly backgroundReserve?: number;
+}
+
+export interface RoomRef {
+  readonly shard: string;
+  readonly room: string;
 }
 
 export interface OwnershipLoader {
   /** 希望 shard 上 visible 区域（世界坐标）的所有权是新的。 */
   request(shard: string, size: WorldSize, visible: WorldRect): void;
+  /** 希望这些房间（可跨 Shard）的所有权已知；替换上一次的清单。优先级低于 request。 */
+  requestRooms(rooms: readonly RoomRef[]): void;
   dispose(): void;
 }
 
@@ -58,6 +73,8 @@ export function createOwnershipLoader(options: OwnershipLoaderOptions): Ownershi
   const maxPerHour = options.maxPerHour ?? 30;
   const maxRooms = options.maxRoomsPerRequest ?? 2500;
   const backoff = options.rateLimitBackoffMs ?? 15 * 60_000;
+  const backgroundTtl = options.backgroundTtlMs ?? 60 * 60_000;
+  const backgroundLimit = Math.max(0, maxPerHour - (options.backgroundReserve ?? 10));
 
   /** 扇区键 → 取到的时间 */
   const fetchedAt = new Map<string, number>();
@@ -66,6 +83,7 @@ export function createOwnershipLoader(options: OwnershipLoaderOptions): Ownershi
   let blockedUntil = 0;
   let busy = false;
   let last: Want | undefined;
+  let background: readonly RoomRef[] = [];
   let timer: ReturnType<typeof setTimeout> | undefined;
   let disposed = false;
 
@@ -112,17 +130,55 @@ export function createOwnershipLoader(options: OwnershipLoaderOptions): Ownershi
     }, Math.max(0, at - Date.now()));
   };
 
-  const run = () => {
-    if (disposed || busy || !last) return;
-    const want = last;
-    const now = Date.now();
-    const sectors = staleSectors(want, now);
-    if (sectors.length === 0) return;
+  /** 补查清单里还要取的扇区：第一个有待取扇区的 Shard */
+  const staleBackground = (now: number): { shard: string; sectors: Sector[] } | undefined => {
+    const byShard = new Map<string, Map<string, Sector>>();
+    for (const { shard, room } of background) {
+      const coord = parseRoomName(room);
+      if (!coord) continue;
+      const sx = Math.floor(coord.x / SECTOR);
+      const sy = Math.floor(coord.y / SECTOR);
+      const key = `${shard}:${sx},${sy}`;
+      const at = fetchedAt.get(key);
+      if (inFlight.has(key) || (at !== undefined && now - at < backgroundTtl)) continue;
+      const sectors = byShard.get(shard) ?? new Map<string, Sector>();
+      byShard.set(shard, sectors);
+      if (sectors.has(key)) continue;
+      const rooms: string[] = [];
+      for (let y = sy * SECTOR; y < (sy + 1) * SECTOR; y++) {
+        for (let x = sx * SECTOR; x < (sx + 1) * SECTOR; x++) rooms.push(roomName({ x, y }));
+      }
+      sectors.set(key, { key, rooms, distance: 0 });
+    }
+    const first = byShard.entries().next().value;
+    return first && { shard: first[0], sectors: [...first[1].values()] };
+  };
 
-    if (now < blockedUntil) return wakeAt(blockedUntil);
+  /** 额度够时返回 true；不够时安排在额度腾出时重试 */
+  const budget = (now: number, limit: number): boolean => {
+    if (now < blockedUntil) {
+      wakeAt(blockedUntil);
+      return false;
+    }
     while (sent.length > 0 && now - sent[0]! >= HOUR) sent.shift();
-    if (sent.length >= maxPerHour) return wakeAt(sent[0]! + HOUR);
+    if (sent.length < limit) return true;
+    if (limit > 0) wakeAt(sent[sent.length - limit]! + HOUR);
+    return false;
+  };
 
+  const run = () => {
+    if (disposed || busy) return;
+    const now = Date.now();
+    const visibleSectors = last ? staleSectors(last, now) : [];
+    if (visibleSectors.length > 0) {
+      if (budget(now, maxPerHour)) send(last!.shard, visibleSectors, now);
+      return;
+    }
+    const extra = staleBackground(now);
+    if (extra && budget(now, backgroundLimit)) send(extra.shard, extra.sectors, now);
+  };
+
+  const send = (shard: string, sectors: readonly Sector[], now: number) => {
     const batch: Sector[] = [];
     let count = 0;
     for (const sector of sectors) {
@@ -134,7 +190,7 @@ export function createOwnershipLoader(options: OwnershipLoaderOptions): Ownershi
     for (const sector of batch) inFlight.add(sector.key);
     sent.push(now);
     busy = true;
-    options.fetch(want.shard, rooms).then(
+    options.fetch(shard, rooms).then(
       (stats) => {
         busy = false;
         for (const sector of batch) inFlight.delete(sector.key);
@@ -160,6 +216,10 @@ export function createOwnershipLoader(options: OwnershipLoaderOptions): Ownershi
   return {
     request(shard, size, visible) {
       last = { shard, size, visible };
+      run();
+    },
+    requestRooms(rooms) {
+      background = rooms;
       run();
     },
     dispose() {

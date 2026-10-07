@@ -181,3 +181,90 @@ describe("所有权加载器", () => {
     expect(calls).toHaveLength(1);
   });
 });
+
+describe("所有权加载器：按房间补查（PvP Overview 等）", () => {
+  it("取房间所在的整个扇区；每个 Shard 一次请求，依次取", async () => {
+    const { loader, calls, received, finish } = harness();
+    loader.requestRooms([
+      { shard: SHARD, room: "W13S28" },
+      { shard: SHARD, room: "W15S21" },
+      { shard: "other", room: "E5N5" },
+    ]);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.shard).toBe(SHARD);
+    expect(calls[0]!.rooms).toHaveLength(100);
+    expect(calls[0]!.rooms).toContain("W19S20");
+    expect(calls[0]!.rooms).toContain("W10S29");
+    await finish();
+    expect(calls).toHaveLength(2);
+    expect(calls[1]!.shard).toBe("other");
+    expect(calls[1]!.rooms).toContain("E0N9");
+    expect(calls[1]!.rooms).toContain("E9N0");
+    await finish();
+    expect(calls).toHaveLength(2);
+    expect(received).toHaveLength(2);
+  });
+
+  it("与地图共用缓存：地图取过的扇区不再补查，补查过的扇区地图也不再取", async () => {
+    const { loader, calls, finish } = harness();
+    loader.request(SHARD, SIZE, inSector);
+    await finish();
+    loader.requestRooms([{ shard: SHARD, room: "W13S28" }]);
+    expect(calls).toHaveLength(1);
+    loader.requestRooms([{ shard: SHARD, room: "E5S5" }]);
+    expect(calls).toHaveLength(2);
+    await finish();
+    loader.request(SHARD, SIZE, { x0: 56, y0: 56, x1: 57, y1: 57 });
+    expect(calls).toHaveLength(2);
+  });
+
+  it("地图的可见区域优先：两者都在等时先取地图", async () => {
+    const { loader, calls, finish } = harness();
+    loader.request(SHARD, SIZE, inSector);
+    loader.requestRooms([{ shard: SHARD, room: "E5S5" }]);
+    loader.request(SHARD, SIZE, { x0: 60, y0: 75, x1: 61, y1: 76 });
+    await finish();
+    expect(calls[1]!.rooms).toContain("E9S28");
+    await finish();
+    expect(calls[2]!.rooms).toContain("E5S5");
+  });
+
+  it("补查只用额度中留给地图之外的部分；地图仍可用剩下的", async () => {
+    const { loader, calls, finish } = harness({ maxPerHour: 3, backgroundReserve: 1, ttlMs: 2 * HOUR });
+    loader.requestRooms([{ shard: SHARD, room: "E5S5" }]);
+    await finish();
+    loader.requestRooms([{ shard: SHARD, room: "E15S5" }]);
+    await finish();
+    loader.requestRooms([{ shard: SHARD, room: "E25S5" }]);
+    expect(calls).toHaveLength(2);
+    loader.request(SHARD, SIZE, inSector);
+    expect(calls).toHaveLength(3);
+    await finish();
+    vi.advanceTimersByTime(HOUR + 1000);
+    expect(calls).toHaveLength(4);
+    expect(calls[3]!.rooms).toContain("E25S5");
+  });
+
+  it("补查的结果按更长的有效期算（所有权很少变）", async () => {
+    const { loader, calls, finish } = harness({ ttlMs: 10 * 60_000, backgroundTtlMs: 60 * 60_000 });
+    loader.requestRooms([{ shard: SHARD, room: "W13S28" }]);
+    await finish();
+    vi.advanceTimersByTime(30 * 60_000);
+    loader.requestRooms([{ shard: SHARD, room: "W13S28" }]);
+    expect(calls).toHaveLength(1);
+    loader.request(SHARD, SIZE, inSector);
+    expect(calls).toHaveLength(2);
+  });
+
+  it("新的补查清单替换旧的", async () => {
+    const { loader, calls, finish } = harness();
+    loader.request(SHARD, SIZE, inSector);
+    loader.requestRooms([{ shard: SHARD, room: "E5S5" }]);
+    loader.requestRooms([{ shard: SHARD, room: "E15S5" }]);
+    await finish();
+    expect(calls[1]!.rooms).toContain("E15S5");
+    expect(calls[1]!.rooms).not.toContain("E5S5");
+    await finish();
+    expect(calls).toHaveLength(2);
+  });
+});
