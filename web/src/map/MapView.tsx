@@ -16,6 +16,7 @@ import { DEFAULT_THEME, type Theme } from "../scene/theme.ts";
 import { errorMessage, type SourceFactory } from "../settings/SettingsPage.tsx";
 import type { Settings } from "../settings/settings.ts";
 import type { ShardInfo, Source } from "../source/source.ts";
+import { attachGestures } from "../scene/pointer-gestures.ts";
 import { panBy, screenToWorld } from "../scene/scene-camera.ts";
 import { centerOn, fitCamera, sceneRect, sceneZoom, visibleRect, zoomAt } from "./map-camera.ts";
 import { buildMapScene, MAP_LAYERS, type MapLayerPainter } from "./map-scene.ts";
@@ -28,8 +29,6 @@ import { findRoom, useMapInfo } from "./use-map-info.ts";
 export const ENTER_ZOOM = 32;
 /** 搜索房间后至少放大到这么多 CSS 像素每房间（够显示矿物与 Power Bank） */
 const SEARCH_ZOOM = 64;
-/** 指针移动超过这么多像素就算拖动，不算点击 */
-const CLICK_SLOP = 5;
 const DEFAULT_WIDTH = 600;
 
 export interface MapTarget {
@@ -265,61 +264,13 @@ export function MapView(props: MapViewProps) {
   });
   onCleanup(() => clearTimeout(settleTimer));
 
-  // ---- 指针交互 ----
+  // ---- 指针交互（手势识别在 scene/pointer-gestures.ts，与 Room View 共用） ----
 
-  const pointers = new Map<number, { x: number; y: number }>();
-  let moved = 0;
   const [dragging, setDragging] = createSignal(false);
-
-  const local = (event: PointerEvent | WheelEvent) => {
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
-  };
 
   const update = (change: (cam: Viewport) => Viewport) => {
     const cam = camera();
     if (cam) setCamera(change(cam));
-  };
-
-  const onPointerDown = (event: PointerEvent) => {
-    if (event.pointerType === "mouse" && event.button !== 0) return;
-    (event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId);
-    pointers.set(event.pointerId, local(event));
-    if (pointers.size === 1) moved = 0;
-    else moved = Infinity; // 多指不算点击
-    setDragging(true);
-  };
-
-  const onPointerMove = (event: PointerEvent) => {
-    const previous = pointers.get(event.pointerId);
-    if (!previous) return;
-    const point = local(event);
-    if (pointers.size === 1) {
-      moved += Math.hypot(point.x - previous.x, point.y - previous.y);
-      pointers.set(event.pointerId, point);
-      update((cam) => panBy(cam, point.x - previous.x, point.y - previous.y));
-      return;
-    }
-    // 捏合：按两指距离缩放，以两指中点为中心，并跟随中点平移
-    const other = [...pointers].find(([id]) => id !== event.pointerId)?.[1];
-    pointers.set(event.pointerId, point);
-    if (!other) return;
-    const before = Math.hypot(previous.x - other.x, previous.y - other.y);
-    const after = Math.hypot(point.x - other.x, point.y - other.y);
-    const midBefore = { x: (previous.x + other.x) / 2, y: (previous.y + other.y) / 2 };
-    const midAfter = { x: (point.x + other.x) / 2, y: (point.y + other.y) / 2 };
-    update((cam) => {
-      const zoomed = before > 0 ? zoomAt(cam, midBefore.x, midBefore.y, after / before, minScale()) : cam;
-      return panBy(zoomed, midAfter.x - midBefore.x, midAfter.y - midBefore.y);
-    });
-  };
-
-  const onPointerUp = (event: PointerEvent) => {
-    if (!pointers.delete(event.pointerId)) return;
-    if (pointers.size > 0) return;
-    setDragging(false);
-    if (event.type !== "pointerup" || moved > CLICK_SLOP) return;
-    click(local(event));
   };
 
   const click = (point: { x: number; y: number }) => {
@@ -351,13 +302,6 @@ export function MapView(props: MapViewProps) {
     setCamera(centerOn(at.x, at.y, width, height, Math.max(cam.scale, SEARCH_ZOOM)));
   };
 
-  const onWheel = (event: WheelEvent) => {
-    event.preventDefault();
-    const pixels = event.deltaMode === 1 ? event.deltaY * 16 : event.deltaMode === 2 ? event.deltaY * 400 : event.deltaY;
-    const point = local(event);
-    update((cam) => zoomAt(cam, point.x, point.y, Math.exp(-pixels * 0.0015), minScale()));
-  };
-
   onMount(() => {
     const size = () => {
       const width = host.clientWidth || DEFAULT_WIDTH;
@@ -367,17 +311,20 @@ export function MapView(props: MapViewProps) {
     let alive = true;
     let created: SceneView | undefined;
     let observer: ResizeObserver | undefined;
+    let detachGestures: (() => void) | undefined;
     (props.createView ?? createSceneView)(size()).then(
       (made) => {
         if (!alive) return made.destroy();
         created = made;
         const canvas = made.canvas;
         canvas.style.touchAction = "none";
-        canvas.addEventListener("pointerdown", onPointerDown);
-        canvas.addEventListener("pointermove", onPointerMove);
-        canvas.addEventListener("pointerup", onPointerUp);
-        canvas.addEventListener("pointercancel", onPointerUp);
-        canvas.addEventListener("wheel", onWheel, { passive: false });
+        detachGestures = attachGestures(canvas, {
+          pan: (dx, dy) => update((cam) => panBy(cam, dx, dy)),
+          zoom: (x, y, factor) => update((cam) => zoomAt(cam, x, y, factor, minScale())),
+          tap: (x, y) => click({ x, y }),
+          end: () => {},
+          press: setDragging,
+        });
         host.append(canvas);
         setView(made);
         const cam = untrack(camera);
@@ -398,6 +345,7 @@ export function MapView(props: MapViewProps) {
     onCleanup(() => {
       alive = false;
       observer?.disconnect();
+      detachGestures?.();
       created?.canvas.remove();
       created?.destroy();
     });

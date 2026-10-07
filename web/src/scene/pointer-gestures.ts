@@ -14,6 +14,8 @@ export interface GestureHandlers {
   tap(x: number, y: number): void;
   /** 一次平移 / 缩放结束（适合在这里持久化视口） */
   end(): void;
+  /** 第一根手指 / 鼠标按下时 true，最后一根抬起或取消时 false（例如拖动中暂停取数） */
+  press?(pressed: boolean): void;
 }
 
 const TAP_SLOP = 6;
@@ -54,6 +56,7 @@ export function attachGestures(el: HTMLElement, handlers: GestureHandlers): () =
       start = point;
       moved = false;
       multi = false;
+      handlers.press?.(true);
     } else multi = true;
   };
 
@@ -87,6 +90,7 @@ export function attachGestures(el: HTMLElement, handlers: GestureHandlers): () =
   const onUp = (event: PointerEvent) => {
     if (!pointers.delete(event.pointerId)) return;
     if (pointers.size > 0) return;
+    handlers.press?.(false);
     if (!moved && !multi && event.type === "pointerup") {
       const point = local(event);
       handlers.tap(point.x, point.y);
