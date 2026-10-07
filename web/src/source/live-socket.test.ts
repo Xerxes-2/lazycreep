@@ -8,6 +8,7 @@ import { LiveSource, type SocketFactory, type SocketHandlers } from "./live-sour
 import { SERVER_PRESETS } from "./servers.ts";
 import type { ConnectionState, ConsoleEvent, CpuUpdate, RoomTick, ServerConfig, StreamError } from "./source.ts";
 import { manualVisibility, type VisibilitySignal } from "../power/visibility.ts";
+import { sharedSources } from "./shared-source.ts";
 
 const SEASON = SERVER_PRESETS.season;
 const SHARD = "shardSeason";
@@ -461,6 +462,32 @@ describe("LiveSource WebSocket：页面不可见时省电（#14）", () => {
     last().event(map, { w: [] });
     last().event(user("cpu"), { cpu: 1, memory: 1 });
     expect(got).toEqual(["room", "map", "cpu"]);
+  });
+
+  it("World Map、Minimap、Attack Alert 经各自的共享 Source 租约订阅同一个 roomMap2：谁退订都不影响别人，最后一个走时才向服务器退订", async () => {
+    const { source, visibility, last } = await watching();
+    const lease = sharedSources(() => source);
+    const [mapLease, minimapLease, alertLease] = [lease(SEASON, TOKEN), lease(SEASON, TOKEN), lease(SEASON, TOKEN)];
+    const other = `roomMap2:${SHARD}/W12S28`;
+    const got: string[] = [];
+    const offMap = mapLease.subscribeRoomMap(SHARD, "W12S28", () => got.push("map"));
+    const offMinimap = minimapLease.subscribeRoomMap(SHARD, "W12S28", () => got.push("minimap"));
+    alertLease.subscribeRoomMap(SHARD, "W12S28", () => got.push("alert"), undefined, { keepWhileHidden: true });
+    expect(last().commands).toEqual([`subscribe ${other}`]);
+
+    // Minimap 切走房间：只退掉它自己的监听者
+    offMinimap();
+    last().event(other, { w: [] });
+    expect(got).toEqual(["map", "alert"]);
+    // 页面隐藏：地图暂停，告警保留，频道仍在
+    visibility.set(false);
+    expect(last().commands).not.toContain(`unsubscribe ${other}`);
+    offMap();
+    visibility.set(true);
+    expect(last().commands).not.toContain(`unsubscribe ${other}`);
+    // 告警的租约关闭后才真正退订
+    alertLease.close();
+    expect(last().commands.filter((c) => c.endsWith(other))).toEqual([`subscribe ${other}`, `unsubscribe ${other}`]);
   });
 
   it("声明 keepWhileHidden 的 roomMap2 订阅（Attack Alert）隐藏时照常保留", async () => {

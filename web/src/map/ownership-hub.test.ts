@@ -57,4 +57,34 @@ describe("OwnershipHub", () => {
     await settle();
     expect(errors).toHaveLength(1);
   });
+
+  it("wantRooms 与 requestRooms 的清单并存（Minimap 不会顶掉 PvP Overview 的补查）；释放后不再补查", async () => {
+    const { hub, calls, settle } = harness();
+    hub.requestRooms([{ shard: "a", room: "W1N1" }]);
+    const release = hub.wantRooms([{ shard: "a", room: "E30S30" }]);
+    calls[0]!.resolve({ shard: "a", gameTime: 1, rooms: {}, users: {} });
+    await settle();
+    expect(calls).toHaveLength(2);
+    const asked = calls.flatMap((c) => c.rooms);
+    expect(asked).toContain("W1N1");
+    expect(asked).toContain("E30S30");
+
+    release();
+    hub.wantRooms([]);
+    calls[1]!.resolve({ shard: "a", gameTime: 2, rooms: {}, users: {} });
+    await settle();
+    hub.requestRooms([]);
+    await settle();
+    expect(calls).toHaveLength(2);
+  });
+
+  it("释放的清单不再补查", async () => {
+    const { hub, calls, settle } = harness();
+    hub.request("a", SIZE, { x0: 70, y0: 70, x1: 71, y1: 71 });
+    const release = hub.wantRooms([{ shard: "a", room: "W1N1" }]);
+    release();
+    calls[0]!.resolve({ shard: "a", gameTime: 1, rooms: {}, users: {} });
+    await settle();
+    expect(calls).toHaveLength(1);
+  });
 });
