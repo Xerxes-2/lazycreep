@@ -5,6 +5,9 @@
  */
 import { createEffect, createMemo, createSignal, onCleanup, onMount, Show } from "solid-js";
 import { useI18n } from "../i18n";
+import { createTickRate } from "../power/tick-rate.ts";
+import { useVisible } from "../power/use-visible.ts";
+import type { VisibilitySignal } from "../power/visibility.ts";
 import { createSceneView, type SceneView, type SceneViewOptions } from "../scene/pixi-scene-view.ts";
 import type { Scene } from "../scene/scene.ts";
 import { DEFAULT_THEME } from "../scene/theme.ts";
@@ -40,11 +43,14 @@ export interface RoomViewProps {
   readonly fixtureSource?: () => Promise<Source>;
   /** 默认是 Pixi 适配层；测试里换成记录 Scene 的假实现 */
   readonly createView?: (options: SceneViewOptions) => Promise<SceneView>;
+  /** 页面可见性（#14）：不可见时暂停渲染；默认跟随 document */
+  readonly visibility?: VisibilitySignal;
 }
 
 export function RoomView(props: RoomViewProps) {
   const { t } = useI18n();
   const settings = props.settings;
+  const visible = useVisible(props.visibility);
 
   const [mode, setMode] = createSignal<Mode>("live");
   const [source, setSource] = createSignal<Source>();
@@ -91,6 +97,7 @@ export function RoomView(props: RoomViewProps) {
   const [terrain, setTerrain] = createSignal<Terrain>();
   const [streamError, setStreamError] = createSignal<StreamError>();
   const [terrainError, setTerrainError] = createSignal<string>();
+  const [tickMs, setTickMs] = createSignal<number>();
 
   createEffect(() => {
     const src = source();
@@ -99,12 +106,20 @@ export function RoomView(props: RoomViewProps) {
     setTerrain(undefined);
     setStreamError(undefined);
     setTerrainError(undefined);
+    setTickMs(undefined);
     if (!src || !current) return;
     let alive = true;
+    const rate = createTickRate();
     const off = src.subscribeRoom(
       current.shard,
       current.room,
-      (tick) => setRoomState((state) => reduceLiveTick(state, tick)),
+      (tick) => {
+        if (tick.gameTime !== undefined) {
+          rate.record(tick.gameTime);
+          setTickMs(rate.msPerTick());
+        }
+        setRoomState((state) => reduceLiveTick(state, tick));
+      },
       setStreamError,
     );
     src.getTerrain(current.shard, current.room).then(
@@ -117,7 +132,9 @@ export function RoomView(props: RoomViewProps) {
     });
   });
 
-  const scene = createMemo<Scene | undefined>(() => {
+  // 页面不可见时不构建新 Scene，沿用上一个（#14）
+  const scene = createMemo<Scene | undefined>((previous) => {
+    if (!visible()) return previous;
     if (!target()) return undefined;
     const state = roomState();
     if (!state) {
@@ -207,6 +224,11 @@ export function RoomView(props: RoomViewProps) {
         <span data-testid="room-view-state">{t(STATE_KEYS[connection()])}</span>
         {" · "}
         {t("roomView.tick")} <span data-testid="room-view-tick">{roomState()?.gameTime ?? "—"}</span>
+        {" · "}
+        {t("power.tickRate")}{" "}
+        <span data-testid="room-view-tick-rate">
+          {tickMs() === undefined ? "—" : t("power.msPerTick", { ms: Math.round(tickMs()!) })}
+        </span>
       </p>
       <Show when={sourceError() ?? terrainError() ?? viewError()}>
         {(message) => (

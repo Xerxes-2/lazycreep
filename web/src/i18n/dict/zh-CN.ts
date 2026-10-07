@@ -61,6 +61,9 @@ export const zhCN = {
   "roomView.open": "打开",
   "roomView.tick": "Tick",
 
+  "power.tickRate": "Tick 速度",
+  "power.msPerTick": "{ms} ms/Tick",
+
   "error.unauthorized": "token 无效或已失效。请在 Screeps 账户设置里生成新的全权限 token。",
   "error.forbidden": "请求被拒绝（HTTP 403）。",
   "error.rateLimited": "触发了速率限制，请稍后再试。",

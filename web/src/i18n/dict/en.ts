@@ -63,6 +63,9 @@ export const en: Partial<Record<MessageKey, string>> = {
   "roomView.open": "Open",
   "roomView.tick": "Tick",
 
+  "power.tickRate": "Tick speed",
+  "power.msPerTick": "{ms} ms/Tick",
+
   "error.unauthorized": "The token is invalid or expired. Generate a new full-access token in your Screeps account settings.",
   "error.forbidden": "Request refused (HTTP 403).",
   "error.rateLimited": "Rate limit reached, try again later.",
