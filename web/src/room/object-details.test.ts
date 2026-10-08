@@ -90,6 +90,54 @@ describe("对象详情", () => {
     expect(field(mineral, "mineral")).toBe("O 63940");
   });
 
+  describe("墓碑", () => {
+    const tombstone = {
+      _id: "t1",
+      type: "tombstone",
+      room: "W17S26",
+      x: 22,
+      y: 3,
+      user: "u1",
+      deathTime: 1041636,
+      decayTime: 1041786,
+      creepId: "6ac77807c7926d497cc17e29",
+      creepName: "Shade1372",
+      creepTicksToLive: 1394,
+      creepBody: ["move", "carry", "move", "carry"],
+      creepSaying: null,
+      store: { energy: 427 },
+    };
+    const text = (d: ObjectDetails, key: string) => d.fields.find((f) => f.key === key)?.text;
+
+    it("名字、死于几 Tick 前、推断死因、活了多久、生前 body、creep id；不再出现在其他字段里", () => {
+      const d = describeObject(tombstone, users, 1041664);
+      expect(field(d, "name")).toBe("Shade1372");
+      expect(text(d, "died")).toEqual({ key: "diedAgo", params: { ago: 28, tick: 1041636 } });
+      expect(text(d, "deathCause")).toEqual({ key: "early", params: { left: 1394 } });
+      expect(field(d, "lived")).toBe("106 / 1500");
+      expect(field(d, "body")).toBe("2M 2C");
+      // 墓碑的 body 只有类型：血量未知，画成满格
+      expect(d.body?.map((c) => [c.type, c.hits, c.fill])).toEqual([
+        ["move", undefined, 1],
+        ["carry", undefined, 1],
+        ["move", undefined, 1],
+        ["carry", undefined, 1],
+      ]);
+      expect(field(d, "creepId")).toBe("6ac77807c7926d497cc17e29");
+      expect(field(d, "decay")).toBe("122");
+      expect(field(d, "saying")).toBeUndefined();
+      expect(d.raw).toEqual([]);
+    });
+
+    it("死时剩余寿命为 1 算寿终；带 CLAIM 的寿命按 600 算；最后说的话；Tick 未知时只给死亡 Tick", () => {
+      const d = describeObject({ ...tombstone, creepTicksToLive: 1, creepBody: ["claim", "move"], creepSaying: "bye" }, users, undefined);
+      expect(text(d, "deathCause")).toEqual({ key: "aged" });
+      expect(field(d, "lived")).toBe("599 / 600");
+      expect(field(d, "saying")).toBe("bye");
+      expect(text(d, "died")).toEqual({ key: "diedAt", params: { tick: 1041636 } });
+    });
+  });
+
   describe("身体部件网格（#59）", () => {
     it("按 body 顺序给出每格的类型、颜色（与身体环同一张表）、填充比例与强化", () => {
       const cells = bodyCells([

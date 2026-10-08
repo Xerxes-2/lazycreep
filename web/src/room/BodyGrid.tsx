@@ -28,7 +28,7 @@ export function BodyGrid(props: BodyGridProps) {
 
   const describe = (cell: BodyCell) => {
     const part = KNOWN_PARTS.has(cell.type) ? t(`roomDetails.part.${cell.type}` as MessageKey) : cell.type;
-    const info = t("roomDetails.partInfo", { part, hits: cell.hits });
+    const info = cell.hits === undefined ? part : t("roomDetails.partInfo", { part, hits: cell.hits });
     return cell.boost ? `${info} · ${t("roomDetails.partBoost", { boost: cell.boost })}` : info;
   };
   const activeCell = () => {

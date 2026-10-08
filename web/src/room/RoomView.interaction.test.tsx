@@ -312,6 +312,20 @@ describe("Room View 交互", () => {
       expect(listed()).toContain("6a9d95c951150f63501b522f");
     });
 
+    it("墓碑：死于几 Tick 前、推断死因、生前 body 网格", async () => {
+      mount();
+      await openRoom("W13S28");
+      // (21,14)：道路、creep 与一个老死的 worker 的墓碑
+      tap(...cellScreen(21, 14), "mouse");
+      await pickFrom("6ac6805c88b9952b6396b48f");
+      await settle(() => expect(field("[data-field=type]").textContent).toBe("tombstone"));
+      expect(field("[data-field=name]").textContent).toBe("worker-1023405-Spawn2");
+      expect(field("[data-field=died]").textContent).toBe("185 Tick 前（Tick 1025053）");
+      expect(field("[data-field=deathCause]").textContent).toBe("寿终");
+      expect(field("[data-field=lived]").textContent).toBe("1499 / 1500");
+      expect(field("[data-field=body]").querySelectorAll(".body-grid__cell")).toHaveLength(50);
+    });
+
     it("键盘：列表获得焦点，上下移动，回车确认", async () => {
       mount();
       await openRoom("W13S28");

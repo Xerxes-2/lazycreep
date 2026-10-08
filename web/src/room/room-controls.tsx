@@ -21,7 +21,7 @@ import type { RoomUser } from "../source/source.ts";
 import type { KeyValueStorage } from "../storage/local-store.ts";
 import { loadCamera, saveCamera } from "./room-camera-store.ts";
 import { BodyGrid } from "./BodyGrid.tsx";
-import { describeObject } from "./object-details.ts";
+import { describeObject, type DetailField } from "./object-details.ts";
 import type { RoomObject } from "./room-state.ts";
 
 export interface CanvasSize {
@@ -148,6 +148,8 @@ export interface RoomDetailsPanelProps {
 export function RoomDetailsPanel(props: RoomDetailsPanelProps) {
   const { t } = useI18n();
   const details = () => (props.object ? describeObject(props.object, props.users, props.gameTime) : undefined);
+  const fieldText = (field: DetailField) =>
+    field.text ? t(`roomDetails.value.${field.text.key}` as MessageKey, field.text.params) : field.value;
   return (
     <Show when={details()}>
       {(d) => (
@@ -165,7 +167,7 @@ export function RoomDetailsPanel(props: RoomDetailsPanelProps) {
                 <>
                   <dt data-label={field().key}>{t(`roomDetails.field.${field().key}` as MessageKey)}</dt>
                   <dd data-field={field().key}>
-                    <Show when={field().key === "body" && d().body} fallback={field().value}>
+                    <Show when={field().key === "body" && d().body} fallback={fieldText(field())}>
                       {(cells) => <BodyGrid objectId={d().id} cells={cells()} summary={field().value} />}
                     </Show>
                   </dd>
