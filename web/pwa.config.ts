@@ -14,8 +14,8 @@ export const pwaOptions = {
   registerType: "autoUpdate",
   injectRegister: "auto",
   manifest: {
-    name: "Screeps 客户端",
-    short_name: "Screeps",
+    name: "lazycreep",
+    short_name: "lazycreep",
     description: "轻快、省电的自用 Screeps 客户端",
     lang: "zh-CN",
     start_url: "/",

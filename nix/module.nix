@@ -8,11 +8,11 @@ self:
   ...
 }:
 let
-  cfg = config.services.my-screeps-client;
+  cfg = config.services.lazycreep;
 in
 {
-  options.services.my-screeps-client = {
-    enable = lib.mkEnableOption "my-screeps-client 的 Gateway 与前端";
+  options.services.lazycreep = {
+    enable = lib.mkEnableOption "lazycreep 的 Gateway 与前端";
 
     address = lib.mkOption {
       type = lib.types.str;
@@ -29,29 +29,29 @@ in
     package = lib.mkOption {
       type = lib.types.package;
       default = self.packages.${pkgs.stdenv.hostPlatform.system}.gateway;
-      defaultText = lib.literalExpression "my-screeps-client.packages.\${system}.gateway";
+      defaultText = lib.literalExpression "lazycreep.packages.\${system}.gateway";
       description = "Gateway 包（内含前端静态文件）。";
     };
   };
 
   config = lib.mkIf cfg.enable {
-    systemd.services.my-screeps-client = {
-      description = "my-screeps-client Gateway";
+    systemd.services.lazycreep = {
+      description = "lazycreep Gateway";
       wantedBy = [ "multi-user.target" ];
       after = [ "network-online.target" ];
       wants = [ "network-online.target" ];
       environment = {
         MSC_ADDRESS = cfg.address;
         MSC_PORT = toString cfg.port;
-        HOME = "/var/lib/my-screeps-client";
-        XDG_DATA_HOME = "/var/lib/my-screeps-client";
-        XDG_CONFIG_HOME = "/var/lib/my-screeps-client";
+        HOME = "/var/lib/lazycreep";
+        XDG_DATA_HOME = "/var/lib/lazycreep";
+        XDG_CONFIG_HOME = "/var/lib/lazycreep";
       };
       serviceConfig = {
         ExecStart = lib.getExe cfg.package;
         Restart = "on-failure";
         DynamicUser = true;
-        StateDirectory = "my-screeps-client";
+        StateDirectory = "lazycreep";
         # 无状态服务：收紧权限
         AmbientCapabilities = lib.optional (cfg.port < 1024) "CAP_NET_BIND_SERVICE";
         CapabilityBoundingSet = lib.optional (cfg.port < 1024) "CAP_NET_BIND_SERVICE";

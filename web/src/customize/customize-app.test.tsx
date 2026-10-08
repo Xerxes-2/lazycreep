@@ -159,7 +159,7 @@ describe("设置导入后无需刷新即生效（#5）", () => {
     expect(file).not.toContain("remote-token");
 
     await chooseFile(container.querySelector<HTMLInputElement>("input[name=import-settings]")!, file);
-    await settle(() => expect(container.querySelector("h1")?.textContent).toBe("Screeps Client"));
+    await settle(() => expect(document.documentElement.lang).toBe("en"));
     expect(document.documentElement.dataset["theme"]).toBe("dark");
     // 重建后 Menu 仍停在导入那一项，显示结果
     expect(container.querySelector("[data-testid=import-result]")).not.toBeNull();

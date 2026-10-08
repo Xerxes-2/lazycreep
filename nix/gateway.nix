@@ -28,5 +28,5 @@ writeShellApplication {
     export MSC_POST_ALLOWLIST=${lib.escapeShellArg postAllowlist}
     exec caddy run --adapter caddyfile --config ${caddyfile} "$@"
   '';
-  meta.description = "my-screeps-client 的 Gateway（Caddy）";
+  meta.description = "lazycreep 的 Gateway（Caddy）";
 }

@@ -96,6 +96,13 @@ describe("设置导出 / 导入（#5）", () => {
     expect(localStorage.getItem("msc.roomCamera.x/y/W1N1")).toBeNull();
   });
 
+  it("导出的格式名是 lazycreep/settings；改名前（my-screeps-client/settings）的备份照样能导入，别的格式不认", () => {
+    expect(exportSettings(localStorage).format).toBe("lazycreep/settings");
+    importSettings(localStorage, { format: "my-screeps-client/settings", version: 1, settings: { "msc.allies": ["Old"] } });
+    expect(localStorage.getItem("msc.allies")).toBe('["Old"]');
+    expect(() => importSettings(localStorage, { format: "someone-else/settings", version: 1, settings: {} })).toThrow();
+  });
+
   it("忽略未知键与类型不对的值；文件里的 token 不导入", () => {
     const report = importSettings(localStorage, {
       format: "my-screeps-client/settings",

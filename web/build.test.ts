@@ -87,7 +87,7 @@ describe("生产构建不包含录制回放", () => {
     const boot = /<div id="?boot"?[\s\S]*?(?=<div id="?root"?)/.exec(html)?.[0];
     expect(boot, "缺少 #boot").toBeDefined();
     // 应用名、进度条与阶段文字都直接写在 HTML 里
-    expect(boot).toContain("Screeps 客户端");
+    expect(boot).toContain("lazycreep");
     expect(boot).toMatch(/role="?progressbar"?/);
     expect(boot).toMatch(/data-boot-text[^>]*>\s*[^<\s]/);
     // 样式内联在页面里：深浅色跟随系统，不等外部样式表

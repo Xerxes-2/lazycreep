@@ -33,7 +33,9 @@ import { KEYBINDINGS_STORAGE } from "./keybindings.ts";
 import { UI_THEME_STORAGE } from "./ui-theme.ts";
 import { RENDER_BACKEND_STORAGE } from "../scene/render-backend.ts";
 
-export const SETTINGS_FORMAT = "my-screeps-client/settings";
+export const SETTINGS_FORMAT = "lazycreep/settings";
+/** 改名前（my-screeps-client）导出的备份：照样能导入 */
+const LEGACY_SETTINGS_FORMATS: readonly string[] = ["my-screeps-client/settings"];
 export const SETTINGS_VERSION = 1;
 
 /** 全部 `msc.*` 存储键（含不导出的运行状态），由各功能模块声明 */
@@ -168,7 +170,7 @@ export function exportSettings(storage: TransferStorage, now: Date = new Date())
 
 /** 校验通过才改动存储；不是设置文件或版本更新时抛 SettingsImportError，存储不变。 */
 export function importSettings(storage: TransferStorage, file: unknown): ImportReport {
-  if (!isObject(file) || file["format"] !== SETTINGS_FORMAT || !isObject(file["settings"])) {
+  if (!isObject(file) || (file["format"] !== SETTINGS_FORMAT && !LEGACY_SETTINGS_FORMATS.includes(String(file["format"]))) || !isObject(file["settings"])) {
     throw new SettingsImportError("notSettings");
   }
   const version = file["version"];

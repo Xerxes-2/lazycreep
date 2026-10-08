@@ -1,6 +1,6 @@
-# my-screeps-client
+# lazycreep
 
-自用的 Screeps 客户端。
+自用的 Screeps 客户端 lazycreep（旧名 my-screeps-client）。
 
 ## Version control
 
@@ -17,7 +17,7 @@
 
 ### Issue tracker
 
-Issues 在 GitHub Issues（Xerxes-2/my-screeps-client），用 gh CLI 操作。See `docs/agents/issue-tracker.md`.
+Issues 在 GitHub Issues（Xerxes-2/lazycreep），用 gh CLI 操作。See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 

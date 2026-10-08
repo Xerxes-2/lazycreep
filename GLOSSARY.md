@@ -1,4 +1,4 @@
-# my-screeps-client
+# lazycreep
 
 自用的 Screeps 第三方客户端：轻快、省电、可自定义，覆盖桌面与移动端。本词表只定义本项目特有的概念。
 

@@ -55,26 +55,28 @@ describe("App", () => {
     history.replaceState(null, "", "/");
   });
 
-  it("shows the application title in zh-CN by default", () => {
+  it("shows the application title (lazycreep) in zh-CN by default", () => {
     mount();
-    expect(heading()).toBe("Screeps 客户端");
+    expect(heading()).toBe("lazycreep");
     expect(document.documentElement.lang).toBe("zh-CN");
   });
 
   it("switches between zh-CN and en with the language button", () => {
     mount();
+    const zhLabel = languageButton().textContent;
     languageButton().click();
-    expect(heading()).toBe("Screeps Client");
     expect(document.documentElement.lang).toBe("en");
+    expect(languageButton().textContent).not.toBe(zhLabel);
     languageButton().click();
-    expect(heading()).toBe("Screeps 客户端");
+    expect(document.documentElement.lang).toBe("zh-CN");
+    expect(languageButton().textContent).toBe(zhLabel);
   });
 
   it("keeps the chosen language after a reload", () => {
     mount();
     languageButton().click();
     mount();
-    expect(heading()).toBe("Screeps Client");
+    expect(document.documentElement.lang).toBe("en");
   });
 
   it("shows the raw readings page with the connection state", () => {

@@ -1,5 +1,5 @@
 {
-  description = "my-screeps-client：自用 Screeps 客户端";
+  description = "lazycreep：自用 Screeps 客户端";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
@@ -46,7 +46,7 @@
                 modules = [
                   self.nixosModules.default
                   {
-                    services.my-screeps-client = {
+                    services.lazycreep = {
                       enable = true;
                       port = 8787;
                     };
@@ -56,8 +56,8 @@
                 ];
               };
             in
-            pkgs.writeText "my-screeps-client-module-eval"
-              nixos.config.systemd.units."my-screeps-client.service".text;
+            pkgs.writeText "lazycreep-module-eval"
+              nixos.config.systemd.units."lazycreep.service".text;
         }
       );
 

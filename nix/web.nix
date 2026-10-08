@@ -35,7 +35,7 @@ let
   };
 in
 stdenvNoCC.mkDerivation (finalAttrs: {
-  pname = "my-screeps-client-web";
+  pname = "lazycreep-web";
   version = "0.0.0";
   inherit src;
 
@@ -75,7 +75,7 @@ stdenvNoCC.mkDerivation (finalAttrs: {
   '';
 
   meta = {
-    description = "my-screeps-client 前端静态文件包";
+    description = "lazycreep 前端静态文件包";
     platforms = lib.platforms.all;
   };
 })
