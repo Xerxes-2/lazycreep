@@ -25,6 +25,7 @@ import { createPvpFeed } from "../pvp/pvp-feed.ts";
 import { createMapLayerPrefs, mapLayers } from "./map-layer-toggles.ts";
 import { badgeLayer } from "./map-badge-layer.ts";
 import { createMapBadges } from "./map-badges.ts";
+import { ownershipBudgetStore } from "./ownership-budget.ts";
 import { createOwnershipHub } from "./ownership-hub.ts";
 import { roomMapHubFor } from "../source/room-map-hub.ts";
 import { createWorldMapLink } from "./world-map-link.ts";
@@ -72,7 +73,10 @@ export function MapAndRoom(props: MapAndRoomProps) {
   const source = useSharedSource(props.sourceFor, props.settings);
   const ownership = createMemo(() => {
     const src = source();
-    const hub = createOwnershipHub({ fetch: (shard, rooms) => src.getMapStats(shard, rooms) });
+    const hub = createOwnershipHub({
+      fetch: (shard, rooms) => src.getMapStats(shard, rooms),
+      budget: ownershipBudgetStore(browserStorage(), src.server.id),
+    });
     onCleanup(() => hub.dispose());
     return hub;
   });
@@ -95,7 +99,9 @@ export function MapAndRoom(props: MapAndRoomProps) {
   // 窄屏底部面板的当前标签（#29）
   const tabs = createSheetTabs();
   const worldMap = createWorldMapLink();
-  // 从 Room View 回到地图（返回按钮、M 键、Top Bar、URL 都走 navigate）：以刚才的房间为中心
+  // 从 Room View 回到地图（返回按钮、M 键、Top Bar、URL 都走 navigate）：以刚才的房间为中心。
+  // 不用 defer：Solid 的 on 在 defer 跳过的第一次执行里不记录上一个值，页面直接在 Room View 打开时，
+  // 第一次回到地图拿到的 previous 会是 undefined 而不是 "room"。第一次执行时 previous 本来就是 undefined，条件自然不成立。
   createEffect(
     on(
       () => shell.mainView(),
@@ -104,7 +110,6 @@ export function MapAndRoom(props: MapAndRoomProps) {
         const room = untrack(() => shell.location().room);
         if (room) worldMap.setFocusRoom(room);
       },
-      { defer: true },
     ),
   );
   const layerPrefs = createMapLayerPrefs(browserStorage());

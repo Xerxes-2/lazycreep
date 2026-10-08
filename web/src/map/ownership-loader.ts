@@ -19,6 +19,7 @@
 import { SourceError, type MapStats, type WorldSize } from "../source/source.ts";
 import { parseRoomName, roomName, worldOffset } from "./map-state.ts";
 import type { WorldRect } from "./map-scene.ts";
+import type { OwnershipBudgetStore } from "./ownership-budget.ts";
 
 export interface OwnershipLoaderOptions {
   /** 通常是 Source.getMapStats */
@@ -37,6 +38,8 @@ export interface OwnershipLoaderOptions {
   readonly backgroundTtlMs?: number;
   /** 每小时额度里留给地图、补查不能用的次数，默认 10 */
   readonly backgroundReserve?: number;
+  /** 额度与限流退避的持久记录（ownership-budget.ts）；不给时只在内存里，刷新页面即清零 */
+  readonly budget?: OwnershipBudgetStore;
 }
 
 export interface RoomRef {
@@ -79,8 +82,20 @@ export function createOwnershipLoader(options: OwnershipLoaderOptions): Ownershi
   /** 扇区键 → 取到的时间 */
   const fetchedAt = new Map<string, number>();
   const inFlight = new Set<string>();
-  const sent: number[] = [];
-  let blockedUntil = 0;
+  const stored = options.budget?.load();
+  const sent: number[] = [...(stored?.sent ?? [])];
+  let blockedUntil = stored?.blockedUntil ?? 0;
+  /**
+   * 有持久记录时以它为准：判断额度前读回（别的标签页 / 上一个页面记下的），
+   * 记账时“读出 → 加一条 → 写回”，多个标签页的记录互相累加而不覆盖。
+   */
+  const sync = () => {
+    const latest = options.budget?.load();
+    if (!latest) return;
+    sent.splice(0, sent.length, ...latest.sent);
+    blockedUntil = Math.max(blockedUntil, latest.blockedUntil);
+  };
+  const persist = () => options.budget?.save({ sent: [...sent], blockedUntil });
   let busy = false;
   let last: Want | undefined;
   let background: readonly RoomRef[] = [];
@@ -156,6 +171,7 @@ export function createOwnershipLoader(options: OwnershipLoaderOptions): Ownershi
 
   /** 额度够时返回 true；不够时安排在额度腾出时重试 */
   const budget = (now: number, limit: number): boolean => {
+    sync();
     if (now < blockedUntil) {
       wakeAt(blockedUntil);
       return false;
@@ -188,7 +204,9 @@ export function createOwnershipLoader(options: OwnershipLoaderOptions): Ownershi
     }
     const rooms = batch.flatMap((s) => s.rooms).slice(0, maxRooms);
     for (const sector of batch) inFlight.add(sector.key);
+    sync();
     sent.push(now);
+    persist();
     busy = true;
     options.fetch(shard, rooms).then(
       (stats) => {
@@ -205,7 +223,9 @@ export function createOwnershipLoader(options: OwnershipLoaderOptions): Ownershi
         for (const sector of batch) inFlight.delete(sector.key);
         if (disposed) return;
         if (error instanceof SourceError && error.kind === "rateLimited") {
-          blockedUntil = Date.now() + backoff;
+          sync();
+          blockedUntil = Math.max(blockedUntil, Date.now() + backoff);
+          persist();
           wakeAt(blockedUntil);
         }
         options.onError?.(error);

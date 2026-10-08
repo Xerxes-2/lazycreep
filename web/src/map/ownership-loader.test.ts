@@ -1,6 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SourceError, type MapStats } from "../source/source.ts";
+import { STORED_KEYS } from "../customize/settings-transfer.ts";
+import { OWNERSHIP_BUDGET_STORAGE, ownershipBudgetStore } from "./ownership-budget.ts";
 import { createOwnershipLoader, type OwnershipLoaderOptions } from "./ownership-loader.ts";
+
+function memoryStorage() {
+  const map = new Map<string, string>();
+  return {
+    getItem: (key: string) => map.get(key) ?? null,
+    setItem: (key: string, value: string) => void map.set(key, value),
+    removeItem: (key: string) => void map.delete(key),
+  };
+}
 
 const SIZE = { width: 102, height: 102 };
 const SHARD = "s";
@@ -129,6 +140,42 @@ describe("所有权加载器", () => {
     expect(calls).toHaveLength(1);
     vi.advanceTimersByTime(2 * 60_000);
     expect(calls).toHaveLength(2);
+  });
+
+  it("额度与限流退避存在额度存储里：刷新页面（新的加载器、同一存储）后接着算，不会清零", async () => {
+    const storage = memoryStorage();
+    const first = harness({ maxPerHour: 2, budget: ownershipBudgetStore(storage, "season") });
+    first.loader.request(SHARD, SIZE, inSector);
+    await first.finish();
+    first.loader.request(SHARD, SIZE, { x0: 60, y0: 75, x1: 61, y1: 76 });
+    await first.finish();
+    first.loader.dispose();
+
+    const second = harness({ maxPerHour: 2, budget: ownershipBudgetStore(storage, "season") });
+    second.loader.request(SHARD, SIZE, { x0: 80, y0: 75, x1: 81, y1: 76 });
+    expect(second.calls).toHaveLength(0);
+    vi.advanceTimersByTime(HOUR + 1000);
+    expect(second.calls).toHaveLength(1);
+
+    // 被限流后的退避同样跨加载器
+    second.calls[0]!.reject(new SourceError("rateLimited", "429", 429));
+    await second.settle();
+    second.loader.dispose();
+    const third = harness({ maxPerHour: 30, rateLimitBackoffMs: 15 * 60_000, budget: ownershipBudgetStore(storage, "season") });
+    third.loader.request(SHARD, SIZE, { x0: 60, y0: 75, x1: 61, y1: 76 });
+    expect(third.calls).toHaveLength(0);
+    // 别的 Server 不受影响
+    const other = harness({ budget: ownershipBudgetStore(storage, "mmo") });
+    other.loader.request(SHARD, SIZE, inSector);
+    expect(other.calls).toHaveLength(1);
+  });
+
+  it("额度存储登记为不导出的运行状态；内容损坏时当作没有记录", () => {
+    expect(STORED_KEYS).toContain(OWNERSHIP_BUDGET_STORAGE);
+    expect(OWNERSHIP_BUDGET_STORAGE).toMatchObject({ role: "runtime", prefix: true });
+    const storage = memoryStorage();
+    storage.setItem(OWNERSHIP_BUDGET_STORAGE.key + "season", '{"sent":"x"}');
+    expect(ownershipBudgetStore(storage, "season").load()).toEqual({ sent: [], blockedUntil: 0 });
   });
 
   it("其他失败报告错误，不缓存，下次调用重试", async () => {

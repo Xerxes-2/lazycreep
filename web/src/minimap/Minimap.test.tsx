@@ -155,6 +155,13 @@ describe("Minimap（#27）", () => {
 
   it("区块折叠或回到 World Map 时退掉自己的 roomMap2 订阅", async () => {
     mount();
+    // 用户先在整张世界的视野里滚了一下（缩不动，但视口算“动过”）：回到地图时保持这个视野，
+    // World Map 不会为这些房间订阅 roomMap2，下面的断言只看 Minimap 自己的订阅
+    const mapCanvas = () => container.querySelector<HTMLCanvasElement>(".world-map canvas");
+    shell.navigate({ shard: SHARD, view: "map" });
+    await settle(() => expect(mapCanvas() && scenes.get(mapCanvas()!)).toBeDefined());
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    mapCanvas()!.dispatchEvent(new WheelEvent("wheel", { clientX: 10, clientY: 10, deltaY: 200, bubbles: true, cancelable: true }));
     shell.navigate({ shard: SHARD, room: "W13S28" });
     await settle(() => expect(minimapSubscriptions(NEAR_W13S28)).toEqual(NEAR_W13S28));
     container.querySelector<HTMLButtonElement>("[data-section='room.minimap'] [data-action=toggle-section]")!.click();

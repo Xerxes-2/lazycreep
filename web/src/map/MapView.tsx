@@ -79,6 +79,8 @@ export function MapView(props: MapViewProps) {
   const { t } = useI18n();
   /** Server + Shard → 视口；组件存活期间保留（进入 Room View 时页面只隐藏地图、不卸载） */
   const savedCameras = new Map<string, Viewport>();
+  /** 视口仍是“整张世界放进画布”的初始值、用户还没动过的地图（按 cameraKey） */
+  const untouched = new Set<string>();
   const settings = props.settings;
   const visible = useVisible(props.visibility);
 
@@ -201,7 +203,9 @@ export function MapView(props: MapViewProps) {
       if (previous && previous.shard === state.shard && previous.size === state.size) return;
       const key = cameraKey()!;
       const { width, height } = untrack(canvasSize);
-      setCamera(savedCameras.get(key) ?? fitCamera(state.size, width, height));
+      const saved = savedCameras.get(key);
+      if (!saved) untouched.add(key);
+      setCamera(saved ?? fitCamera(state.size, width, height));
     }),
   );
   createEffect(() => {
@@ -292,6 +296,8 @@ export function MapView(props: MapViewProps) {
   const update = (change: (cam: Viewport) => Viewport) => {
     const cam = camera();
     if (cam) setCamera(change(cam));
+    const key = cameraKey();
+    if (key) untouched.delete(key);
     // 用户自己拖动 / 缩放了，就不再追着“回到地图时居中的房间”
     props.link?.setFocusRoom(undefined);
   };
@@ -325,6 +331,8 @@ export function MapView(props: MapViewProps) {
     if (!cam || !state) return;
     if (cam.scale < ENTER_ZOOM) {
       setCamera(zoomAt(cam, point.x, point.y, 2, minScale()));
+      const key = cameraKey();
+      if (key) untouched.delete(key);
       return;
     }
     const world = screenToWorld(cam, point.x, point.y);
@@ -341,6 +349,8 @@ export function MapView(props: MapViewProps) {
     if (!at) return false;
     const { width, height } = canvasSize();
     setCamera(centerOn(at.x, at.y, width, height, Math.max(cam.scale, SEARCH_ZOOM)));
+    const key = cameraKey();
+    if (key) untouched.delete(key);
     return true;
   };
   createEffect(() => {
@@ -350,16 +360,22 @@ export function MapView(props: MapViewProps) {
 
   // 从 Room View 回到地图：以刚才的房间为中心、保持缩放。意图在用户拖动 / 缩放前一直有效，
   // 所以地图显示后画布尺寸才测出来时会重新对准一次。
+  // 地图视口若还是初始的整张世界（例如页面直接在 Room View 打开，地图从没显示过），“保持缩放”就是整个世界，
+  // 一眼看不清、所有权图层还要为上万个房间请求 map-stats——这时至少放大到房间搜索的那一档。
+  // 只在“有没有视口”变化时通知：世界尺寸晚到时，视口在同一轮里才建立，居中要等它建立后再做一次
+  const hasCamera = createMemo(() => camera() !== undefined);
   createEffect(() => {
     const room = props.link?.focusRoom();
     const state = mapState();
     const { width, height } = canvasSize();
-    if (!room || !state || props.active === false) return;
+    if (!room || !state || props.active === false || !hasCamera()) return;
     const cam = untrack(camera);
     if (!cam) return;
     const at = findRoom(state, room);
     if (!at) return;
-    setCamera(centerOn(at.x, at.y, width, height, cam.scale));
+    const key = untrack(cameraKey);
+    const fresh = key !== undefined && untouched.delete(key);
+    setCamera(centerOn(at.x, at.y, width, height, fresh ? Math.max(cam.scale, SEARCH_ZOOM) : cam.scale));
   });
 
   onMount(() => {

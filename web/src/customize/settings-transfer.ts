@@ -27,6 +27,7 @@ import { removeKey, type KeyValueStorage, type StoredKey, type StoredKind } from
 import { STATIC_CACHE_STORAGE } from "../source/static-cache.ts";
 import { TERRAIN_CACHE_STORAGE } from "../source/terrain-cache.ts";
 import { DECORATION_CACHE_STORAGE } from "../source/decoration-cache.ts";
+import { OWNERSHIP_BUDGET_STORAGE } from "../map/ownership-budget.ts";
 import { COLOR_SCHEME_STORAGE } from "./color-scheme.ts";
 import { KEYBINDINGS_STORAGE } from "./keybindings.ts";
 import { UI_THEME_STORAGE } from "./ui-theme.ts";
@@ -55,6 +56,7 @@ export const STORED_KEYS: readonly StoredKey[] = [
   STATIC_CACHE_STORAGE,
   TERRAIN_CACHE_STORAGE,
   DECORATION_CACHE_STORAGE,
+  OWNERSHIP_BUDGET_STORAGE,
 ];
 
 /**

@@ -41,16 +41,18 @@ async function fakeView(options: SceneViewOptions): Promise<SceneView> {
 
 let shell: ShellState;
 
-/** narrow：窄屏结构 */
-function mount(narrow = false) {
+/** narrow：窄屏结构；startIn：挂载前先导航到这个房间（模拟页面直接在 Room View 打开，地图从没显示过） */
+function mount(narrow = false, startIn?: string) {
   const settings = createSettings(localStorage);
   settings.setToken("token");
+  const initial = startIn ? createShellState(localStorage, settings) : undefined;
+  if (initial && startIn) initial.navigate({ shard: "shardSeason", room: startIn });
   dispose = render(
     () => (
       <I18nProvider>
         <MapAndRoom
           settings={settings}
-          shell={(shell = createShellState(localStorage, settings))}
+          shell={(shell = initial ?? createShellState(localStorage, settings))}
           sourceFor={() => new FixtureSource(bundle, { speed: Infinity })}
           createView={fakeView}
           roomView={{ historyCache: async () => undefined }}
@@ -126,6 +128,37 @@ describe("World Map 与 Room View", () => {
     await settle(() => {
       const v = viewports.get(mapCanvas())!;
       expect(v.scale).toBeCloseTo(zoomed.scale);
+      expect(centerOf(v)).toEqual(expect.objectContaining({ x: expect.closeTo(W13S28.x, 3), y: expect.closeTo(W13S28.y, 3) }));
+    });
+  });
+
+  it("地图还是初始的整张世界（例如页面直接在 Room View 打开）时返回地图：以该房间为中心、用房间级缩放，而不是整个世界", async () => {
+    mount();
+    await settle(() => expect(viewports.get(mapCanvas())).toBeDefined());
+    const fitted = { ...viewports.get(mapCanvas())! };
+    shell.navigate({ shard: "shardSeason", room: "W13S28" });
+    await settle(() => expect(roomView().room).toBe("W13S28"));
+
+    backButton()!.click();
+    await settle(() => {
+      const v = viewports.get(mapCanvas())!;
+      expect(v.scale).toBeGreaterThanOrEqual(64);
+      expect(v.scale).toBeGreaterThan(fitted.scale * 10);
+      expect(centerOf(v)).toEqual(expect.objectContaining({ x: expect.closeTo(W13S28.x, 3), y: expect.closeTo(W13S28.y, 3) }));
+    });
+  });
+
+  it("页面直接在 Room View 打开（地图挂载时隐藏、世界尺寸之后才到）：返回地图时以该房间为中心、用房间级缩放", async () => {
+    mount(false, "W13S28");
+    await settle(() => expect(roomView().room).toBe("W13S28"));
+    expect(slot("map").hidden).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    backButton()!.click();
+    await settle(() => {
+      const v = viewports.get(mapCanvas())!;
+      expect(v).toBeDefined();
+      expect(v.scale).toBeGreaterThanOrEqual(64);
       expect(centerOf(v)).toEqual(expect.objectContaining({ x: expect.closeTo(W13S28.x, 3), y: expect.closeTo(W13S28.y, 3) }));
     });
   });
