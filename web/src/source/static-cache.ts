@@ -21,7 +21,7 @@ import { sharedTime } from "./shared-time.ts";
 import { createDecorationCache } from "./decoration-cache.ts";
 import { createSnapshotCache } from "./snapshot-cache.ts";
 import { createTerrainCache } from "./terrain-cache.ts";
-import type { ServerVersion, ShardInfo, Source, WorldSize } from "./source.ts";
+import type { ServerVersion, ShardInfo, Source, UserInfo, WorldSize } from "./source.ts";
 
 /** 每个 Server 一个键：`msc.staticCache.<server id>` */
 export const STATIC_CACHE_STORAGE: StoredKey = {
@@ -122,7 +122,7 @@ function serverStore(storage: KeyValueStorage | undefined, serverId: string) {
   };
 }
 
-/** 包装一个 Source：getShards / getWorldSize / getVersion / getTerrain / getRoomDecorations / getRoomSnapshot 走缓存，getTime 去重（#38），其余原样转发 */
+/** 包装一个 Source：getShards / getWorldSize / getVersion / getTerrain / getRoomDecorations / getRoomSnapshot 走缓存，getTime 与 getMe 去重（#38），其余原样转发 */
 export function withStaticCache(source: Source, options: StaticCacheOptions): Source {
   const now = options.now ?? Date.now;
   const store = serverStore(options.storage, source.server.id);
@@ -213,6 +213,16 @@ export function withStaticCache(source: Source, options: StaticCacheOptions): So
   /** 当前时间不持久化，只在途去重与短窗口复用（#38，shared-time.ts） */
   const getTime = sharedTime((shard) => source.getTime(shard), now);
 
+  /**
+   * 当前用户：只在途去重，不缓存（我的房间会变）。打开页面时徽章、地图、Minimap、Room View、攻击提醒同时要，
+   * 不去重就是 5–6 份 `auth/me` + `user/rooms`；浏览器还会把同一地址的并发 GET 排成队，最后一份要等好几秒。
+   */
+  let me: Promise<UserInfo> | undefined;
+  const getMe = (): Promise<UserInfo> =>
+    (me ??= source.getMe().finally(() => {
+      me = undefined;
+    }));
+
   return new Proxy(source, {
     get(target, prop) {
       if (prop === "getShards") return getShards;
@@ -220,6 +230,7 @@ export function withStaticCache(source: Source, options: StaticCacheOptions): So
       if (prop === "getRoomDecorations") return getRoomDecorations;
       if (prop === "getRoomSnapshot") return getRoomSnapshot;
       if (prop === "getTime") return getTime;
+      if (prop === "getMe") return getMe;
       if (prop === "getVersion") return getVersion;
       if (prop === "getWorldSize") return getWorldSize;
       const value: unknown = Reflect.get(target, prop, target);

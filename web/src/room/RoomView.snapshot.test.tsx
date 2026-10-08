@@ -173,6 +173,15 @@ describe("Room View 的房间快照（#63）", () => {
     expect(tweenFrom("c1/base", "offsetY")).toBe(-1);
   });
 
+  it("对象到达之前（快照与第一帧都没到）先画地形", async () => {
+    net.state.hold = true;
+    mount();
+    await settle(() => expect(lastScene()?.primitives.some((p) => p.key === "official-terrain")).toBe(true));
+    expect(objectIds()).toEqual(new Set());
+    net.release("W13S28");
+    await settle(() => expect(objectIds()).toEqual(new Set(["c1", "c2"])));
+  });
+
   it("第一帧先到时丢弃迟到的快照", async () => {
     net.state.hold = true;
     mount();

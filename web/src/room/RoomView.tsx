@@ -327,6 +327,8 @@ export function RoomView(props: RoomViewProps) {
   let hidden = false;
   /** 回到屏幕时画面上的状态与它的 Tick：同一个状态、或 Tick 已知且相同的状态不带动画 */
   let quiet: { readonly state: RoomState; readonly tick: number | undefined } | undefined;
+  /** 对象到达之前只画地形时用的空状态 */
+  const NO_OBJECTS: RoomState = { gameTime: undefined, objects: {}, users: {}, visual: "" };
   // 每个画面状态只取一次 Tick 间隔：之后实测值变了也不改这个 Tick 的动画描述（否则同一 Tick 内重建 Scene 会重播）
   let timing: { readonly state: RoomState; readonly ms: number } | undefined;
   const scene = createMemo<Scene | undefined>((previous) => {
@@ -338,7 +340,13 @@ export function RoomView(props: RoomViewProps) {
     const theme = props.theme ?? DEFAULT_THEME;
     const { current: state, previous: before, previousFacing } = shownHistory();
     if (!state) {
-      return { width: ROOM_SIZE, height: ROOM_SIZE, background: theme.background, primitives: [] };
+      // 对象还没到（快照约 1.4 秒、实时第一帧 1–4 秒）：地形与装饰多半已在缓存里，先画出来
+      const loaded = terrain();
+      if (!loaded) return { width: ROOM_SIZE, height: ROOM_SIZE, background: theme.background, primitives: [] };
+      return buildRoomScene(
+        { state: NO_OBJECTS, terrain: loaded, decorations: decorations() },
+        { theme, zoom: controls.zoom(), display: props.display, seasonArt: currentSeasonArt() },
+      );
     }
     if (hidden) {
       hidden = false;
