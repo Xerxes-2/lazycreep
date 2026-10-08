@@ -172,8 +172,8 @@ describe("Minimap（#27）", () => {
     expect(container.querySelector("[data-testid=minimap-replay-note]")).not.toBeNull();
     await settle(() => {
       const scene = scenes.get(minimapCanvas()!)!;
-      expect(scene.primitives.filter((p) => p.kind === "image")).toHaveLength(9);
-      expect(scene.primitives.filter((p) => p.kind === "circle")).toEqual([]);
+      expect(scene.primitives.filter((p) => p.kind === "image" && p.key.startsWith("tile:"))).toHaveLength(9);
+      expect(scene.primitives.filter((p) => p.key.startsWith("units:"))).toEqual([]);
     });
 
     shell.navigate({ shard: SHARD, room: "W13S28" });

@@ -2,13 +2,15 @@
  * Minimap 的 Scene（#27）：以当前房间为中心的 3×3 房间格。纯函数，Pixi 适配层负责画。
  *
  * 世界单位 1 = 一个房间，Scene 是 [0, 3) × [0, 3)，当前房间占中心格 [1, 2) × [1, 2)。
- * 每格是该房间的单房间地形瓦片（与 World Map 同一份），上面叠所有者着色与 roomMap2 的玩家位置点
- * （官方客户端即如此：每格一个 roomMap2 订阅）。世界之外的格子什么都不画，也不可点。
+ * 每格是该房间的单房间地形瓦片（与 World Map 同一份），上面叠所有者着色与 roomMap2 的位置
+ * （官方客户端即如此：每格一个 roomMap2 订阅）。位置与 World Map 的单位图层同一画法：每房间一张
+ * 50×50 像素图（一格一像素，units-raster.ts），加色混合。世界之外的格子什么都不画，也不可点。
  */
 import { parseRoomName, roomName, worldOffset } from "../map/map-state.ts";
 import type { Color, Primitive, Scene } from "../scene/scene.ts";
 import type { Theme } from "../scene/theme.ts";
-import { playerPoints, roomOwnership, type RoomMapUpdate, type RoomStats, type WorldSize } from "../source/source.ts";
+import { createUnitsRaster } from "../map/units-raster.ts";
+import { roomOwnership, type RoomMapUpdate, type RoomStats, type WorldSize } from "../source/source.ts";
 
 export interface MinimapInput {
   /** 当前房间 */
@@ -22,6 +24,8 @@ export interface MinimapInput {
   readonly positions: Readonly<Record<string, RoomMapUpdate>>;
   /** 玩家 id → 颜色（与地图、Room View 同一条规则） */
   readonly ownerColor: (userId: string) => Color;
+  /** 已知用户（roomMap2 的键不是标准 id 时据此认作玩家）；默认空 */
+  readonly users?: Readonly<Record<string, unknown>>;
   readonly theme: Theme;
 }
 
@@ -35,12 +39,12 @@ export interface MinimapCell {
 
 const LAYER = { tile: 0, ownership: 10, units: 20, frame: 30 } as const;
 
-const ROOM_TILES = 50;
 const OWNED_ALPHA = 0.35;
 const RESERVED_ALPHA = 0.15;
-/** 位置点半径（世界单位），约 1.5 格 */
-const DOT_RADIUS = 1.5 / ROOM_TILES;
 const FRAME_WIDTH = 0.03;
+
+/** 全页共用一份像素图缓存 */
+const unitsRaster = createUnitsRaster();
 
 /** 3×3 格里在世界之内的格子（按行）；不是常规房间名时为空 */
 export function minimapCells(center: string, size: WorldSize): MinimapCell[] {
@@ -71,6 +75,7 @@ export function minimapRoomAt(center: string, size: WorldSize, x: number, y: num
 
 export function buildMinimapScene(input: MinimapInput): Scene {
   const out: Primitive[] = [];
+  const coloring = { ownerColor: input.ownerColor, knownUsers: input.users ?? {} };
   for (const { room, col, row } of minimapCells(input.center, input.size)) {
     out.push({ kind: "image", key: `tile:${room}`, layer: LAYER.tile, x: col, y: row, width: 1, height: 1, url: input.tileUrl(room) });
 
@@ -89,19 +94,10 @@ export function buildMinimapScene(input: MinimapInput): Scene {
       });
     }
 
-    for (const [key, points] of playerPoints(input.positions[room] ?? {}, { includeNpc: true })) {
-      const fill = input.ownerColor(key);
-      points.forEach(([px, py], i) =>
-        out.push({
-          kind: "circle",
-          key: `unit:${room}:${key}:${i}`,
-          layer: LAYER.units,
-          x: col + (px + 0.5) / ROOM_TILES,
-          y: row + (py + 0.5) / ROOM_TILES,
-          radius: DOT_RADIUS,
-          fill,
-        }),
-      );
+    const frame = input.positions[room];
+    const url = frame && unitsRaster(frame, coloring);
+    if (url !== undefined) {
+      out.push({ kind: "image", key: `units:${room}`, layer: LAYER.units, x: col, y: row, width: 1, height: 1, url, blend: "add" });
     }
   }
   if (out.length > 0) {

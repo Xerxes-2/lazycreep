@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { CirclePrimitive, ImagePrimitive, Primitive, RectPrimitive } from "../scene/scene.ts";
+import { decodePixelImage } from "../scene/pixel-image.ts";
+import type { ImagePrimitive, Primitive, RectPrimitive } from "../scene/scene.ts";
 import { DEFAULT_THEME } from "../scene/theme.ts";
 import { buildMinimapScene, minimapRoomAt, type MinimapInput } from "./minimap-scene.ts";
 
@@ -23,7 +24,14 @@ const of = <K extends Primitive["kind"]>(prims: readonly Primitive[], kind: K) =
   prims.filter((p): p is Extract<Primitive, { kind: K }> => p.kind === kind);
 
 const tiles = (prims: readonly Primitive[]) =>
-  of(prims, "image").map((p: ImagePrimitive) => ({ x: p.x, y: p.y, url: p.url }));
+  of(prims, "image").filter((p) => p.key.startsWith("tile:")).map((p: ImagePrimitive) => ({ x: p.x, y: p.y, url: p.url }));
+
+/** 像素图里 (x, y) 处的 [r, g, b, a] */
+function pixel(image: ImagePrimitive, x: number, y: number): number[] {
+  const decoded = decodePixelImage(image.url)!;
+  const i = (y * decoded.width + x) * 4;
+  return [...decoded.rgba.slice(i, i + 4)];
+}
 
 describe("Minimap 的 Scene", () => {
   it("3×3 格、每格一张单房间瓦片，当前房间在中心", () => {
@@ -86,25 +94,33 @@ describe("Minimap 的 Scene", () => {
     expect(at(0, 2)).toBeUndefined();
   });
 
-  it("roomMap2 的玩家位置画成所有者颜色的点，落在对应格子的对应坐标；地形类别不当作玩家", () => {
+  it("roomMap2 与 World Map 同一画法：每房间一张 50×50 像素图（一格一像素），加色混合叠在瓦片与所有权之上", () => {
+    const ME = "5a0000000000000000000001";
+    const FOE = "5a0000000000000000000002";
     const scene = buildMinimapScene(
       input({
+        ownerColor: (user) => (user === ME ? 0x0000ff : 0xff0000),
         positions: {
-          W12S28: { me: [[10, 20]], w: [[1, 1]], s: [[5, 5]] },
-          W14S27: { foe: [[0, 49]] },
+          W12S28: { [ME]: [[10, 20]], s: [[5, 5]] },
+          W14S27: { [FOE]: [[0, 49]] },
         },
       }),
     );
-    const dots = of(scene.primitives, "circle");
-    expect(dots).toHaveLength(2);
-    const near = (dot: CirclePrimitive, x: number, y: number) => Math.abs(dot.x - x) < 1e-9 && Math.abs(dot.y - y) < 1e-9;
-    const mine = dots.find((d) => d.fill === 0x0000ff)!;
-    expect(near(mine, 2 + 10.5 / 50, 1 + 20.5 / 50)).toBe(true);
-    const foe = dots.find((d) => d.fill === 0xff0000)!;
-    expect(near(foe, 0 + 0.5 / 50, 0 + 49.5 / 50)).toBe(true);
-    // 点在瓦片与所有权之上
-    const tileLayer = of(scene.primitives, "image")[0]!.layer;
-    expect(dots.every((d) => d.layer > tileLayer)).toBe(true);
+    expect(of(scene.primitives, "circle")).toEqual([]);
+    const units = of(scene.primitives, "image").filter((p) => p.key.startsWith("units:"));
+    expect(units).toHaveLength(2);
+    const east = units.find((p) => p.key === "units:W12S28")!;
+    const northWest = units.find((p) => p.key === "units:W14S27")!;
+    expect(east).toMatchObject({ x: 2, y: 1, width: 1, height: 1, blend: "add" });
+    expect(northWest).toMatchObject({ x: 0, y: 0, width: 1, height: 1, blend: "add" });
+    expect(pixel(east, 10, 20)).toEqual([0, 0, 255, 255]);
+    // 固定类别用官方颜色（Source 黄）
+    expect(pixel(east, 5, 5)).toEqual([0xff, 0xf2, 0x46, 255]);
+    expect(pixel(east, 11, 20)[3]).toBe(0);
+    expect(pixel(northWest, 0, 49)).toEqual([255, 0, 0, 255]);
+    const tileLayer = of(scene.primitives, "image").find((p) => p.key.startsWith("tile:"))!.layer;
+    const ownLayer = 10;
+    expect(units.every((p) => p.layer > tileLayer && p.layer > ownLayer)).toBe(true);
   });
 
   it("世界坐标换算到格子里的房间；边缘外与画面外为 undefined", () => {

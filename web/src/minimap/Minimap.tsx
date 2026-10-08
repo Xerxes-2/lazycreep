@@ -147,6 +147,7 @@ export function Minimap(props: { readonly ctx: SectionContext; readonly shown: A
       rooms: known?.rooms ?? {},
       positions: replaying() ? {} : positions(),
       ownerColor: color,
+      users: known?.users ?? {},
       theme,
     });
   });
