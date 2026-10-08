@@ -57,6 +57,7 @@ function manualRoomSource() {
       if (!push) throw new Error("还没有订阅房间");
       push(tick);
     },
+    subscribed: () => push !== undefined,
   };
 }
 
@@ -211,13 +212,18 @@ describe("Room View 的动画接线（#55）", () => {
 
     visibility.set(false);
     expect(settles).toBe(1);
-    room.tick({ gameTime: 102, objects: { t1: { actionLog: { attack: { x: 12, y: 14 } } } } });
+    // 不在屏幕上就退订房间流
+    expect(room.subscribed()).toBe(false);
     await new Promise((resolve) => setTimeout(resolve, 30));
     expect(shown.length).toBe(built);
 
     visibility.set(true);
     await settle(() => expect(shown.length).toBe(built + 1));
     expect(animatedCount()).toBe(0);
+    // 重新订阅后的第一帧（全量）：整体替换，不补播
+    await settle(() => expect(room.subscribed()).toBe(true));
+    room.tick({ gameTime: 102, objects: { t1: tower, c1: creep } });
+    await settle(() => expect(field(".room-view").dataset.tick).toBe("102"));
     // 下一个 Tick 照常播放
     await fire(103);
     expect(animatedCount()).toBeGreaterThan(0);

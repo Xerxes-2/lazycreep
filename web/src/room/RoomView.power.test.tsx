@@ -38,6 +38,7 @@ function manualRoomSource() {
       if (!push) throw new Error("还没有订阅房间");
       push(tick);
     },
+    subscribed: () => push !== undefined,
   };
 }
 
@@ -137,18 +138,23 @@ describe("Room View 省电", () => {
     await vi.waitFor(() => expect(renders - before).toBe(1));
   });
 
-  it("页面不可见时不渲染，回到前台画出最新的 Tick", async () => {
+  it("页面不可见时退订房间流、不渲染；回到前台重新订阅后照常更新", async () => {
     await watch();
     const before = renders;
     visibility.set(false);
-    room.tick({ gameTime: 101, objects: { a: { x: 11 } } });
-    room.tick({ gameTime: 102, objects: { a: { x: 12 } } });
+    // 服务器限制同时订阅的 room: 频道数：不在屏幕上就不占
+    expect(room.subscribed()).toBe(false);
     await quiet();
     expect(renders - before).toBe(0);
 
     visibility.set(true);
-    await vi.waitFor(() => expect(renders - before).toBe(1));
+    await vi.waitFor(() => expect(room.subscribed()).toBe(true));
+    // 隐藏期间什么都没变：回来不必重画
     await quiet();
-    expect(renders - before).toBe(1);
+    expect(renders - before).toBe(0);
+    room.tick({ objects: { b: portal(20) } });
+    room.tick({ gameTime: 102, objects: {} });
+    await vi.waitFor(() => expect(tickText()).toBe("102"));
+    expect(renders - before).toBeGreaterThan(0);
   });
 });

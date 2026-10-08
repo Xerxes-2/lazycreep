@@ -282,6 +282,23 @@ describe("Room View 的房间快照（#63）", () => {
     }
   });
 
+  it("不在屏幕上时退订房间流；回来后重新订阅，第一帧（全量）整体替换留下的旧状态", async () => {
+    mount();
+    await settle(() => expect(net.subscribed()).toBe(true));
+    net.tick({ objects: { c1: creep, c2: gone } });
+    net.tick({ gameTime: 100, objects: {} });
+    await settle(() => expect(objectIds()).toEqual(new Set(["c1", "c2"])));
+
+    visibility.set(false);
+    expect(net.subscribed()).toBe(false);
+    visibility.set(true);
+    await settle(() => expect(net.subscribed()).toBe(true));
+    // 第一帧到之前仍画着旧状态
+    expect(objectIds()).toEqual(new Set(["c1", "c2"]));
+    net.tick({ objects: { c1: creep } });
+    await settle(() => expect(objectIds()).toEqual(new Set(["c1"])));
+  });
+
   it("页面隐藏时不预加载邻居的快照", async () => {
     visibility = manualVisibility(false);
     mount();

@@ -229,23 +229,29 @@ export function RoomView(props: RoomViewProps) {
     if (!src || !current) return;
     let alive = true;
     const live = !replay.active();
-    /** 本房间已收到实时帧（#63）：之前画面上的只可能是快照 */
+    /** 这次订阅已收到实时帧（#63）：之前画面上的只可能是快照，或不在屏幕上之前留下的旧状态 */
     let streaming = false;
-    // Replay 期间退订 Live 房间流
-    const off = live
-      ? src.subscribeRoom(
+    // Live 房间流只在 Room View 在屏幕上时订阅（页面隐藏或切到 World Map 就退订）：服务器限制同时订阅的 room: 频道数，
+    // 每个标签页、每台设备一直占着一个很快就会 subscribe limit reached。回来时重新订阅，第一帧到之前先画着旧状态。
+    // Replay 期间不订阅
+    createEffect(() => {
+      if (!live || !visible()) return;
+      streaming = false;
+      onCleanup(
+        src.subscribeRoom(
           current.shard,
           current.room,
           (tick) => {
-            // 第一帧是全量：整体替换快照（不当增量合并，否则快照里已不存在的对象会残留）
+            // 第一帧是全量：整体替换快照或旧状态（不当增量合并，否则已不存在的对象会残留）
             const first = !streaming;
             streaming = true;
             if (tick.gameTime !== undefined) props.onLiveTick?.(current.shard, tick.gameTime);
             setRoomState((state) => reduceLiveTick(first ? undefined : state, tick));
           },
           setStreamError,
-        )
-      : () => {};
+        ),
+      );
+    });
     // 房间快照（#63）：等第一帧要 1–4 秒，快照先到就先画（Tick 未知）；第一帧先到则丢弃迟到的快照。Replay 不取
     if (live) {
       void roomSnapshot(src, current.shard, current.room).then(
@@ -273,7 +279,6 @@ export function RoomView(props: RoomViewProps) {
       : undefined;
     onCleanup(() => {
       alive = false;
-      off();
       if (refresh !== undefined) clearInterval(refresh);
     });
   });
