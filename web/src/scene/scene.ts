@@ -26,8 +26,13 @@ interface PrimitiveBase {
   readonly objectId?: string;
   /** 0–1，默认 1 */
   readonly alpha?: number;
-  /** 混合方式，默认正常；"add" 为加色混合（World Map 单位图层、光照、动作动画的光束与闪光） */
-  readonly blend?: "add";
+  /**
+   * 混合方式，默认正常；"add" 为加色混合（World Map 单位图层、动作动画的光束与闪光），
+   * "screen" 为滤色（光照组里的 glow 与遮罩，照官方 lighting 图层）
+   */
+  readonly blend?: "add" | "screen";
+  /** 属于光照组（见 {@link Scene.lighting}）；没有时是普通图元 */
+  readonly group?: "lighting";
   /** 有界动画（ADR 0008）：图元自身的属性是终态，这里描述从哪里开始、怎样变到终态；没有时静止 */
   readonly animation?: PrimitiveAnimation;
 }
@@ -170,4 +175,10 @@ export interface Scene {
   readonly height: number;
   readonly background: Color;
   readonly primitives: readonly Primitive[];
+  /**
+   * 光照组（ADR 0009，照官方 lighting 图层）：带 `group: "lighting"` 的图元先合成一张光照图（组内按 layer、
+   * 再按出现顺序叠放，各自的混合方式在组内生效），再以正片叠底（MULTIPLY）盖在 layer 之下的一切之上；
+   * layer 之上的图元不受影响。没有时不画光照组（组里的图元也不画）。
+   */
+  readonly lighting?: { readonly layer: number };
 }

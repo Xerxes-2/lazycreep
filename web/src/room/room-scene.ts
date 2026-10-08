@@ -1,6 +1,6 @@
 /**
  * buildRoomScene：RoomState（+ 地形）→ Room View 的 Scene。纯函数。只有官方画风（ADR 0007）：
- * 官方地形 / 道路 / rampart 房间层、官方对象画法、光照、赛季贴图。
+ * 官方地形 / 道路 / rampart 房间层、官方对象画法、光照（光照组，ADR 0009）、赛季贴图。
  * 对象按 `type` 查映射表（official-painters.ts，加上 withSeasonArt 的赛季对象）分发；表里没有的类型
  * 由赛季 metadata 的通用画法补，再没有就画成带类型名的占位图元。
  *
@@ -19,7 +19,7 @@ import { DEFAULT_ROOM_DISPLAY, showSayBubbles, type RoomDisplay } from "./displa
 import { nameLabel } from "./name-labels.ts";
 import { sayBubble } from "./say-bubbles.ts";
 import type { SeasonArt } from "../art/season-art.ts";
-import { GLOW_GAIN, LIGHTING_LAYER, officialLighting } from "./official-lighting.ts";
+import { LIGHTING_LAYER, LIGHT_LAYER, officialLighting } from "./official-lighting.ts";
 import { actionEffects, hitFlashes } from "./action-animation.ts";
 import { applyObjectMotions, nextFacings, objectMotions, type Facings } from "./movement-tween.ts";
 import { objectDecorationDrafts } from "./decoration-look.ts";
@@ -129,6 +129,7 @@ export function buildRoomScene(
     ...(view.seasonArt ? { seasonArt: view.seasonArt } : {}),
     ...(animation ? { animation } : {}),
     ...(decorations ? { decorations } : {}),
+    ...(display.lighting ? { lighting: true } : {}),
     ...(display.animation ? { facings: { before: room.facing ?? NO_FACINGS, after: nextFacings(room.facing, previous, room.state) } } : {}),
   };
 
@@ -151,9 +152,9 @@ export function buildRoomScene(
       primitives.push({ ...draft, key: `${id}/${part}`, objectId: id } as Primitive);
     }
   }
-  if (display.lighting) primitives.push(...officialLighting(room.state, animation));
+  if (display.lighting) primitives.push(...officialLighting(room.state, ctx));
   if (animation) {
-    const lighting = display.lighting ? { layer: LIGHTING_LAYER, gain: GLOW_GAIN } : undefined;
+    const lighting = display.lighting ? { layer: LIGHT_LAYER } : undefined;
     primitives.push(...actionEffects(room.state, animation, { lighting }), ...hitFlashes(room.state, animation));
   }
   // 整个对象一起动（移动补间等）：统一加到对象的所有图元上，见 movement-tween.ts
@@ -161,5 +162,12 @@ export function buildRoomScene(
   if (display.visual) moved.push(...roomVisualPrimitives(room.state.visual));
   // 稳定排序：同层按出现顺序
   moved.sort((a, b) => a.layer - b.layer);
-  return { width: ROOM_SIZE, height: ROOM_SIZE, background: theme.background, primitives: moved };
+  return {
+    width: ROOM_SIZE,
+    height: ROOM_SIZE,
+    background: theme.background,
+    primitives: moved,
+    // 光照组（ADR 0009）：光照打开时，组里的底色与光以正片叠底盖住对象与地形
+    ...(display.lighting ? { lighting: { layer: LIGHTING_LAYER } } : {}),
+  };
 }

@@ -112,13 +112,13 @@ export interface FlashTiming {
 
 /**
  * 目标处的 cover 闪光（官方 createCoverSprite + createCoverSpriteAction）：cover（透明度 0.3，染色）、
- * flare2（300²，加色，0.05，染色）与光照层的 glow（500²，0.5）；整体在 delay 之后用 1/4 时间升到峰值、
+ * flare2（300²，加色，0.05，染色）与光照组的 glow（500²，0.5，滤色）；整体在 delay 之后用 1/4 时间升到峰值、
  * 3/4 时间降到 0。部件名 `<part>-cover`、`<part>-flare`、`<part>-glow`（没有光照时没有 glow）。
  */
 export function coverFlash(part: string, at: Point, color: Color, timing: FlashTiming, anim: AnimationContext, options: EffectOptions): PrimitiveDraft[] {
   const delay = timing.delay ?? 0;
   const length = Math.max(0, timing.end - delay);
-  const sprite = (suffix: string, url: string, size: number, peak: number, layer: number, tint?: Color, add = false): PrimitiveDraft => {
+  const sprite = (suffix: string, url: string, size: number, peak: number, layer: number, tint?: Color, blend?: { readonly blend: "add" } | typeof lightingGlow): PrimitiveDraft => {
     const side = u(size);
     return {
       part: part + suffix,
@@ -131,16 +131,16 @@ export function coverFlash(part: string, at: Point, color: Color, timing: FlashT
       url,
       alpha: 0,
       ...(tint === undefined ? {} : { tint }),
-      ...(add ? { blend: "add" as const } : {}),
+      ...blend,
       animation: animationOf(anim, [pulse("alpha", 0, peak, length / 4, (3 * length) / 4, delay)]),
     };
   };
   const out = [
     sprite("-cover", officialArtUrl("cover"), 128, 0.3, EFFECTS_LAYER, color),
-    sprite("-flare", officialTextureUrl("flare2"), 300, 0.05, EFFECTS_LAYER, color, true),
+    sprite("-flare", officialTextureUrl("flare2"), 300, 0.05, EFFECTS_LAYER, color, { blend: "add" }),
   ];
   const { lighting } = options;
-  if (lighting) out.push(sprite("-glow", officialTextureUrl("glow"), 500, 0.5 * lighting.gain, lighting.layer, undefined, true));
+  if (lighting) out.push(sprite("-glow", officialTextureUrl("glow"), 500, 0.5, lighting.layer, undefined, lightingGlow));
   return out;
 }
 
@@ -176,9 +176,12 @@ const TOWER_BEAM: Readonly<Record<TowerAction, Color>> = {
 };
 
 export interface EffectOptions {
-  /** 光照开启时给出光照层与增益（official-lighting.ts 的 LIGHTING_LAYER、GLOW_GAIN）：目标闪光的 glow 属于光照层 */
-  readonly lighting: { readonly layer: number; readonly gain: number } | undefined;
+  /** 光照开启时给出光照组里光的层级（official-lighting.ts 的 LIGHT_LAYER）：目标闪光的 glow 属于光照组 */
+  readonly lighting: { readonly layer: number } | undefined;
 }
+
+/** 光照组里的光（ADR 0009）：滤色混合 */
+const lightingGlow = { group: "lighting", blend: "screen" } as const;
 
 /** id 是对象在房间状态里的 id（取上一个状态里的同一对象用） */
 type EffectRule = (obj: RoomObject, anim: AnimationContext, options: EffectOptions, id: string) => readonly PrimitiveDraft[];

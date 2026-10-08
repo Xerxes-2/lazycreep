@@ -7,8 +7,11 @@
  * - 有界动画（ADR 0008）：带新动画描述的图元在 show() 时记下开始时刻、放进“进行中”集合；集合非空时
  *   每帧只插值这些显示对象（不重新比较整份 Scene），全部到期后停止请求帧。新 Scene 里描述变了或没了的
  *   动画先跳到终态；settle() 让所有动画立即跳到终态且不请求帧（Room View 隐藏时）
+ * - 光照组（ADR 0009，Scene.lighting）：组里的图元画进一个独立容器，容器挂一个什么都不改的滤镜，
+ *   滤镜以 MULTIPLY 把合成好的光照图盖到世界里它之下的一切上（官方 lighting 图层的做法）。离屏合成只发生在
+ *   本来就要画的帧里，不额外请求帧。Canvas 渲染器没有滤镜，那里不画光照组（官方同样在非 WebGL 时隐藏光照）
  */
-import { Container, Graphics, Sprite, Text, Texture, Ticker, autoDetectRenderer, type Renderer } from "pixi.js";
+import { AlphaFilter, Container, Graphics, RendererType, Sprite, Text, Texture, Ticker, autoDetectRenderer, type Renderer } from "pixi.js";
 import { withCompositeImages } from "./composite-textures.ts";
 import { withPixelImages } from "./pixel-textures.ts";
 import { animationDuration, finalValue, sameAnimation, tweenValue } from "./animation.ts";
@@ -24,7 +27,7 @@ export interface Viewport {
 }
 
 /** 适配层用到的渲染器能力；默认由 Pixi 的 autoDetectRenderer 创建。 */
-export type SceneRenderer = Pick<Renderer, "render" | "resize" | "canvas" | "destroy" | "background">;
+export type SceneRenderer = Pick<Renderer, "render" | "resize" | "canvas" | "destroy" | "background"> & Partial<Pick<Renderer, "type">>;
 
 export interface SceneViewOptions {
   /** 画布 CSS 尺寸 */
@@ -74,6 +77,28 @@ type NodeKind = "graphics" | "text" | "image";
 
 function nodeKind(p: Primitive): NodeKind {
   return p.kind === "text" ? "text" : p.kind === "image" ? "image" : "graphics";
+}
+
+/** 换显示对象（或换父容器）才能表达的变化 */
+function sameNode(a: Primitive, b: Primitive): boolean {
+  return nodeKind(a) === nodeKind(b) && a.group === b.group;
+}
+
+/** 光照组的容器在显示树里的名字（测试按它找） */
+export const LIGHTING_LABEL = "lighting";
+
+/**
+ * 光照组的容器：子节点按 layer 排，滤镜以 MULTIPLY 混合整张合成结果。滤镜分辨率与抗锯齿跟随画布
+ * （默认的 1 倍会让高像素比屏幕上的遮罩边缘发糊）
+ */
+function createLightingContainer(filters: boolean): Container {
+  const container = new Container({ sortableChildren: true, label: LIGHTING_LABEL });
+  if (filters) {
+    const multiply = new AlphaFilter({ alpha: 1, resolution: "inherit", antialias: "inherit" });
+    multiply.blendMode = "multiply";
+    container.filters = [multiply];
+  } else container.visible = false;
+  return container;
 }
 
 interface Entry {
@@ -375,6 +400,8 @@ export async function createSceneView(options: SceneViewOptions): Promise<SceneV
   const stage = new Container();
   const world = new Container({ sortableChildren: true });
   stage.addChild(world);
+  /** 光照组；Scene 没有光照组时不挂在世界里（组里的图元也就不画） */
+  const lighting = createLightingContainer(renderer.type !== RendererType.CANVAS);
 
   const entries = new Map<string, Entry>();
   let current: Scene | undefined;
@@ -502,7 +529,7 @@ export async function createSceneView(options: SceneViewOptions): Promise<SceneV
   };
   const drop = (entry: Entry) => {
     if (entry.primitive.kind === "image") textures.detach(entry.node as Sprite, entry.primitive.url);
-    world.removeChild(entry.node);
+    entry.node.removeFromParent();
     entry.node.destroy();
   };
 
@@ -514,7 +541,7 @@ export async function createSceneView(options: SceneViewOptions): Promise<SceneV
       const key = primitive.key;
       seen.add(key);
       const entry = entries.get(key);
-      if (!entry || nodeKind(entry.primitive) !== nodeKind(primitive)) {
+      if (!entry || !sameNode(entry.primitive, primitive)) {
         if (entry) {
           runs.delete(key);
           drop(entry);
@@ -522,7 +549,7 @@ export async function createSceneView(options: SceneViewOptions): Promise<SceneV
         const node = make(primitive);
         node.zIndex = primitive.layer;
         node.label = key;
-        world.addChild(node);
+        (primitive.group === "lighting" ? lighting : world).addChild(node);
         const created = { primitive, node };
         entries.set(key, created);
         if (primitive.animation) startRun(key, created);
@@ -557,7 +584,22 @@ export async function createSceneView(options: SceneViewOptions): Promise<SceneV
       entries.delete(key);
       changed = true;
     }
+    if (syncLighting(scene)) changed = true;
     return changed;
+  };
+
+  /** 光照组的容器跟着 Scene.lighting 挂上、摘下与换层级；返回是否有变化 */
+  const syncLighting = (scene: Scene): boolean => {
+    const layer = scene.lighting?.layer;
+    if (layer === undefined) {
+      if (!lighting.parent) return false;
+      world.removeChild(lighting);
+      return true;
+    }
+    if (lighting.parent && lighting.zIndex === layer) return false;
+    lighting.zIndex = layer;
+    if (!lighting.parent) world.addChild(lighting);
+    return true;
   };
 
   stage.position.set(0, 0);
@@ -611,6 +653,8 @@ export async function createSceneView(options: SceneViewOptions): Promise<SceneV
     destroy() {
       if (destroyed) return;
       destroyed = true;
+      // 摘下来的光照组不在 stage 里，单独销毁
+      if (!lighting.parent) lighting.destroy({ children: true });
       stage.destroy({ children: true });
       entries.clear();
       runs.clear();

@@ -18,6 +18,8 @@ export const LAYER = {
   /** 未知类型的占位图元 */
   placeholder: 25,
   creep: 30,
+  /** 光照组（ADR 0009）：以正片叠底盖住它之下的地形与对象；之上的 rampart、effects、名字等不受影响 */
+  lighting: 39,
   /** 半透明盖在 creep 上 */
   rampart: 40,
   label: 60,
@@ -55,6 +57,11 @@ export interface PaintContext {
   readonly facings?: { readonly before: ReadonlyMap<string, number>; readonly after: ReadonlyMap<string, number> };
   /** 房间的装饰（#61）；“装饰”开关关掉或房间没有装饰时不给，画法用默认外观 */
   readonly decorations?: RoomDecorations;
+  /**
+   * 光照组打开（ADR 0009）：环境光由光照组统一乘上，地形与道路不再预先乘环境光；
+   * 没有时（光照关闭）地形与道路照旧自带环境光
+   */
+  readonly lighting?: boolean;
 }
 
 /** 画法播放动画需要的上下文（action-animation.ts 的构件都收它） */

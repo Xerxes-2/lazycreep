@@ -9,7 +9,8 @@ import type { ImagePrimitive, LinePrimitive, Primitive, Scene } from "../scene/s
 import { DEFAULT_THEME } from "../scene/theme.ts";
 import type { Terrain } from "../source/source.ts";
 import { FixtureSource, fixtureBundle } from "../source/fixture-source.ts";
-import { createOfficialLayers, OFFICIAL_ROAD_COLOR } from "./official-terrain.ts";
+import { DEFAULT_ROOM_DISPLAY } from "./display-options.ts";
+import { createOfficialLayers, LIGHTING_BASE_KEY, OFFICIAL_ROAD_COLOR } from "./official-terrain.ts";
 import { LAYER, type PaintContext } from "./room-paint.ts";
 import { buildRoomScene, type RoomSceneView } from "./room-scene.ts";
 import { reduceLiveTick, roomStateFrom, type RoomState } from "./room-state.ts";
@@ -17,6 +18,7 @@ import { reduceLiveTick, roomStateFrom, type RoomState } from "./room-state.ts";
 const theme = DEFAULT_THEME;
 const users = { me1: { _id: "me1", username: "Me" }, foe1: { _id: "foe1", username: "Foe" } };
 const official: RoomSceneView = { theme, me: "me1" };
+const unlit: RoomSceneView = { ...official, display: { ...DEFAULT_ROOM_DISPLAY, lighting: false } };
 
 /** 50×50 的地形：cells 里的格子按给定代码（1 墙、2 沼泽） */
 function terrainOf(cells: Record<string, number> = {}, room = "W1N1"): Terrain {
@@ -30,7 +32,7 @@ function terrainOf(cells: Record<string, number> = {}, room = "W1N1"): Terrain {
 
 type Objects = Record<string, Record<string, unknown>>;
 const stateOf = (objects: Objects, gameTime = 1): RoomState => roomStateFrom({ gameTime, objects, users });
-const sceneOf = (objects: Objects, terrain?: Terrain): Scene => buildRoomScene({ state: stateOf(objects), terrain }, official);
+const sceneOf = (objects: Objects, terrain?: Terrain, view: RoomSceneView = official): Scene => buildRoomScene({ state: stateOf(objects), terrain }, view);
 
 const byKey = (s: Scene, key: string) => s.primitives.find((p) => p.key === key);
 const terrainImage = (s: Scene) => byKey(s, "official-terrain") as ImagePrimitive | undefined;
@@ -115,13 +117,55 @@ describe("官方画风：地形", () => {
     expect(svg).toMatch(/fill="url\(#groundMask\)" opacity="0.3"/);
     expect(svg).toMatch(/<use href="#swamps" fill="#4a501e"[^>]*opacity="0.6"/);
     expect(svg).toMatch(/fill="url\(#swampNoiseA\)" opacity="0.15"/);
-    expect(svg).toContain(`<rect x="0" y="0" width="5000" height="5000" fill="#8c8c8c"/>`);
+    // 环境光：光照关闭时乘进地形；打开时是光照组的底色
+    const ambient = `<rect x="0" y="0" width="5000" height="5000" fill="#8c8c8c"/>`;
+    expect(svgOf(terrainImage(sceneOf({}, terrainOf({ "1,1": 1, "4,4": 2 }), unlit)))).toContain(ambient);
+    expect(svgOf(byKey(sceneOf({}, terrainOf({ "1,1": 1, "4,4": 2 })), LIGHTING_BASE_KEY.walls) as ImagePrimitive)).toContain(ambient);
   });
 
   it("地形还没到时没有地形贴图，道路照画", () => {
     const s = sceneOf({ a: road(1, 1), b: road(2, 1) });
     expect(terrainImage(s)).toBeUndefined();
     expect(roadLines(s)).toEqual(["1.5 1.5 2.5 1.5"]);
+  });
+});
+
+describe("官方画风：光照组的底色（ADR 0009）", () => {
+  const terrain = terrainOf({ "1,1": 1, "2,1": 1, "4,4": 2 });
+  const groupOf = (s: Scene) => s.primitives.filter((p) => p.group === "lighting");
+
+  it("光照打开时地形贴图不乘环境光与墙阴影；拆出来的这一层原样成为光照组的底色贴图", () => {
+    const litTerrain = svgOf(terrainImage(sceneOf({}, terrain)));
+    const unlitTerrain = svgOf(terrainImage(sceneOf({}, terrain, unlit)));
+    expect(litTerrain).not.toContain("mix-blend-mode:multiply\"><rect");
+    expect(litTerrain).not.toContain(`filter="url(#shadow)"`);
+    expect(litTerrain).not.toContain(`<filter id="shadow"`);
+    const base = svgOf(byKey(sceneOf({}, terrain), LIGHTING_BASE_KEY.walls) as ImagePrimitive);
+    // 关闭时地形末尾 <g multiply> 里的内容，就是打开时底色贴图的内容
+    const multiplied = /<g style="mix-blend-mode:multiply">(.*)<\/g><\/svg>$/.exec(unlitTerrain)![1]!;
+    expect(base).toContain(multiplied);
+    expect(base).toMatch(/^<svg [^>]*><defs><filter id="shadow"[^>]*>.*<\/filter><path id="walls" d="[^"]+"\/><\/defs><rect /);
+    expect(multiplied).toContain(`<use href="#walls" fill="#000000" filter="url(#shadow)" style="mix-blend-mode:multiply"/>`);
+    expect(multiplied).toContain(`<use href="#walls" fill="#808080" stroke="#000000" stroke-width="10" paint-order="stroke" style="mix-blend-mode:screen"/>`);
+    // 去掉那一层与阴影滤镜，两张地形贴图完全相同
+    expect(litTerrain).toBe(unlitTerrain.replace(`<g style="mix-blend-mode:multiply">${multiplied}</g>`, "").replace(/<filter id="shadow".*?<\/filter>/, ""));
+  });
+
+  it("底色：一块铺满房间的环境光方块（地形还没到时也有）与墙阴影贴图，都在光照组、光照层级、普通混合", () => {
+    const groups = groupOf(sceneOf({}, terrain));
+    expect(groups.slice(0, 2)).toEqual([
+      { key: LIGHTING_BASE_KEY.ambient, kind: "rect", layer: LAYER.lighting, group: "lighting", x: 0, y: 0, width: 50, height: 50, fill: 0x8c8c8c },
+      expect.objectContaining({ key: LIGHTING_BASE_KEY.walls, kind: "image", layer: LAYER.lighting, group: "lighting", x: 0, y: 0, width: 50, height: 50 }),
+    ]);
+    for (const p of groups.slice(0, 2)) expect(p.blend).toBeUndefined();
+    expect(groupOf(sceneOf({})).map((p) => p.key)).toEqual([LIGHTING_BASE_KEY.ambient]);
+  });
+
+  it("光照关闭时没有光照组，Scene 也不带 lighting", () => {
+    const s = sceneOf({ a: road(5, 5) }, terrain, unlit);
+    expect(groupOf(s)).toEqual([]);
+    expect(s.lighting).toBeUndefined();
+    expect(sceneOf({}, terrain).lighting).toEqual({ layer: LAYER.lighting });
   });
 });
 
@@ -141,8 +185,10 @@ describe("官方画风：道路连接", () => {
     expect(roadLines(s).sort()).toEqual(
       ["5.5 5.5 6.5 5.5", "6.5 5.5 7.5 6.5", "7.5 6.5 7.5 9.5", "20.5 20.5 19.5 21.5"].sort(),
     );
+    // 光照打开时是官方原色（环境光由光照组乘），关闭时预乘环境光
     const line = byKey(s, "official-road/0/5/5") as LinePrimitive;
-    expect(line).toMatchObject({ layer: LAYER.road, stroke: { color: OFFICIAL_ROAD_COLOR, width: 0.3 } });
+    expect(line).toMatchObject({ layer: LAYER.road, stroke: { color: 0xaaaaaa, width: 0.3 } });
+    expect(byKey(sceneOf({ a: road(5, 5), b: road(6, 5) }, undefined, unlit), "official-road/0/5/5")).toMatchObject({ stroke: { color: OFFICIAL_ROAD_COLOR } });
   });
 
   it("每条道路仍是一个可点选的圆（官方半径 0.15 格）", () => {
@@ -203,7 +249,7 @@ describe("官方画风：按房间缓存，只在输入变化时重算", () => {
       expect(again).toHaveLength(first.length);
       again.forEach((p, i) => expect(p).toBe(first[i]));
     }
-    expect(counters).toEqual({ terrain: 1, roads: 1, ramparts: 1 });
+    expect(counters).toEqual({ terrain: 1, lighting: 0, roads: 1, ramparts: 1 });
   });
 
   it("只重算变了的那一层；对象顺序不同但集合相同不算变化", () => {
@@ -211,19 +257,34 @@ describe("官方画风：按房间缓存，只在输入变化时重算", () => {
     layers(stateOf(base), terrain, ctx);
     const more: Objects = { ...base, c: road(7, 5) };
     layers(stateOf(more), terrain, ctx);
-    expect(counters).toEqual({ terrain: 1, roads: 2, ramparts: 1 });
+    expect(counters).toEqual({ terrain: 1, lighting: 0, roads: 2, ramparts: 1 });
     const walled: Objects = { ...more, w2: { type: "constructedWall", x: 21, y: 20 } };
     layers(stateOf(walled), terrain, ctx);
-    expect(counters).toEqual({ terrain: 2, roads: 2, ramparts: 1 });
+    expect(counters).toEqual({ terrain: 2, lighting: 0, roads: 2, ramparts: 1 });
     const reversed = Object.fromEntries(Object.entries(walled).reverse());
     layers(stateOf(reversed), terrain, ctx);
-    expect(counters).toEqual({ terrain: 2, roads: 2, ramparts: 1 });
+    expect(counters).toEqual({ terrain: 2, lighting: 0, roads: 2, ramparts: 1 });
+  });
+
+  it("光照打开时光照组底色也按房间缓存：只在墙变了时重算；开关来回切换不重算", () => {
+    const { layers, counters } = createOfficialLayers();
+    const lit = { ...ctx, lighting: true } as PaintContext;
+    const first = layers(stateOf(tick(0)), terrain, lit);
+    const again = layers(stateOf(tick(1), 1), terrain, lit);
+    again.forEach((p, i) => expect(p).toBe(first[i]));
+    expect(counters).toMatchObject({ terrain: 1, lighting: 1 });
+    layers(stateOf(tick(2), 2), terrain, ctx);
+    layers(stateOf(tick(3), 3), terrain, lit);
+    layers(stateOf(tick(4), 4), terrain, ctx);
+    expect(counters).toMatchObject({ terrain: 2, lighting: 1 });
+    layers(stateOf({ ...tick(5), w2: { type: "constructedWall", x: 21, y: 20 } }, 5), terrain, lit);
+    expect(counters).toMatchObject({ terrain: 3, lighting: 2 });
   });
 
   it("buildRoomScene 在连续 Tick 里交给适配层的是同一批图元对象", () => {
     const one = buildRoomScene({ state: stateOf(tick(1)), terrain }, official);
     const two = buildRoomScene({ state: stateOf(tick(2), 2), terrain }, official);
-    for (const key of ["official-terrain", "official-road/0/5/5", "official-rampart/me1"]) {
+    for (const key of ["official-terrain", LIGHTING_BASE_KEY.walls, "official-road/0/5/5", "official-rampart/me1"]) {
       expect(byKey(two, key), key).toBe(byKey(one, key));
     }
   });

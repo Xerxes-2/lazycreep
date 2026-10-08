@@ -46,7 +46,8 @@ describe("buildRoomScene：地形", () => {
   // 官方地形的画法见 official-terrain.test.ts
   it("没有地形时只画对象", () => {
     const scene = buildRoomScene({ state: stateWith({}) }, view);
-    expect(scene.primitives).toHaveLength(0);
+    // 光照打开（默认）时只有光照组的环境光底色
+    expect(scene.primitives.map((p) => p.key)).toEqual(["lighting/ambient"]);
   });
 });
 

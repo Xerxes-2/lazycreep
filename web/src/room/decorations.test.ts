@@ -67,6 +67,9 @@ const sceneOf = (decorations: RoomDecorations | undefined, v: RoomSceneView = vi
 
 const byKey = (s: Scene, key: string) => s.primitives.find((p) => p.key === key);
 const terrainSvg = (s: Scene) => compositeSvgText((byKey(s, "official-terrain") as ImagePrimitive).url)!;
+/** 光照组底色的合成贴图（光照打开时） */
+const lightingSvg = (s: Scene) => compositeSvgText((byKey(s, "lighting/terrain") as ImagePrimitive).url)!;
+const unlit: RoomSceneView = { ...view, display: { ...DEFAULT_ROOM_DISPLAY, lighting: false } };
 
 describe("装饰：地形", () => {
   const svg = terrainSvg(sceneOf(SEASON));
@@ -76,8 +79,16 @@ describe("装饰：地形", () => {
     expect(svg).toMatch(/<image href="\/season-static\/season11\/decorations\/wall\.png" x="0" y="0" width="5000" height="5000" preserveAspectRatio="none" filter="url\(#wallTint\)" opacity="0\.15" clip-path="url\(#wallClip\)"\/>/);
     // #CFAD01 → 0xcf/255, 0xad/255, 0x01/255
     expect(svg).toContain(`<filter id="wallTint" color-interpolation-filters="sRGB"><feColorMatrix values="0.8118 0 0 0 0 0 0.6784 0 0 0 0 0 0.0039 0 0 0 0 0 1 0"/></filter>`);
-    // 光照层里墙的描边：hsl(0, 0, strokeLighting)
-    expect(svg).toContain(`<use href="#walls" fill="#808080" stroke="#1a1a1a" stroke-width="10" paint-order="stroke" style="mix-blend-mode:screen"/>`);
+  });
+
+  it("光照里墙的描边按 strokeLighting（hsl(0, 0, strokeLighting)），环境光用官方 #808080：光照打开时在光照组底色里，关闭时乘进地形", () => {
+    const wallLight = `<use href="#walls" fill="#808080" stroke="#1a1a1a" stroke-width="10" paint-order="stroke" style="mix-blend-mode:screen"/>`;
+    const lit = lightingSvg(sceneOf(SEASON));
+    expect(lit).toContain(wallLight);
+    expect(lit).toContain(`<rect x="0" y="0" width="5000" height="5000" fill="#808080"/>`);
+    expect(byKey(sceneOf(SEASON), "lighting/ambient")).toMatchObject({ kind: "rect", fill: 0x808080, group: "lighting" });
+    expect(svg).not.toContain(wallLight);
+    expect(terrainSvg(sceneOf(SEASON, unlit))).toContain(wallLight);
   });
 
   it("地面：底色按装饰，前景图案按 tileScale 平铺（贴图 1024 像素 × 2），不再用默认的地面纹理", () => {
@@ -122,16 +133,20 @@ describe("装饰：地形", () => {
 });
 
 describe("装饰：道路", () => {
-  it("连线与圆按装饰的道路颜色与亮度（再乘官方环境光 0x808080）", () => {
-    const s = sceneOf(SEASON);
-    const line = s.primitives.find((p): p is LinePrimitive => p.key.startsWith("official-road/"))!;
-    expect(line.stroke.color).toBe(0x564c25);
-    expect((byKey(s, "r1/body") as CirclePrimitive).fill).toBe(0x564c25);
+  const roadColors = (s: Scene) => [
+    s.primitives.find((p): p is LinePrimitive => p.key.startsWith("official-road/"))!.stroke.color,
+    (byKey(s, "r1/body") as CirclePrimitive).fill,
+  ];
+
+  it("连线与圆按装饰的道路颜色与亮度；光照打开时是原色（由光照组乘环境光），关闭时再乘官方环境光 0x808080", () => {
+    expect(roadColors(sceneOf(SEASON))).toEqual([0xac984a, 0xac984a]);
+    expect(roadColors(sceneOf(SEASON, unlit))).toEqual([0x564c25, 0x564c25]);
   });
 
-  it("没有地面装饰时仍是官方道路色", () => {
-    const s = sceneOf({ objects: SEASON.objects, wall: SEASON.wall! });
-    expect((byKey(s, "r1/body") as CirclePrimitive).fill).toBe(OFFICIAL_ROAD_COLOR);
+  it("没有地面装饰时仍是官方道路色（光照打开时 0xaaaaaa）", () => {
+    const wallOnly = { objects: SEASON.objects, wall: SEASON.wall! };
+    expect(roadColors(sceneOf(wallOnly))).toEqual([0xaaaaaa, 0xaaaaaa]);
+    expect(roadColors(sceneOf(wallOnly, unlit))).toEqual([OFFICIAL_ROAD_COLOR, OFFICIAL_ROAD_COLOR]);
   });
 });
 

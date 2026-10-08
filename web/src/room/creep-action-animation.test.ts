@@ -74,7 +74,7 @@ describe("creep 的光束（Scene）", () => {
     ]);
     expect(animationDuration(cover.animation!)).toBe(0.9 * TD);
     expect(byKey(scene, `action/c1/${action}-target-flare`)).toMatchObject({ blend: "add", tint: 0xffe533 });
-    expect(byKey(scene, `action/c1/${action}-target-glow`)).toMatchObject({ blend: "add" });
+    expect(byKey(scene, `action/c1/${action}-target-glow`)).toMatchObject({ group: "lighting", blend: "screen" });
   });
 
   it("远程攻击、远程治疗没有目标闪光", () => {

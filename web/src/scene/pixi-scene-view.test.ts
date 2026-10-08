@@ -5,9 +5,9 @@
  * 文字测量、逐对象绘制调用）都真实走一遍，只是像素不落地。
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { autoDetectRenderer, Graphics, Texture, type Container } from "pixi.js";
+import { autoDetectRenderer, Graphics, RendererType, Texture, type Container, type Filter } from "pixi.js";
 import type { ImagePrimitive, Primitive, PrimitiveAnimation, Scene } from "./scene.ts";
-import { createSceneView, type SceneRenderer, type SceneView } from "./pixi-scene-view.ts";
+import { createSceneView, LIGHTING_LABEL, type SceneRenderer, type SceneView } from "./pixi-scene-view.ts";
 import { encodePixelImage } from "./pixel-image.ts";
 import { createSvgRasterCache, type SvgRasterCache } from "./texture-sources.ts";
 
@@ -746,5 +746,147 @@ describe("有界动画（ADR 0008）", () => {
     view.show(structuredClone(withPrims(flash(1))));
     expect(at(150)).toBe(2);
     expect(frames.pending).toBe(0);
+  });
+});
+
+describe("光照组（ADR 0009）", () => {
+  /**
+   * 渲染器：webgl 时是只记录调用的假 WebGL 渲染器（jsdom 没有 WebGL，滤镜无法真正执行），
+   * canvas 时是 Pixi 自带的 Canvas 渲染器（真实走一遍渲染管线）
+   */
+  async function lightingView(kind: "webgl" | "canvas") {
+    const frames = manualFrames();
+    let time = 0;
+    const renderer: SceneRenderer =
+      kind === "canvas"
+        ? await canvasRenderer()
+        : {
+            type: RendererType.WEBGL,
+            render: () => undefined,
+            resize: () => undefined,
+            destroy: () => undefined,
+            canvas: document.createElement("canvas"),
+            background: { color: 0 } as unknown as SceneRenderer["background"],
+          };
+    const render = vi.spyOn(renderer, "render");
+    const view = await createSceneView({
+      width: 400,
+      height: 300,
+      renderer,
+      schedule: frames.schedule,
+      now: () => time,
+      textures: { load: () => new Promise<Texture>(() => {}), unload: () => {} },
+    });
+    views.push(view);
+    const root = () => (render.mock.calls.at(-1)?.[0] as unknown as { container: Container }).container;
+    return {
+      view,
+      frames,
+      /** 把时钟拨到 at 并跑完已排队的帧；返回累计渲染次数 */
+      at(ms: number) {
+        time = ms;
+        frames.flush();
+        return render.mock.calls.length;
+      },
+      world: () => root().children[0] as Container,
+      lighting: () => root().getChildByLabel(LIGHTING_LABEL, true),
+      node: (key: string) => root().getChildByLabel(key, true)!,
+    };
+  }
+
+  const ambient: Primitive = { key: "lighting/ambient", kind: "rect", layer: 39, group: "lighting", x: 0, y: 0, width: 50, height: 50, fill: 0x808080 };
+  const glow = (extra: Partial<ImagePrimitive> = {}): Primitive => ({
+    key: "lighting/a/0",
+    kind: "image",
+    layer: 39.5,
+    group: "lighting",
+    blend: "screen",
+    x: 1,
+    y: 1,
+    width: 4,
+    height: 4,
+    url: "/glow.png",
+    alpha: 0.5,
+    ...extra,
+  });
+  const litScene = (...extra: Primitive[]): Scene => ({ ...scene, primitives: [...scene.primitives, ambient, glow(), ...extra], lighting: { layer: 39 } });
+
+  it("组里的图元画进一个容器：容器在世界里、层级取 Scene.lighting，挂一个以 MULTIPLY 混合的滤镜（分辨率跟随画布）", async () => {
+    const { view, at, world, lighting, node } = await lightingView("webgl");
+    view.show(litScene());
+    at(0);
+    const container = lighting()!;
+    expect(container.parent).toBe(world());
+    expect(container.zIndex).toBe(39);
+    expect(container.visible).toBe(true);
+    expect(container.filters).toHaveLength(1);
+    const [filter] = container.filters as Filter[];
+    expect(filter!.blendMode).toBe("multiply");
+    expect(filter!.resolution).toBe("inherit");
+    // 组内：底色普通混合，光滤色，按 layer 排
+    expect(container.sortableChildren).toBe(true);
+    expect(container.children.map((c) => c.label)).toEqual(["lighting/ambient", "lighting/a/0"]);
+    expect(node("lighting/ambient").blendMode).toBe("normal");
+    expect(node("lighting/a/0").blendMode).toBe("screen");
+    // 组外的图元仍直接在世界里；容器在对象（层级 30 的 c）之上、RoomVisual（层级 100 的 l）之下
+    expect(node("c").parent).toBe(world());
+    world().sortChildren();
+    const order = world().children.map((c) => c.label);
+    expect(order.indexOf(LIGHTING_LABEL)).toBeGreaterThan(order.indexOf("c"));
+    expect(order.indexOf(LIGHTING_LABEL)).toBeLessThan(order.indexOf("l"));
+  });
+
+  it("不增加帧：带光照组的 Scene 只渲染一帧；组里的动画与其他动画一样到期即停", async () => {
+    const { view, at, frames } = await lightingView("webgl");
+    view.show(litScene());
+    expect(at(0)).toBe(1);
+    expect(frames.pending).toBe(0);
+    expect(at(1000)).toBe(1);
+    // 同样内容的新 Scene 不渲染
+    view.show(structuredClone(litScene()));
+    expect(at(1100)).toBe(1);
+    const flashing = glow({ animation: { id: 1, tweens: [{ property: "alpha", from: 0.5, steps: [{ to: 1, duration: 100 }, { duration: 100 }] }] } });
+    view.show({ ...litScene(), primitives: [...scene.primitives, ambient, flashing] });
+    // 动画从 show() 时（时钟 1100）开始，200 ms 后停
+    expect(at(1200)).toBe(2);
+    expect(at(1250)).toBe(3);
+    expect(at(1300)).toBe(4);
+    expect(frames.pending).toBe(0);
+    expect(at(2000)).toBe(4);
+  });
+
+  it("Scene 没有光照组时容器摘下（组里的图元不画）；再打开时挂回去", async () => {
+    const { view, at, world, lighting } = await lightingView("webgl");
+    view.show(litScene());
+    at(0);
+    const container = lighting()!;
+    view.show({ ...scene, primitives: [...scene.primitives] });
+    expect(at(10)).toBe(2);
+    expect(container.parent).toBeNull();
+    expect(world().getChildByLabel(LIGHTING_LABEL)).toBeNull();
+    view.show(litScene());
+    expect(at(20)).toBe(3);
+    expect(container.parent).toBe(world());
+  });
+
+  it("图元换到组里或组外时换父容器", async () => {
+    const { view, at, world, lighting, node } = await lightingView("webgl");
+    view.show(litScene());
+    at(0);
+    const { group: _group, ...plain } = glow() as ImagePrimitive;
+    view.show({ ...scene, primitives: [...scene.primitives, ambient, plain], lighting: { layer: 39 } });
+    at(10);
+    expect(node("lighting/a/0").parent).toBe(world());
+    view.show(litScene());
+    at(20);
+    expect(node("lighting/a/0").parent).toBe(lighting());
+  });
+
+  it("Canvas 渲染器没有滤镜：不画光照组，渲染不抛错", async () => {
+    const { view, at, lighting } = await lightingView("canvas");
+    view.show(litScene());
+    expect(() => at(0)).not.toThrow();
+    expect(lighting()!.visible).toBe(false);
+    expect(lighting()!.filters ?? []).toHaveLength(0);
   });
 });

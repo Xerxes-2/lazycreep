@@ -8,7 +8,7 @@ import { animationDuration } from "../scene/animation.ts";
 import type { Primitive, Scene } from "../scene/scene.ts";
 import { DEFAULT_THEME } from "../scene/theme.ts";
 import { DEFAULT_ROOM_DISPLAY } from "./display-options.ts";
-import { GLOW_GAIN } from "./official-lighting.ts";
+import { LIGHT_LAYER } from "./official-lighting.ts";
 import { buildRoomScene, type RoomSceneView } from "./room-scene.ts";
 import { roomStateFrom, type RoomState } from "./room-state.ts";
 
@@ -76,11 +76,12 @@ describe("塔的射击动画（Scene）", () => {
     expect(flare.kind === "image" && flare.url).toMatch(/flare1\.png$/);
     expect(flare.animation?.tweens).toEqual([{ property: "alpha", from: 0, steps: [{ to: 0.2, duration: 200 }, { duration: 600 }] }]);
 
-    const glow = byKey(scene, "lighting/t1/0");
-    expect(glow.alpha).toBeCloseTo(0.5 * GLOW_GAIN);
-    expect(glow.animation?.tweens).toEqual([
-      { property: "alpha", from: 0.5 * GLOW_GAIN, steps: [{ to: GLOW_GAIN, duration: 200 }, { duration: 600 }] },
-    ]);
+    // 塔的 light glow（600，官方 alpha 0.5）在光照组里滤色叠加；有能量时的小 glow（100）不闪
+    const glow = byKey(scene, "lighting/t1/1");
+    expect(glow).toMatchObject({ group: "lighting", blend: "screen", alpha: 0.5, width: 6 });
+    expect(glow.animation?.tweens).toEqual([{ property: "alpha", from: 0.5, steps: [{ to: 1, duration: 200 }, { duration: 600 }] }]);
+    expect(byKey(scene, "lighting/t1/0")).toMatchObject({ width: 1, alpha: 1 });
+    expect(byKey(scene, "lighting/t1/0").animation).toBeUndefined();
   });
 
   it("炮塔（与能量条）从上一个画面的朝向转向目标，0.3 秒，绕塔中心；终态就是静止画面的朝向", () => {
@@ -121,7 +122,10 @@ describe("塔的射击动画（Scene）", () => {
     ]);
     expect(animationDuration(cover.animation!)).toBe(0.9 * TD);
     expect(byKey(repairing, "action/t1/repair-target-flare")).toMatchObject({ blend: "add", tint: 0xffe533 });
-    expect(byKey(repairing, "action/t1/repair-target-glow")).toMatchObject({ blend: "add" });
+    // 目标闪光的 glow 在光照组里：滤色，峰值是官方的 0.5
+    const glow = byKey(repairing, "action/t1/repair-target-glow");
+    expect(glow).toMatchObject({ group: "lighting", blend: "screen", layer: LIGHT_LAYER, alpha: 0 });
+    expect(glow.animation?.tweens).toEqual([{ property: "alpha", from: 0, delay: 600, steps: [{ to: 0.5, duration: 300 }, { duration: 900 }] }]);
     // 光照关闭时目标闪光没有 glow
     const dark = build(roomAt(101, { repair: { x: 7, y: 10 } }), idle, { ...view, display: { ...DEFAULT_ROOM_DISPLAY, lighting: false } });
     expect(dark.primitives.some((p) => p.key === "action/t1/repair-target-glow")).toBe(false);

@@ -1,14 +1,14 @@
 /**
- * 官方 PNG 纹理（#46）：screeps/renderer `metadata/images` 里地形用到的 4 张、光照的 glow（#49）与动作动画的
+ * 官方 PNG 纹理（#46）：screeps/renderer `metadata/images` 里地形用到的 4 张、光照的 glow（#49）与 creep-mask（#64）、动作动画的
  * flare1 / flare2（#55）（ISC，LICENSE 与来源见
  * `public/official-art/`），原样放在 `public/official-art/textures/`。
  *
  * 不进 PWA 预缓存（pwa.config.ts 的 globIgnores，build.test.ts 检查），也不由 JS 引用：只有官方画风的
- * 地形贴图被栅格化时（首次进入 Room View）、glow / flare 在第一个用到它的图元被画时才按需请求，之后走 HTTP 缓存。
+ * 地形贴图被栅格化时（首次进入 Room View）、glow / creep-mask / flare 在第一个用到它的图元被画时才按需请求，之后走 HTTP 缓存。
  */
 import { OFFICIAL_ART_DIR } from "./official-art.ts";
 
-export const OFFICIAL_TEXTURE_NAMES = ["ground", "ground-mask", "noise1", "noise2", "glow", "flare1", "flare2"] as const;
+export const OFFICIAL_TEXTURE_NAMES = ["ground", "ground-mask", "noise1", "noise2", "glow", "creep-mask", "flare1", "flare2"] as const;
 
 export type OfficialTextureName = (typeof OFFICIAL_TEXTURE_NAMES)[number];
 
