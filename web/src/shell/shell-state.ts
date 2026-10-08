@@ -16,7 +16,7 @@
  */
 import { batch, createSignal, type Accessor } from "solid-js";
 import type { Settings } from "../settings/settings.ts";
-import { isRecord, readJson, writeJson, type KeyValueStorage, type StoredKey } from "../storage/local-store.ts";
+import { isRecord, readJson, removeKey, writeJson, type KeyValueStorage, type StoredKey } from "../storage/local-store.ts";
 
 export type MainViewMode = "map" | "room";
 
@@ -100,18 +100,12 @@ const decodeMode = (value: unknown): MainViewMode | undefined => (value === "map
 
 /**
  * #2 网格停靠留下的两个布局键（ADR 0005：启动时清除，不迁移）。
- * 键名拼出来写：它们已不是本应用存储的键，不登记进 STORED_KEYS。
+ * 它们已不是本应用存储的键，不登记进 STORED_KEYS；存储键扫描测试（settings-transfer.test.ts）把它们列为豁免。
  */
-export const LEGACY_LAYOUT_KEYS: readonly string[] = ["desktop", "monitor"].map((name) => `${"msc"}.layout.${name}`);
+export const LEGACY_LAYOUT_KEYS: readonly string[] = ["msc.layout.desktop", "msc.layout.monitor"];
 
-export function clearLegacyLayout(storage: Pick<Storage, "removeItem"> | undefined): void {
-  for (const key of LEGACY_LAYOUT_KEYS) {
-    try {
-      storage?.removeItem(key);
-    } catch {
-      // 存储不可用：没什么可清的
-    }
-  }
+export function clearLegacyLayout(storage: (KeyValueStorage & Partial<Pick<Storage, "removeItem">>) | undefined): void {
+  for (const key of LEGACY_LAYOUT_KEYS) removeKey(storage, key);
 }
 
 export interface ShellState {
@@ -156,7 +150,7 @@ export function createShellState(
   storage: (KeyValueStorage & Partial<Pick<Storage, "removeItem">>) | undefined,
   settings: ShardSettings,
 ): ShellState {
-  clearLegacyLayout(storage?.removeItem ? (storage as Pick<Storage, "removeItem">) : undefined);
+  clearLegacyLayout(storage);
 
   const [prefs, setPrefs] = createSignal<ShellPrefs>(readJson(storage, SHELL_STORAGE.key, decodePrefs, DEFAULT_PREFS));
   const change = (patch: Partial<ShellPrefs>) => {
