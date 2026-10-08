@@ -41,6 +41,7 @@ import { replayMsPerTick } from "../replay/replay-engine.ts";
 import { replayAt, replayTick, type RoomRequest, type RoomTarget } from "../shell/shell-state.ts";
 import { seasonArtFor } from "../art/season-art.ts";
 import type { DataSource } from "./data-source.ts";
+import { preloadNeighbors } from "./neighbor-preload.ts";
 
 type Target = RoomTarget;
 /** 从外部打开的房间；给了 replay 就以该 Tick 进入 Replay */
@@ -228,7 +229,12 @@ export function RoomView(props: RoomViewProps) {
           setStreamError,
         );
     src.getTerrain(current.shard, current.room).then(
-      (loaded) => alive && setTerrain(loaded),
+      (loaded) => {
+        if (!alive) return;
+        setTerrain(loaded);
+        // 当前房间的地形到了再在后台预加载邻居（neighbor-preload.ts）；页面隐藏时不做
+        void preloadNeighbors(src, current.shard, current.room, () => alive && untrack(visible));
+      },
       (error: unknown) => alive && setTerrainError(errorMessage(t, error)),
     );
     onCleanup(() => {
