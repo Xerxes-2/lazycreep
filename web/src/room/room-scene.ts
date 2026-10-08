@@ -20,6 +20,7 @@ import { sayBubble } from "./say-bubbles.ts";
 import type { SeasonArt } from "../art/season-art.ts";
 import { GLOW_GAIN, LIGHTING_LAYER, officialLighting } from "./official-lighting.ts";
 import { actionEffects } from "./action-animation.ts";
+import { applyObjectMotions, nextFacings, objectMotions, type Facings } from "./movement-tween.ts";
 import { OFFICIAL_PAINTERS } from "./official-painters.ts";
 import { officialRoomLayers } from "./official-terrain.ts";
 import { seasonMetadataPainter, withSeasonArt } from "./season-official-painters.ts";
@@ -37,6 +38,8 @@ export interface RoomSceneInput {
   readonly terrain?: Terrain | undefined;
   /** 上一个画出的房间状态（动画的起点）；没有时不播动画 */
   readonly previous?: RoomState | undefined;
+  /** 上一个 Tick 记住的 creep 朝向（movement-tween.ts 的 nextFacings 沿 Tick 传下来）；没有时都朝上 */
+  readonly facing?: Facings | undefined;
 }
 
 export interface RoomSceneView {
@@ -85,6 +88,8 @@ const placeholder: ObjectPainter = (obj, ctx) => {
   ];
 };
 
+const NO_FACINGS: Facings = new Map();
+
 export function buildRoomScene(
   room: RoomSceneInput,
   view: RoomSceneView,
@@ -108,6 +113,7 @@ export function buildRoomScene(
     ownerColor: ownerColorRule(theme, room.state.users, { me: view.me, allies: view.allies }),
     ...(view.seasonArt ? { seasonArt: view.seasonArt } : {}),
     ...(animation ? { animation } : {}),
+    ...(display.animation ? { facings: { before: room.facing ?? NO_FACINGS, after: nextFacings(room.facing, previous, room.state) } } : {}),
   };
 
   const primitives: Primitive[] = officialRoomLayers(room.state, room.terrain, ctx);
@@ -132,8 +138,10 @@ export function buildRoomScene(
     const lighting = display.lighting ? { layer: LIGHTING_LAYER, gain: GLOW_GAIN } : undefined;
     primitives.push(...actionEffects(room.state, animation, { lighting }));
   }
-  if (display.visual) primitives.push(...roomVisualPrimitives(room.state.visual));
+  // 整个对象一起动（移动补间等）：统一加到对象的所有图元上，见 movement-tween.ts
+  const moved = animation ? applyObjectMotions(primitives, objectMotions(room.state, animation), animation) : primitives;
+  if (display.visual) moved.push(...roomVisualPrimitives(room.state.visual));
   // 稳定排序：同层按出现顺序
-  primitives.sort((a, b) => a.layer - b.layer);
-  return { width: ROOM_SIZE, height: ROOM_SIZE, background: theme.background, primitives };
+  moved.sort((a, b) => a.layer - b.layer);
+  return { width: ROOM_SIZE, height: ROOM_SIZE, background: theme.background, primitives: moved };
 }

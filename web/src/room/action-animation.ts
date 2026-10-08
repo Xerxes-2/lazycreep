@@ -16,6 +16,7 @@ import type { AnimatedProperty, Color, Primitive, PrimitiveAnimation, Tween } fr
 import { LAYER, center, num, type AnimationContext, type PrimitiveDraft } from "./room-paint.ts";
 import type { RoomObject, RoomState } from "./room-state.ts";
 import { u } from "./official-sprite.ts";
+import { stepOf } from "./movement-tween.ts";
 
 /** 官方 effects 图层：对象（含 rampart）与光照之上 */
 export const EFFECTS_LAYER = LAYER.rampart + 1;
@@ -231,14 +232,8 @@ const MASS_ATTACK_RADIUS = 300;
  */
 function actingPosition(obj: RoomObject, id: string, anim: AnimationContext): Point {
   const now = center(obj);
-  const before = anim.previous.objects[id];
-  if (!before) return now;
-  const bx = num(before, "x");
-  const by = num(before, "y");
-  if (bx === undefined || by === undefined) return now;
-  const dx = bx + 0.5 - now.x;
-  const dy = by + 0.5 - now.y;
-  return Math.max(Math.abs(dx), Math.abs(dy)) <= 1 ? { x: bx + 0.5, y: by + 0.5 } : now;
+  const step = stepOf(anim.previous.objects[id], obj);
+  return step ? { x: now.x - step.dx, y: now.y - step.dy } : now;
 }
 
 /**

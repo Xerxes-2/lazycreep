@@ -23,6 +23,7 @@ import { browserStorage, type KeyValueStorage } from "../storage/local-store.ts"
 import { cameraKey } from "./room-camera-store.ts";
 import { RoomDetailsPanel, createRoomControls } from "./room-controls.tsx";
 import { ROOM_SIZE, buildRoomScene } from "./room-scene.ts";
+import { nextFacings, type Facings } from "./movement-tween.ts";
 import { reduceLiveTick, type RoomState } from "./room-state.ts";
 import type { HistoryCache } from "../replay/history-cache.ts";
 import { createReplayController } from "../replay/replay-controller.ts";
@@ -252,12 +253,21 @@ export function RoomView(props: RoomViewProps) {
   /** 画面上的房间状态：Replay 期间是重放出来的状态，否则是 Live 状态 */
   const shownState = () => (replay.active() ? replay.snapshot()?.roomState : roomState());
 
-  /** 画面上的房间状态与它之前的那个（动画的起点，#55）；换房间时清空 */
-  const shownHistory = createMemo<{ readonly current: RoomState | undefined; readonly previous: RoomState | undefined }>((last) => {
+  /**
+   * 画面上的房间状态与它之前的那个（动画的起点，#55），以及 creep 朝向的记忆（#57：previousFacing 是上一个
+   * 画面状态时的朝向，facing 是本状态的）；换房间时清空
+   */
+  const shownHistory = createMemo<{
+    readonly current: RoomState | undefined;
+    readonly previous: RoomState | undefined;
+    readonly facing: Facings | undefined;
+    readonly previousFacing: Facings | undefined;
+  }>((last) => {
     const current = shownState();
-    if (!current) return { current, previous: undefined };
+    if (!current) return { current, previous: undefined, facing: undefined, previousFacing: undefined };
     if (last && current === last.current) return last;
-    return { current, previous: last?.current };
+    const previous = last?.current;
+    return { current, previous, facing: nextFacings(last?.facing, previous, current), previousFacing: last?.facing };
   });
 
   /** 动画的 Tick 间隔（#55）：Replay 按回放速度，Live 按 Top Bar 实测 */
@@ -285,7 +295,7 @@ export function RoomView(props: RoomViewProps) {
     }
     if (!target()) return undefined;
     const theme = props.theme ?? DEFAULT_THEME;
-    const { current: state, previous: before } = shownHistory();
+    const { current: state, previous: before, previousFacing } = shownHistory();
     if (!state) {
       return { width: ROOM_SIZE, height: ROOM_SIZE, background: theme.background, primitives: [] };
     }
@@ -296,7 +306,7 @@ export function RoomView(props: RoomViewProps) {
     const animate = state.gameTime !== quietTick;
     if (timing?.state !== state) timing = { state, ms: untrack(tickMs) };
     return buildRoomScene(
-      { state, terrain: terrain(), previous: animate ? before : undefined },
+      { state, terrain: terrain(), previous: animate ? before : undefined, facing: previousFacing },
       {
         theme,
         zoom: controls.zoom(),

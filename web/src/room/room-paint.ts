@@ -47,6 +47,11 @@ export interface PaintContext {
   readonly seasonArt?: SeasonArt;
   /** 本 Tick 要播放有界动画时给出（ADR 0008）；没有时画法只画静止画面、不带动画描述 */
   readonly animation?: AnimationContext;
+  /**
+   * 动画开关打开时给出：creep / powerCreep 身体的朝向（movement-tween.ts 的 Facings，顺时针弧度，0 = 朝上）。
+   * before 是上一个 Tick 记住的朝向，after 是本 Tick 的（静止画面按它画）；没有记录的对象朝上。
+   */
+  readonly facings?: { readonly before: ReadonlyMap<string, number>; readonly after: ReadonlyMap<string, number> };
 }
 
 /** 画法播放动画需要的上下文（action-animation.ts 的构件都收它） */
