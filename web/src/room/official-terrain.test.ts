@@ -40,8 +40,39 @@ const roadLines = (s: Scene) =>
   s.primitives.filter((p): p is LinePrimitive => p.key.startsWith("official-road/")).map((p) => p.points.join(" "));
 
 const road = (x: number, y: number) => ({ type: "road", x, y });
+const terrainCtx = { ownerColor: () => 0x5d9cec } as unknown as PaintContext;
 
 describe("官方画风：地形", () => {
+  describe("加色混合（plus-lighter）的降级", () => {
+    const terrain = terrainOf({ "1,1": 1, "4,4": 2 });
+    const layerSvg = (blend: "plus-lighter" | "screen") =>
+      svgOf(createOfficialLayers({ additiveBlend: blend }).layers(stateOf({}), terrain, terrainCtx)[0] as ImagePrimitive);
+
+    it("支持 plus-lighter 时噪声纹理按官方的加色混合合成", () => {
+      const svg = layerSvg("plus-lighter");
+      expect(svg.match(/mix-blend-mode:plus-lighter/g)).toHaveLength(3);
+    });
+
+    it("不支持时改用 screen 近似，其余不变", () => {
+      const add = layerSvg("plus-lighter");
+      const screen = layerSvg("screen");
+      expect(screen).not.toContain("plus-lighter");
+      expect(screen.replace(/mix-blend-mode:screen/g, "")).toBe(add.replace(/mix-blend-mode:(plus-lighter|screen)/g, ""));
+    });
+
+    it("默认按浏览器是否支持选择", () => {
+      const supports = vi.fn((property: string, value: string) => property === "mix-blend-mode" && value === "plus-lighter");
+      vi.stubGlobal("CSS", { supports });
+      try {
+        expect(svgOf(createOfficialLayers().layers(stateOf({}), terrain, terrainCtx)[0] as ImagePrimitive)).toContain("plus-lighter");
+        supports.mockReturnValue(false);
+        expect(svgOf(createOfficialLayers().layers(stateOf({}), terrain, terrainCtx)[0] as ImagePrimitive)).not.toContain("plus-lighter");
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    });
+  });
+
   it("整块地形是一张铺满房间、在地形层的合成贴图；几何画风的逐行矩形不再出现", () => {
     const s = sceneOf({}, terrainOf({ "1,1": 1, "2,1": 1, "4,4": 2 }));
     expect(terrainImage(s)).toMatchObject({ kind: "image", layer: LAYER.terrain, x: 0, y: 0, width: 50, height: 50 });

@@ -47,12 +47,31 @@ const hex = (color: Color) => `#${color.toString(16).padStart(6, "0")}`;
 
 // ---- 地形 SVG（terrain.js：lighting 'normal'、swampTexture 静止、没有 decoration） ----
 
-function terrainSvg(walls: string, swamps: string): string {
+/**
+ * 官方噪声纹理用加色混合（Pixi 的 ADD）叠进墙与沼泽。SVG 里对应 `mix-blend-mode: plus-lighter`，
+ * 不认它的浏览器（MDN 兼容数据：Chrome / Edge 100、Firefox 99 之前；Safari 自 9.1 起认）会忽略整条声明、
+ * 退成普通混合，噪声盖住底色。注意同一份数据称 Safari / iOS 不支持 SVG 元素上的 mix-blend-mode，
+ * 那里本文件所有混合（含 multiply、screen）是否生效要在设备上确认，检测 CSS.supports 也测不出来。
+ * 这时改用 `screen`：1 − (1 − a)(1 − b)，底色很暗（墙 #111、沼泽的暗绿）且噪声不透明度只有 0.075–0.2，
+ * 结果与相加只差 b·a 一项，肉眼几乎看不出。
+ */
+export type AdditiveBlend = "plus-lighter" | "screen";
+
+export function detectAdditiveBlend(): AdditiveBlend {
+  const css = (globalThis as { CSS?: { supports?: (property: string, value: string) => boolean } }).CSS;
+  try {
+    return css?.supports?.("mix-blend-mode", "plus-lighter") ? "plus-lighter" : "screen";
+  } catch {
+    return "screen";
+  }
+}
+
+function terrainSvg(walls: string, swamps: string, blend: AdditiveBlend): string {
   const full = `x="0" y="0" width="5000" height="5000"`;
   const tile = (id: string, name: Parameters<typeof officialTextureUrl>[0], size: number, filter = "") =>
     `<pattern id="${id}" patternUnits="userSpaceOnUse" width="${size}" height="${size}">` +
     `<image href="${officialTextureUrl(name)}" width="${size}" height="${size}" preserveAspectRatio="none"${filter}/></pattern>`;
-  const add = `style="mix-blend-mode:plus-lighter"`;
+  const add = `style="mix-blend-mode:${blend}"`;
   const parts = [
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 5000 5000">`,
     `<defs>`,
@@ -144,8 +163,14 @@ export interface OfficialLayerCounters {
   ramparts: number;
 }
 
+export interface OfficialLayerOptions {
+  /** 噪声纹理的加色混合方式；默认按浏览器支持检测（{@link detectAdditiveBlend}） */
+  readonly additiveBlend?: AdditiveBlend;
+}
+
 /** 一份按输入缓存的官方地形与连接图层；counters 记录真正重算的次数（测试用） */
-export function createOfficialLayers() {
+export function createOfficialLayers(options: OfficialLayerOptions = {}) {
+  const blend = options.additiveBlend ?? detectAdditiveBlend();
   const counters: OfficialLayerCounters = { terrain: 0, roads: 0, ramparts: 0 };
   const terrainCache = new WeakMap<Terrain, { key: string; primitive: ImagePrimitive }>();
   const roadCache = new Recent<readonly LinePrimitive[]>(8);
@@ -163,7 +188,7 @@ export function createOfficialLayers() {
       if (code & 1) natural[i] = 1;
       else if (code & 2) swamps[i] = 1;
     }
-    const svg = terrainSvg(renderPath(gridOf(constructedWalls, natural)), renderPath(swamps));
+    const svg = terrainSvg(renderPath(gridOf(constructedWalls, natural)), renderPath(swamps), blend);
     const primitive: ImagePrimitive = {
       key: "official-terrain",
       kind: "image",
