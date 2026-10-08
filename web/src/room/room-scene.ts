@@ -6,7 +6,7 @@ import type { Primitive, Scene } from "../scene/scene.ts";
 import type { Theme } from "../scene/theme.ts";
 import type { Terrain } from "../source/source.ts";
 import { LAYER, center, num, type ObjectPainter, type ObjectPainters, type PaintContext, type PrimitiveDraft } from "./room-paint.ts";
-import { barsVisible, extraBars, ownerColorRule, selectionHighlight } from "./room-detail-rules.ts";
+import { barsVisible, extraBars, ownerColorRule, selectionHighlight, stackBars } from "./room-detail-rules.ts";
 import { ROOM_OBJECT_PAINTERS } from "./room-painters.ts";
 import type { RoomState } from "./room-state.ts";
 import { roomVisualPrimitives } from "./room-visual.ts";
@@ -122,9 +122,10 @@ export function buildRoomScene(
     const showBars = barsVisible(ctx, id);
     const label = display.names && showBars ? nameLabel(obj, ctx) : undefined;
     if (label) drafts.push(label);
-    for (const { part, ...draft } of drafts) {
-      if (!showBars && draft.kind === "bar") continue;
-      if (!display.bars && draft.kind === "bar" && part === "hits") continue;
+    const shown = drafts.filter(
+      (d) => d.kind !== "bar" || (showBars && (display.bars || d.part !== "hits")),
+    );
+    for (const { part, ...draft } of stackBars(shown)) {
       primitives.push({ ...draft, key: `${id}/${part}`, objectId: id } as Primitive);
     }
   }

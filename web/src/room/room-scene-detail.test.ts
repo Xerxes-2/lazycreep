@@ -158,3 +158,41 @@ describe("buildRoomScene：选中态", () => {
     ).toBe(false);
   });
 });
+
+describe("buildRoomScene：同时有血条与资源条时顺序固定", () => {
+  // 建筑的画法自己画资源条、creep 的条全由通用规则补上，两条路径都必须得到同一顺序：
+  // 血条贴格子下沿，资源条在它正上方。
+  const state = stateWith({
+    box: { _id: "box", type: "container", x: 5, y: 5, hits: 100_000, hitsMax: 250_000, store: { energy: 1000 }, storeCapacity: 2000 },
+    hauler: { _id: "hauler", type: "creep", x: 7, y: 5, user: "me1", hits: 300, hitsMax: 500, body: [{ type: "carry", hits: 100 }, { type: "move", hits: 100 }], store: { energy: 25 }, storeCapacity: 50 },
+  });
+  const scene = buildRoomScene({ state }, { theme, me: "me1", zoom: BAR_MIN_ZOOM + 10 });
+  const barY = (id: string, name: string) => {
+    const p = part(scene, id, name);
+    if (p?.kind !== "bar") throw new Error(`${id}/${name} 不是进度条：${JSON.stringify(p)}`);
+    return p.y;
+  };
+
+  for (const id of ["box", "hauler"]) {
+    it(`${id}：血条在资源条下方`, () => {
+      expect(barY(id, "hits")).toBeGreaterThan(barY(id, "store"));
+    });
+  }
+
+  it("建筑与 creep 的两条进度条相对格子的位置完全一致", () => {
+    const offset = (id: string, x: number) => ({ hits: barY(id, "hits") - 5, store: barY(id, "store") - 5, x });
+    const box = offset("box", 5);
+    const hauler = offset("hauler", 7);
+    expect(hauler.hits).toBeCloseTo(box.hits);
+    expect(hauler.store).toBeCloseTo(box.store);
+  });
+
+  it("显示选项关掉血条后，资源条落到血条原来的位置", () => {
+    const noHits = buildRoomScene({ state }, { theme, me: "me1", zoom: BAR_MIN_ZOOM + 10, display: { say: true, visual: true, bars: false, names: true } });
+    for (const id of ["box", "hauler"]) {
+      expect(part(noHits, id, "hits")).toBeUndefined();
+      const store = part(noHits, id, "store");
+      expect(store?.kind === "bar" ? store.y : undefined).toBeCloseTo(barY(id, "hits"));
+    }
+  });
+});
