@@ -32,7 +32,9 @@ export type DetailKey =
   | "structureType"
   | "structureHitsMax"
   | "structureOwner"
-  | "structureId";
+  | "structureId"
+  | "streak"
+  | "fuelLeft";
 
 type AddField = (key: DetailKey, value: string | undefined, text?: DetailField["text"]) => void;
 
@@ -92,6 +94,8 @@ const KNOWN = new Set([
   // 废墟
   "destroyTime",
   "structure",
+  // 赛季 reactor
+  "launchTime",
 ]);
 
 const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
@@ -213,6 +217,26 @@ function ruinFields(obj: RoomObject, users: Readonly<Record<string, RoomUser>>, 
   add("structureId", typeof s["id"] === "string" ? s["id"] : undefined);
 }
 
+/**
+ * 赛季 reactor：连续运转了多少 Tick（当前 Tick − launchTime；没在运转时 launchTime 为 null），
+ * 运转中还能撑多少 Tick（每 Tick 烧 1 个钍 T，实测）。
+ */
+function reactorFields(obj: RoomObject, gameTime: number | undefined, add: AddField) {
+  if (obj["type"] !== "reactor" || !("launchTime" in obj)) return;
+  const launchTime = obj["launchTime"];
+  if (!isNum(launchTime)) {
+    add("streak", "idle", { key: "idle" });
+    return;
+  }
+  if (gameTime !== undefined) {
+    const streak = gameTime - launchTime;
+    add("streak", `${streak} (${launchTime})`, { key: "since", params: { ticks: streak, tick: launchTime } });
+  } else add("streak", String(launchTime), { key: "sinceTick", params: { tick: launchTime } });
+  const store = obj["store"];
+  const fuel = typeof store === "object" && store !== null ? (store as Record<string, unknown>)["T"] : undefined;
+  add("fuelLeft", isNum(fuel) ? String(fuel) : undefined);
+}
+
 function rawText(value: unknown): string {
   if (typeof value === "string") return value;
   try {
@@ -263,6 +287,7 @@ export function describeObject(
   add("cooldown", cooldown !== undefined && Number(cooldown) > 0 ? cooldown : undefined);
   tombstoneFields(obj, gameTime, add);
   ruinFields(obj, users, gameTime, add);
+  reactorFields(obj, gameTime, add);
 
   const raw = Object.entries(obj)
     .filter(([key]) => !KNOWN.has(key))

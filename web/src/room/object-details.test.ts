@@ -168,6 +168,35 @@ describe("对象详情", () => {
     });
   });
 
+  describe("赛季 reactor", () => {
+    const reactor = {
+      _id: "re1",
+      type: "reactor",
+      room: "W5S5",
+      x: 25,
+      y: 9,
+      user: "u1",
+      store: { T: 220 },
+      storeCapacityResource: { T: 1000 },
+      launchTime: 1041457,
+    };
+    const text = (d: ObjectDetails, key: string) => d.fields.find((f) => f.key === key)?.text;
+
+    it("运转中：连续运转多少 Tick（自哪个 Tick 起）、按每 Tick 1 个 T 还能运转多少 Tick", () => {
+      const d = describeObject(reactor, users, 1041831);
+      expect(text(d, "streak")).toEqual({ key: "since", params: { ticks: 374, tick: 1041457 } });
+      expect(field(d, "fuelLeft")).toBe("220");
+      expect(field(d, "store")).toBe("T 220 / 1000");
+      expect(d.raw).toEqual([]);
+    });
+
+    it("没在运转（launchTime 为 null）：显示未运转，不给还能运转多久", () => {
+      const d = describeObject({ ...reactor, launchTime: null, store: { T: 0 } }, users, 1041831);
+      expect(text(d, "streak")).toEqual({ key: "idle" });
+      expect(field(d, "fuelLeft")).toBeUndefined();
+    });
+  });
+
   describe("身体部件网格（#59）", () => {
     it("按 body 顺序给出每格的类型、颜色（与身体环同一张表）、填充比例与强化", () => {
       const cells = bodyCells([
