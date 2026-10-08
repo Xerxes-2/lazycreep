@@ -20,7 +20,7 @@
  *   --pvp-interval  PvP 列表的 interval，默认 100
  *   --history-lag   历史 chunk 至少落后当前 Tick 多少，默认 300
  *   --map-radius    map-stats 录自己房间周围多少格房间（正方形半径），默认 10
- *   --only     逗号分隔的种类子集：version,me,time,shards,pvp,nukes,terrain,room,roomMap2,history,worldSize,mapStats
+ *   --only     逗号分隔的种类子集：version,me,time,shards,pvp,nukes,terrain,room,roomMap2,history,worldSize,mapStats,users,roomDecorations
  *   --out      输出目录，默认 fixtures/<server>
  */
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -40,7 +40,7 @@ import {
 } from "../web/src/source/fixture-format.ts";
 import type { ServerConfig } from "../web/src/source/source.ts";
 
-const ALL_KINDS = ["version", "me", "time", "shards", "pvp", "nukes", "terrain", "room", "roomMap2", "history", "worldSize", "mapStats", "users"] as const;
+const ALL_KINDS = ["version", "me", "time", "shards", "pvp", "nukes", "terrain", "room", "roomMap2", "history", "worldSize", "mapStats", "users", "roomDecorations"] as const;
 
 const { values: args } = parseArgs({
   options: {
@@ -328,6 +328,17 @@ if (want("terrain")) {
       meta: meta("terrain", { shard, room }),
       status: res.status,
       body: res.body && { terrain: res.body.terrain.map(({ room: r, terrain }: any) => ({ room: r, terrain })) },
+    });
+  }
+}
+
+if (want("roomDecorations")) {
+  for (const room of rooms) {
+    const res = await api("/game/room-decorations", { room, ...shardQuery(shard) });
+    writeFixture(fixtureFileName({ kind: "roomDecorations", shard, room }), {
+      meta: meta("roomDecorations", { shard, room }),
+      status: res.status,
+      body: res.body && { decorations: res.body.decorations },
     });
   }
 }

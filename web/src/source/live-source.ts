@@ -4,6 +4,7 @@
  * WebSocket 流直连官方（Server 配置的 socketUrl），一个 LiveSource 至多一条连接，
  * 第一次订阅流时建立；任何时刻最多一条房间订阅（ADR 0002）由这里保证。
  */
+import { roomDecorationsFromWire, type RoomDecorations } from "./room-decorations.ts";
 import { parseBadge } from "../badge/badge.ts";
 import type {
   WireConsole,
@@ -311,6 +312,10 @@ export class LiveSource implements Source {
   async getTerrain(shard: string, room: string): Promise<Terrain> {
     const wire = await this.api<WireTerrain>("/game/room-terrain", { room, encoded: "1", ...this.shardQuery(shard) });
     return terrainFromWire(shard, room, wire);
+  }
+
+  async getRoomDecorations(shard: string, room: string): Promise<RoomDecorations> {
+    return roomDecorationsFromWire(await this.api<unknown>("/game/room-decorations", { room, ...this.shardQuery(shard) }));
   }
 
   mapTiles(shard: string, version: ServerVersion | undefined): MapTiles {

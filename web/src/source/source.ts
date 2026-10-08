@@ -2,6 +2,7 @@
  * Source：前端与一切外部数据之间唯一的边界（spec #1 接缝 1）。
  * 实现：FixtureSource（播放 `fixtures/` 的录制数据）；LiveSource（HTTP 经同源 Gateway，WebSocket 直连官方）。
  */
+import type { RoomDecorations } from "./room-decorations.ts";
 import type { Badge } from "../badge/badge.ts";
 import type { MapTiles } from "./map-tiles.ts";
 import type { RendererOverride } from "./season-renderer.ts";
@@ -321,6 +322,8 @@ export interface Source {
   getTime(shard: string, options?: TimeOptions): Promise<number>;
   getShards(): Promise<readonly ShardInfo[]>;
   getTerrain(shard: string, room: string): Promise<Terrain>;
+  /** 房间的装饰（`game/room-decorations`，匿名即可，#61）；没有装饰时 objects 为空、无 wall / floor */
+  getRoomDecorations(shard: string, room: string): Promise<RoomDecorations>;
   /**
    * 某个 Shard 的地图瓦片地址（map-tiles.ts）。必须给版本信息：赛季服的本赛季瓦片根地址在里面；
    * 版本信息取不到时传 undefined，用 Server 的默认根地址。

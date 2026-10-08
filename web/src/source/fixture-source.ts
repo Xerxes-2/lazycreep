@@ -2,6 +2,7 @@
  * FixtureSource：播放 `fixtures/` 录制文件的 Source。
  * 流按录制时的帧间隔播放，`speed` 为加速倍数（Infinity = 不等待，仍按顺序异步投递）。
  */
+import { NO_DECORATIONS, roomDecorationsFromWire, type RoomDecorations } from "./room-decorations.ts";
 import { parseBadge, type Badge } from "../badge/badge.ts";
 import {
   FIXTURE_FORMAT_VERSION,
@@ -19,6 +20,7 @@ import {
   type ShardsFixture,
   type StreamFrame,
   type TerrainFixture,
+  type RoomDecorationsFixture,
   type TimeFixture,
   type UsersFixture,
   type VersionFixture,
@@ -81,6 +83,7 @@ const KINDS: readonly FixtureKind[] = [
   "worldSize",
   "mapStats",
   "users",
+  "roomDecorations",
 ];
 
 function isFixtureFile(value: unknown): value is FixtureFile {
@@ -272,6 +275,13 @@ export class FixtureSource implements Source {
       (f) => f.meta.shard === shard && f.meta.room === room,
     );
     return terrainFromWire(shard, room, body);
+  }
+
+  /** 没录到的房间当作没有装饰 */
+  async getRoomDecorations(shard: string, room: string): Promise<RoomDecorations> {
+    const match = (f: RoomDecorationsFixture) => f.meta.shard === shard && f.meta.room === room;
+    if (!this.find<RoomDecorationsFixture>("roomDecorations", match)) return NO_DECORATIONS;
+    return roomDecorationsFromWire(await this.body<RoomDecorationsFixture>("roomDecorations", `${shard}/${room} 的装饰`, match));
   }
 
   mapTiles(shard: string, version: ServerVersion | undefined): MapTiles {
