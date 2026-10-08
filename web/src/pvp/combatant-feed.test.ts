@@ -3,6 +3,7 @@ import { createRoot, createSignal } from "solid-js";
 import { FixtureSource, fixtureBundle } from "../source/fixture-source.ts";
 import type { Source } from "../source/source.ts";
 import { createCombatantFeed } from "./combatant-feed.ts";
+import { roomMapHubFor } from "../source/room-map-hub.ts";
 import { createPvpFeed } from "./pvp-feed.ts";
 
 const season = fixtureBundle(
@@ -40,7 +41,7 @@ afterEach(() => {
   dispose = undefined;
 });
 
-function setup(options: { token?: boolean; shown?: boolean; maxRooms?: number; allies?: string[] } = {}) {
+function setup(options: { token?: boolean; shown?: boolean; maxRooms?: number; budget?: number; allies?: string[] } = {}) {
   const source = new FixtureSource(season, { speed: Infinity });
   const subs = tracked(source);
   const getPlayer = vi.spyOn(source, "getPlayer");
@@ -51,6 +52,7 @@ function setup(options: { token?: boolean; shown?: boolean; maxRooms?: number; a
     const pvp = createPvpFeed({ source: () => source as Source });
     const feed = createCombatantFeed({
       source: () => source as Source,
+      roomMaps: roomMapHubFor(() => source as Source, options.budget ? { budget: options.budget } : {}),
       groups: pvp.groups,
       active: shown,
       canSubscribe: token,
@@ -76,6 +78,13 @@ describe("参战者订阅", () => {
     const { feed, subs } = setup({ maxRooms: 4 });
     await settle(() => expect(subs.rooms()).toEqual(["E13N21", "W17N21", "W7N15", "E26N3"].sort()));
     expect(feed.of("shardSeason", "W5N29")).toEqual({ kind: "unwatched" });
+  });
+
+  it("订阅中心的总预算不够时，被截断的房间同样标为未订阅（超出订阅上限）", async () => {
+    const { feed, subs } = setup({ budget: 3 });
+    await settle(() => expect(subs.rooms()).toEqual(["E13N21", "E26N3", "W7N15"]));
+    expect(feed.of("shardSeason", "W17N21")).toEqual({ kind: "unwatched" });
+    expect(feed.of("shardSeason", "E13N21").kind).not.toBe("unwatched");
   });
 
   it("区块折叠 / 不可见时全部退订，重新显示时再订阅", async () => {

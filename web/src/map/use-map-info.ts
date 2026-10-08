@@ -1,18 +1,20 @@
 /**
  * World Map 信息层的数据接线（#17），供 MapView 调用：
  * - Ally List 写进 MapState（着色与高亮由 buildMapScene 的层负责）
- * - 放大到 ICON_MIN_ZOOM 以上时订阅可见房间的 roomMap2，把 Power Bank 写进 MapState
+ * - 放大到 ICON_MIN_ZOOM 以上时经 roomMap2 订阅中心订阅可见房间（World Map 优先级最低，预算不够时先被截），
+ *   把 Power Bank 写进 MapState
  * 矿物、RCL 与区域状态随 map-stats 由所有权加载器带回，这里不另发请求。
  */
-import { createEffect, createMemo, onCleanup, type Accessor, type Setter } from "solid-js";
-import type { Source } from "../source/source.ts";
+import { createEffect, createMemo, type Accessor, type Setter } from "solid-js";
+import { ROOM_MAP_PRIORITY, useRoomMapLease, type RoomMapHub } from "../source/room-map-hub.ts";
 import { ICON_MIN_ZOOM } from "./map-info-layers.ts";
 import type { WorldRect } from "./map-scene.ts";
 import { applyPowerBanks, parseRoomName, withAllies, worldOffset, type MapState } from "./map-state.ts";
-import { createRoomMapFeed, roomsByDistance } from "./room-map-feed.ts";
+import { roomsByDistance } from "./room-map-feed.ts";
 
 export interface MapInfoOptions {
-  readonly source: Accessor<Source>;
+  /** roomMap2 订阅中心（全页共用） */
+  readonly roomMaps: Accessor<RoomMapHub>;
   readonly mapState: Accessor<MapState | undefined>;
   readonly setMapState: Setter<MapState | undefined>;
   readonly allies: Accessor<ReadonlySet<string> | undefined>;
@@ -31,16 +33,6 @@ export function useMapInfo(options: MapInfoOptions): void {
     if (state && allies && state.allies !== allies) setMapState(withAllies(state, allies));
   });
 
-  const feed = createMemo(() => {
-    const src = options.source();
-    const created = createRoomMapFeed({
-      subscribe: (shard, room, listener) => src.subscribeRoomMap(shard, room, listener),
-      onPowerBanks: (room, positions) => setMapState((state) => state && applyPowerBanks(state, room, positions)),
-    });
-    onCleanup(() => created.dispose());
-    return created;
-  });
-
   /** 只随 Shard 与世界尺寸变化，Power Bank 更新不触发重算订阅 */
   const world = createMemo(
     () => {
@@ -51,13 +43,21 @@ export function useMapInfo(options: MapInfoOptions): void {
     { equals: (a, b) => a === b || (!!a && !!b && a.shard === b.shard && a.size === b.size) },
   );
 
-  createEffect(() => {
-    const current = feed();
+  const wanted = createMemo(() => {
     const w = world();
     const focus = options.focus();
-    const wanted = w && focus && options.enabled() && focus.zoom >= ICON_MIN_ZOOM;
-    current.show(w?.shard ?? "", wanted ? roomsByDistance(w.size, focus.rect) : []);
+    if (!w || !focus || !options.enabled() || focus.zoom < ICON_MIN_ZOOM) return [];
+    return roomsByDistance(w.size, focus.rect).map((room) => ({ shard: w.shard, room }));
   });
+  useRoomMapLease(
+    options.roomMaps,
+    {
+      priority: ROOM_MAP_PRIORITY.worldMap,
+      onFrame: (shard, room, frame) =>
+        setMapState((state) => (state && state.shard === shard ? applyPowerBanks(state, room, frame["pb"] ?? []) : state)),
+    },
+    wanted,
+  );
 }
 
 /** 搜索框里的房间名 → 房间中心的世界坐标；不是房间名或在世界之外时 undefined。 */

@@ -7,7 +7,8 @@
  * - 地图点房间、PvP Overview 点房间、告警 → navigate({ shard, room })（别的 Shard 上的房间同时切 Shard）；
  * - Room View 的“返回地图” → navigate({ view: "map" })；
  * - “回看” → navigate({ shard, room, replay })；地址（URL 路由，shell/url-router.ts）也经 navigate 导航。
- * 地图、PvP Overview 与告警共用一个 OwnershipHub（同一份 map-stats 缓存与额度）与一个 PvP feed。
+ * 地图、PvP Overview 与告警共用一个 OwnershipHub（同一份 map-stats 缓存与额度）与一个 PvP feed；
+ * 所有 roomMap2（告警、Minimap、PvP 参战者、地图）经同一个订阅中心（source/room-map-hub.ts），总数受预算约束。
  */
 import { createMemo, createSignal, onCleanup, Show, type Accessor, type JSX } from "solid-js";
 import { pageVisibility, type VisibilitySignal } from "../power/visibility.ts";
@@ -23,6 +24,7 @@ import { shownVisibility } from "../shell/view-visibility.ts";
 import { createPvpFeed } from "../pvp/pvp-feed.ts";
 import { createMapLayerPrefs, mapLayers } from "./map-layer-toggles.ts";
 import { createOwnershipHub } from "./ownership-hub.ts";
+import { roomMapHubFor } from "../source/room-map-hub.ts";
 import { createWorldMapLink } from "./world-map-link.ts";
 import type { SceneView, SceneViewOptions } from "../scene/pixi-scene-view.ts";
 import type { Theme } from "../scene/theme.ts";
@@ -75,6 +77,7 @@ export function MapAndRoom(props: MapAndRoomProps) {
     onCleanup(() => hub.dispose());
     return hub;
   });
+  const roomMaps = roomMapHubFor(source);
   // Attack Alert 需要 PvP / 核弹时，页面隐藏也继续轮询（#4 对 #14 规则的调整）
   const alertsNeedFeed = () => {
     const config = props.alerts?.config();
@@ -102,6 +105,7 @@ export function MapAndRoom(props: MapAndRoomProps) {
     sourceFor: props.sourceFor,
     source,
     ownership,
+    roomMaps,
     pvp,
     setDetailsHost,
     worldMap,
@@ -124,6 +128,7 @@ export function MapAndRoom(props: MapAndRoomProps) {
         {(alerts) => (
           <AttackAlert
             source={source}
+            roomMaps={roomMaps}
             feed={pvp}
             enabled={() => !!props.settings.token()}
             allies={() => props.allies ?? new Set()}
@@ -141,6 +146,7 @@ export function MapAndRoom(props: MapAndRoomProps) {
               {...(props.createView ? { createView: props.createView } : {})}
               visibility={shownVisibility(page, mapShown)}
               ownership={ownership()}
+              roomMaps={roomMaps()}
               layers={(shard) => mapLayers(layerPrefs.enabled(), pvp.groups()?.find((g) => g.shard === shard))}
               link={worldMap}
               {...(props.allies ? { allies: props.allies } : {})}

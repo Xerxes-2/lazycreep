@@ -9,6 +9,7 @@ import { SERVER_PRESETS } from "./servers.ts";
 import type { ConnectionState, ConsoleEvent, CpuUpdate, RoomTick, ServerConfig, StreamError } from "./source.ts";
 import { manualVisibility, type VisibilitySignal } from "../power/visibility.ts";
 import { sharedSources } from "./shared-source.ts";
+import { createRoomMapHub, ROOM_MAP_PRIORITY } from "./room-map-hub.ts";
 
 const SEASON = SERVER_PRESETS.season;
 const SHARD = "shardSeason";
@@ -488,6 +489,28 @@ describe("LiveSource WebSocket：页面不可见时省电（#14）", () => {
     // 告警的租约关闭后才真正退订
     alertLease.close();
     expect(last().commands.filter((c) => c.endsWith(other))).toEqual([`subscribe ${other}`, `unsubscribe ${other}`]);
+  });
+
+  it("经 roomMap2 订阅中心：页面隐藏时告警的租约（keepWhileHidden）照常收到帧，地图的租约暂停；频道不退订", async () => {
+    const { source, visibility, last } = await watching();
+    const hub = createRoomMapHub({ source, schedule: (flush) => (flush(), () => {}) });
+    const other = `roomMap2:${SHARD}/W12S28`;
+    const got: string[] = [];
+    hub.lease({ priority: ROOM_MAP_PRIORITY.worldMap, onFrame: () => got.push("map") }).want([{ shard: SHARD, room: "W12S28" }]);
+    hub
+      .lease({ priority: ROOM_MAP_PRIORITY.alert, keepWhileHidden: true, everyFrame: true, onFrame: () => got.push("alert") })
+      .want([{ shard: SHARD, room: "W12S28" }]);
+    expect(last().commands).toEqual([`subscribe ${other}`]);
+    last().event(other, { w: [] });
+    expect(got.sort()).toEqual(["alert", "map"]);
+
+    got.length = 0;
+    visibility.set(false);
+    expect(last().commands).not.toContain(`unsubscribe ${other}`);
+    last().event(other, { w: [] });
+    expect(got).toEqual(["alert"]);
+    hub.dispose();
+    expect(last().commands).toContain(`unsubscribe ${other}`);
   });
 
   it("声明 keepWhileHidden 的 roomMap2 订阅（Attack Alert）隐藏时照常保留", async () => {

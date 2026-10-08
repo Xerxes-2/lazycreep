@@ -2,8 +2,8 @@
  * Minimap 区块（#27）：Room View 下的 Sidebar Section，以当前房间为中心的 3×3 房间格。
  *
  * 数据：瓦片沿用 World Map 的单房间瓦片；所有权取全页的 OwnershipHub（缺的房间用 wantRooms 补查，
- * 与地图共用额度）；玩家位置点为 9 个房间各一个 roomMap2，经共享 Source 的租约订阅，
- * 换房间时只增删差出来的那几个。区块不在屏幕上（不在 Room View、Sidebar 收起、区块折叠）
+ * 与地图共用额度）；玩家位置点为 9 个房间各一个 roomMap2，经全页的 roomMap2 订阅中心订阅
+ * （Minimap 优先级仅次于告警；中心按动画帧合并分发，Scene 每帧至多重建一次）。区块不在屏幕上（不在 Room View、Sidebar 收起、区块折叠）
  * 或页面不可见时退掉全部订阅、不构建 Scene。
  *
  * 点相邻格经 shell.navigate 切房间；Replay 中以同一 Tick 打开该房间的 Replay。世界外的格子不可点。
@@ -18,7 +18,8 @@ import type { Scene } from "../scene/scene.ts";
 import { screenToWorld } from "../scene/scene-camera.ts";
 import { DEFAULT_THEME } from "../scene/theme.ts";
 import type { SectionContext } from "../shell/sidebar-sections.tsx";
-import type { MapStats, RoomMapUpdate, Source, Unsubscribe, WorldSize } from "../source/source.ts";
+import type { MapStats, RoomMapUpdate, WorldSize } from "../source/source.ts";
+import { ROOM_MAP_PRIORITY, roomMapKey, useRoomMapLease, type RoomRef } from "../source/room-map-hub.ts";
 import { buildMinimapScene, minimapCells, minimapRoomAt } from "./minimap-scene.ts";
 
 const DEFAULT_SIZE = 200;
@@ -99,41 +100,31 @@ export function Minimap(props: { readonly ctx: SectionContext; readonly shown: A
     onCleanup(ctx.ownership().wantRooms(rooms.map((room) => ({ shard: current, room }))));
   });
 
-  // roomMap2：每格一个订阅，按差集增删
+  // roomMap2：每格一个，经订阅中心（按动画帧合并分发）
   const [positions, setPositions] = createSignal<Readonly<Record<string, RoomMapUpdate>>>({});
-  const subscriptions = new Map<string, { readonly source: Source; readonly room: string; readonly off: Unsubscribe }>();
-  const drop = (key: string) => {
-    const sub = subscriptions.get(key);
-    if (!sub) return;
-    subscriptions.delete(key);
-    sub.off();
-    setPositions(({ [sub.room]: _gone, ...rest }) => rest);
-  };
-  createEffect(() => {
-    const src = ctx.source();
+  const watched = createMemo<readonly RoomRef[]>(() => {
     const current = shard();
-    const wanted = new Map<string, string>(
-      active() && current !== undefined ? cells().map((room) => [`${current}/${room}`, room]) : [],
-    );
-    for (const [key, sub] of subscriptions) if (!wanted.has(key) || sub.source !== src) drop(key);
-    for (const [key, room] of wanted) {
-      if (subscriptions.has(key)) continue;
-      let open = true;
-      const off = src.subscribeRoomMap(current!, room, (update) => {
-        if (open) setPositions((all) => ({ ...all, [room]: update }));
-      });
-      subscriptions.set(key, {
-        source: src,
-        room,
-        off: () => {
-          open = false;
-          off();
-        },
-      });
-    }
+    return active() && current !== undefined ? cells().map((room) => ({ shard: current, room })) : [];
   });
-  onCleanup(() => {
-    for (const key of [...subscriptions.keys()]) drop(key);
+  const granted = useRoomMapLease(
+    ctx.roomMaps,
+    {
+      priority: ROOM_MAP_PRIORITY.minimap,
+      onFrame: (at, room, update) => {
+        if (at === shard()) setPositions((all) => ({ ...all, [room]: update }));
+      },
+    },
+    watched,
+  );
+  // 不再订阅的格子去掉旧的位置点
+  createEffect(() => {
+    const keep = granted();
+    const current = shard();
+    setPositions((all) => {
+      const rooms = Object.keys(all);
+      const kept = rooms.filter((room) => current !== undefined && keep.has(roomMapKey(current, room)));
+      return kept.length === rooms.length ? all : Object.fromEntries(kept.map((room) => [room, all[room]!]));
+    });
   });
 
   // 不在屏幕上时不构建新 Scene（#14）

@@ -3,7 +3,7 @@
  *
  * 数据来源（实测见 docs/research/screeps-api-facts.md 第 5 节）：
  * - RCL、矿物、新手区 / 重生区 / 开放时间、越界：map-stats（statName `minerals0`，经所有权加载器，不额外占额度）
- * - Power Bank：roomMap2 的 `pb`（只在放大到 ICON_MIN_ZOOM 以上时订阅可见房间，见 room-map-feed.ts）
+ * - Power Bank：roomMap2 的 `pb`（只在放大到 ICON_MIN_ZOOM 以上时订阅可见房间，见 use-map-info.ts）
  *
  * 远看自动降密：RCL 数字在 RCL_MIN_ZOOM 以上才画，矿物与 Power Bank 在 ICON_MIN_ZOOM 以上才画；
  * 区域覆盖与我方 / 盟友高亮任何缩放都画。

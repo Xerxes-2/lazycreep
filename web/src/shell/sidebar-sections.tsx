@@ -28,6 +28,7 @@ import { DisplayOptionsSection, RoomInfoSection } from "../room/RoomSidebarSecti
 import type { SourceFactory } from "../settings/SettingsPage.tsx";
 import type { Settings } from "../settings/settings.ts";
 import type { Source } from "../source/source.ts";
+import type { RoomMapHub } from "../source/room-map-hub.ts";
 import { replayAt, type MainViewMode, type ShellState } from "./shell-state.ts";
 
 /** 区块可用的页面级数据与动作 */
@@ -40,6 +41,8 @@ export interface SectionContext {
   /** 当前 Server + token 的共享 Source */
   readonly source: Accessor<Source>;
   readonly ownership: Accessor<OwnershipHub>;
+  /** 全页共用的 roomMap2 订阅中心（总预算、去重、按优先级截断）；roomMap2 一律经它订阅 */
+  readonly roomMaps: Accessor<RoomMapHub>;
   readonly pvp: PvpFeed;
   /** Room View 把选中对象的详情画进这个元素 */
   readonly setDetailsHost: (el: HTMLElement | undefined) => void;

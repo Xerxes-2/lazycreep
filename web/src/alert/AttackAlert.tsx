@@ -7,6 +7,7 @@ import { useI18n, type MessageKey } from "../i18n";
 import type { Translate } from "../i18n/translator.ts";
 import type { PvpFeed } from "../pvp/pvp-feed.ts";
 import type { Source } from "../source/source.ts";
+import type { RoomMapHub } from "../source/room-map-hub.ts";
 import { browserStorage, type KeyValueStorage } from "../storage/local-store.ts";
 import type { Alert } from "./alert-detector.ts";
 import type { AlertSettings } from "./alert-settings.ts";
@@ -19,6 +20,8 @@ export interface AlertTarget {
 
 export interface AttackAlertProps {
   readonly source: Accessor<Source>;
+  /** 全页共用的 roomMap2 订阅中心（告警优先级最高） */
+  readonly roomMaps: Accessor<RoomMapHub>;
   readonly feed: Pick<PvpFeed, "data" | "groups">;
   readonly enabled: Accessor<boolean>;
   readonly allies: Accessor<ReadonlySet<string>>;
@@ -70,6 +73,7 @@ export function AttackAlert(props: AttackAlertProps) {
 
   createAttackAlert({
     source: props.source,
+    roomMaps: props.roomMaps,
     feed: props.feed,
     enabled: props.enabled,
     allies: props.allies,

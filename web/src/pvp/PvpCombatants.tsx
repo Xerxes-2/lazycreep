@@ -8,12 +8,14 @@ import type { Accessor } from "solid-js";
 import { createCombatantFeed, type CombatantFeed, type RoomCombatants } from "./combatant-feed.ts";
 import type { PvpFeed } from "./pvp-feed.ts";
 import type { Source } from "../source/source.ts";
+import type { RoomMapHub } from "../source/room-map-hub.ts";
 import type { Settings } from "../settings/settings.ts";
 
 /** 在 PvP 区块里建参战者 feed：区块不在屏幕上时退订，无 token 时不订阅 */
 export function sectionCombatants(
   ctx: {
     readonly source: Accessor<Source>;
+    readonly roomMaps: Accessor<RoomMapHub>;
     readonly pvp: PvpFeed;
     readonly settings: Settings;
     readonly allies: Accessor<ReadonlySet<string> | undefined>;
@@ -22,6 +24,7 @@ export function sectionCombatants(
 ): CombatantFeed {
   return createCombatantFeed({
     source: ctx.source,
+    roomMaps: ctx.roomMaps,
     groups: ctx.pvp.groups,
     active: shown,
     canSubscribe: () => !!ctx.settings.token(),

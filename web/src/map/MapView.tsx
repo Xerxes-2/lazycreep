@@ -16,6 +16,7 @@ import { DEFAULT_THEME, type Theme } from "../scene/theme.ts";
 import { errorMessage, type SourceFactory } from "../settings/SettingsPage.tsx";
 import type { Settings } from "../settings/settings.ts";
 import type { ShardInfo, Source } from "../source/source.ts";
+import { roomMapHubFor, type RoomMapHub } from "../source/room-map-hub.ts";
 import { attachGestures } from "../scene/pointer-gestures.ts";
 import { panBy, screenToWorld } from "../scene/scene-camera.ts";
 import { centerOn, fitCamera, sceneRect, sceneZoom, visibleRect, zoomAt } from "./map-camera.ts";
@@ -52,6 +53,11 @@ export interface MapViewProps {
    * 不给时组件自建一个加载器。
    */
   readonly ownership?: OwnershipHub;
+  /**
+   * 全页共用的 roomMap2 订阅中心（总预算与去重）；须与本组件的 Server + token 一致。
+   * 不给时组件按自己的 Source 建一个（只有地图自己用）。
+   */
+  readonly roomMaps?: RoomMapHub;
   /** 叠加在默认图层之上的额外图层（例如 PvP 热点）；按 Shard 给出，变化时重建 Scene */
   readonly overlays?: (shard: string) => readonly MapLayerPainter[];
   /** Ally List（#17）：玩家用户名，不分大小写 */
@@ -231,8 +237,9 @@ export function MapView(props: MapViewProps) {
     },
   );
 
+  const ownRoomMaps = roomMapHubFor(source);
   useMapInfo({
-    source,
+    roomMaps: () => props.roomMaps ?? ownRoomMaps(),
     mapState,
     setMapState,
     allies: () => props.allies,
