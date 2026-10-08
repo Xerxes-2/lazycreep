@@ -16,6 +16,7 @@ import type { ArtStyle } from "../art/art-style.ts";
 import type { SeasonArt } from "../art/season-art.ts";
 import { paintersFor } from "./official-painters.ts";
 import { officialRoomLayers } from "./official-terrain.ts";
+import { officialLighting } from "./official-lighting.ts"; // #49
 
 export { LAYER, ROOM_OBJECT_PAINTERS };
 export type { ObjectPainter, ObjectPainters, PaintContext, PrimitiveDraft };
@@ -140,6 +141,7 @@ export function buildRoomScene(
       primitives.push({ ...draft, key: `${id}/${part}`, objectId: id } as Primitive);
     }
   }
+  if (view.artStyle === "official" && display.lighting) primitives.push(...officialLighting(room.state)); // #49
   if (display.visual) primitives.push(...roomVisualPrimitives(room.state.visual));
   // 稳定排序：同层按出现顺序
   primitives.sort((a, b) => a.layer - b.layer);

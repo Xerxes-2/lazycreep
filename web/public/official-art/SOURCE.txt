@@ -4,6 +4,6 @@ Source: https://github.com/screeps/renderer
 Commit: a2db4a76bb8f4c70e0c2a9e3b7d22a35a8c6b504 (2026-08-21)
 Path:   metadata/images/*.svg (all 117 SVG files, unmodified)
 
-Textures: textures/{ground,ground-mask,noise1,noise2}.png from the same directory (unmodified),
+Textures: textures/{ground,ground-mask,noise1,noise2,glow}.png from the same directory (unmodified),
           loaded on demand and excluded from the PWA precache. The other PNGs are not bundled.
 "Screeps" is a trademark of its owner and is not covered by the ISC license.

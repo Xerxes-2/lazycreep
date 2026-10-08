@@ -349,6 +349,8 @@ export const en: Partial<Record<MessageKey, string>> = {
   "roomSidebar.display.visual": "RoomVisual",
   "roomSidebar.display.bars": "Hit bars",
   "roomSidebar.display.names": "Player names",
+  // #49
+  "roomSidebar.display.lighting": "Lighting (official art)",
   "roomSidebar.tools": "Room tools",
   "roomSidebar.zoomIn": "Zoom in",
   "roomSidebar.zoomOut": "Zoom out",

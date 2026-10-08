@@ -2,7 +2,7 @@
  * 官方画法映射表（#42，ADR 0006）：与几何映射表（room-painters.ts）同形——对象类型 → 画法 → 图元草稿。
  * 画法照官方渲染器的 metadata（screeps/renderer `metadata/src/objects/*.metadata.js`，ISC，
  * commit a2db4a7）改写成静态图元：官方贴图用 image 图元（{@link officialSprite}），官方用 Graphics
- * 画的部分用现有图元；补间、闪烁、旋转等动画与 lighting 图层都不做。
+ * 画的部分用现有图元；补间、闪烁、旋转等动画不做；lighting 图层的 glow 见 official-lighting.ts（#49）。
  *
  * 新增一种对象的官方画法：在 {@link OFFICIAL_PAINTERS} 里加一个条目，用 officialSprite 摆贴图
  * （尺寸、锚点用官方的 100 单位 = 1 格），官方 `tint: { $calc: 'playerColor' }` 的部件传

@@ -33,7 +33,7 @@ describe("几何画风：录制房间的 Scene 输出不变", () => {
     const views: Record<string, RoomSceneView> = {
       default: { theme: DEFAULT_THEME },
       near: { theme: DEFAULT_THEME, zoom: 40, me: owner, selectedId: anyCreep, allies: new Set(["someone"]) },
-      plain: { theme: DEFAULT_THEME, zoom: 40, me: owner, display: { say: false, visual: false, bars: false, names: false } },
+      plain: { theme: DEFAULT_THEME, zoom: 40, me: owner, display: { say: false, visual: false, bars: false, names: false, lighting: false } },
     };
     const scenes = Object.fromEntries(
       Object.entries(views).map(([name, view]) => [name, buildRoomScene({ state, terrain }, { ...view, artStyle: "geometric" } as RoomSceneView)]),

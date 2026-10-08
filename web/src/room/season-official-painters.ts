@@ -5,7 +5,7 @@
  * 非钍的矿物与掉落资源照官方表原来的画法。
  *
  * 照下发 metadata 改写成静态图元：reactor 是炉芯 `reactor-core` + 外圈 `reactor-edge`（官方在装着钍时
- * 让外圈旋转，我们不做动画）+ 有主人时的徽章位（半径 29）；钍矿是 `T` 贴图；lighting 图层的 glow 不做。
+ * 让外圈旋转，我们不做动画）+ 有主人时的徽章位（半径 29）；钍矿是 `T` 贴图；lighting 图层的 glow 见 official-lighting.ts（#49）。
  * 掉落的钍官方没有专门的画法，用同一张 `T` 贴图，按数量缩放（与几何画法的大小一致）。
  */
 import type { ArtStyle } from "../art/art-style.ts";

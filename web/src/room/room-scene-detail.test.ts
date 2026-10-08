@@ -188,7 +188,7 @@ describe("buildRoomScene：同时有血条与资源条时顺序固定", () => {
   });
 
   it("显示选项关掉血条后，资源条落到血条原来的位置", () => {
-    const noHits = buildRoomScene({ state }, { theme, me: "me1", zoom: BAR_MIN_ZOOM + 10, display: { say: true, visual: true, bars: false, names: true } });
+    const noHits = buildRoomScene({ state }, { theme, me: "me1", zoom: BAR_MIN_ZOOM + 10, display: { say: true, visual: true, bars: false, names: true, lighting: true } });
     for (const id of ["box", "hauler"]) {
       expect(part(noHits, id, "hits")).toBeUndefined();
       const store = part(noHits, id, "store");

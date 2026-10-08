@@ -35,9 +35,9 @@ const nameLabels = (scene: Scene) =>
   scene.primitives.filter((p) => p.kind === "text" && p.text === "Xerxes_2");
 
 describe("显示选项 → Room View 的 Scene", () => {
-  it("默认四项全开：RoomVisual、血条、creep 上方的玩家名都画出来", () => {
+  it("默认全开：RoomVisual、血条、creep 上方的玩家名都画出来", () => {
     const display = createRoomDisplayOptions(memoryStorage()).display();
-    expect(display).toEqual({ say: true, visual: true, bars: true, names: true });
+    expect(display).toEqual({ say: true, visual: true, bars: true, names: true, lighting: true });
     const scene = build({ ...near, display });
     expect(visuals(scene)).toHaveLength(1);
     expect(hitsBars(scene).map((p) => p.objectId).sort()).toEqual(["c1", "s1"]);
@@ -84,7 +84,7 @@ describe("显示选项 → Room View 的 Scene", () => {
     first.set("say", false);
 
     const again = createRoomDisplayOptions(storage).display();
-    expect(again).toEqual({ say: false, visual: false, bars: true, names: false });
+    expect(again).toEqual({ say: false, visual: false, bars: true, names: false, lighting: true });
     const scene = build({ ...near, display: again });
     expect(visuals(scene)).toEqual([]);
     expect(nameLabels(scene)).toEqual([]);
@@ -96,8 +96,8 @@ describe("显示选项 → Room View 的 Scene", () => {
   it("存储内容损坏时退回默认", () => {
     const storage = memoryStorage();
     storage.setItem("msc.roomDisplay", '{"visual": "nope", "bars": false');
-    expect(createRoomDisplayOptions(storage).display()).toEqual({ say: true, visual: true, bars: true, names: true });
+    expect(createRoomDisplayOptions(storage).display()).toEqual({ say: true, visual: true, bars: true, names: true, lighting: true });
     storage.setItem("msc.roomDisplay", '{"visual": "nope", "bars": false}');
-    expect(createRoomDisplayOptions(storage).display()).toEqual({ say: true, visual: true, bars: false, names: true });
+    expect(createRoomDisplayOptions(storage).display()).toEqual({ say: true, visual: true, bars: false, names: true, lighting: true });
   });
 });

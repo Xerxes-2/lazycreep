@@ -121,6 +121,7 @@ const DISPLAY_LABELS: Readonly<Record<(typeof ROOM_DISPLAY_KEYS)[number], Messag
   visual: "roomSidebar.display.visual",
   bars: "roomSidebar.display.bars",
   names: "roomSidebar.display.names",
+  lighting: "roomSidebar.display.lighting", // #49
 };
 
 export function DisplayOptionsSection(props: { readonly options: RoomDisplayOptions }) {

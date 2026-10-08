@@ -347,6 +347,8 @@ export const zhCN = {
   "roomSidebar.display.visual": "RoomVisual",
   "roomSidebar.display.bars": "血条",
   "roomSidebar.display.names": "玩家名",
+  // #49
+  "roomSidebar.display.lighting": "光照（官方画风）",
   "roomSidebar.tools": "房间工具",
   "roomSidebar.zoomIn": "放大",
   "roomSidebar.zoomOut": "缩小",
