@@ -39,6 +39,8 @@ export interface PaintContext {
   /** 当前选中的对象 id */
   readonly selectedId: string | undefined;
   readonly users: Readonly<Record<string, RoomUser>>;
+  /** 当前 Tick；未知时为 undefined。按剩余时间画的东西（冷却、衰减、倒计时）用它 */
+  readonly gameTime?: number | undefined;
   /** 对象主人的颜色；按玩家 / 阵营着色的规则替换这里 */
   ownerColor(user: unknown): Color;
 }

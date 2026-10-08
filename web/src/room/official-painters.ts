@@ -14,84 +14,16 @@
  * 主人徽章（徽章缺失时是纯色圆）。我们的 playerColor 是 ownerColorRule（我方 / 盟友 / 陌生人）。
  */
 import type { ArtStyle } from "../art/art-style.ts";
-import { officialArtUrl, type OfficialSvgName } from "../art/official-art.ts";
+import { type OfficialSvgName } from "../art/official-art.ts";
 import type { Color } from "../scene/scene.ts";
-import { LAYER, center, num, type ObjectPainter, type ObjectPainters, type PaintContext, type PrimitiveDraft } from "./room-paint.ts";
+import { center, num, type ObjectPainter, type ObjectPainters, type PrimitiveDraft } from "./room-paint.ts";
 import { ROOM_OBJECT_PAINTERS } from "./room-painters.ts";
 import type { RoomObject } from "./room-state.ts";
+import { ENERGY, badgeSpot, circle, energyCapacity, energyStore, officialSprite, ownerTint, u, zLayer } from "./official-sprite.ts";
+import { OFFICIAL_STRUCTURE_PAINTERS, controllerProgress } from "./official-structures.ts";
+import { OFFICIAL_WORLD_PAINTERS } from "./official-world-objects.ts";
 
-/** 官方 metadata 的长度单位：100 = 1 格 */
-const u = (value: number) => value / 100;
-
-/** 官方的 zIndex 换成我们的层级：都在 structure 层，按官方先后微调 */
-const zLayer = (zIndex: number) => LAYER.structure + zIndex / 100;
-
-/** 官方的能量黄 */
-const ENERGY = 0xffe56d;
-
-export interface SpriteOptions {
-  /** 官方单位（100 = 1 格） */
-  readonly width: number;
-  readonly height?: number;
-  /** 贴图上对准格子中心的点（0–1），默认 (0.5, 0.5)；也是旋转中心 */
-  readonly anchorX?: number;
-  readonly anchorY?: number;
-  readonly rotation?: number;
-  readonly tint?: Color;
-  readonly alpha?: number;
-  readonly layer?: number;
-}
-
-/** 以格子中心为锚点摆一张官方贴图（对应官方 `sprite` processor）。 */
-export function officialSprite(obj: RoomObject, part: string, name: OfficialSvgName, options: SpriteOptions): PrimitiveDraft {
-  const { x, y } = center(obj);
-  const width = u(options.width);
-  const height = u(options.height ?? options.width);
-  const ax = options.anchorX ?? 0.5;
-  const ay = options.anchorY ?? 0.5;
-  const rotated = options.rotation !== undefined;
-  return {
-    part,
-    kind: "image",
-    layer: options.layer ?? LAYER.structure,
-    x: x - ax * width,
-    y: y - ay * height,
-    width,
-    height,
-    url: officialArtUrl(name),
-    ...(rotated ? { rotation: options.rotation, pivotX: x, pivotY: y } : {}),
-    ...(options.tint === undefined ? {} : { tint: options.tint }),
-    ...(options.alpha === undefined ? {} : { alpha: options.alpha }),
-  };
-}
-
-function circle(obj: RoomObject, part: string, radius: number, fill: Color, layer: number): PrimitiveDraft {
-  const { x, y } = center(obj);
-  return { part, kind: "circle", layer, x, y, radius: u(radius), fill };
-}
-
-const energyStore = (obj: RoomObject) => {
-  const store = obj["store"];
-  const value = typeof store === "object" && store !== null ? (store as Record<string, unknown>)["energy"] : undefined;
-  return typeof value === "number" ? value : 0;
-};
-
-const energyCapacity = (obj: RoomObject) => {
-  const cap = obj["storeCapacityResource"];
-  const value = typeof cap === "object" && cap !== null ? (cap as Record<string, unknown>)["energy"] : undefined;
-  return typeof value === "number" ? value : undefined;
-};
-
-/** 有主人时的主人色（官方 playerColor） */
-const ownerTint = (obj: RoomObject, ctx: PaintContext) => ctx.ownerColor(obj["user"]);
-
-/**
- * 徽章位：官方 userBadge 在没有徽章图时画纯色圆。徽章图由徽章票接入；在那之前用主人色，
- * 没有主人时用官方默认的 0x222222。
- */
-function badgeSpot(obj: RoomObject, ctx: PaintContext, radius: number, layer: number): PrimitiveDraft {
-  return circle(obj, "badge", radius, obj["user"] === undefined ? 0x222222 : ownerTint(obj, ctx), layer);
-}
+export { officialSprite, type SpriteOptions } from "./official-sprite.ts";
 
 // ---- spawn（spawn.metadata.js：三个同心圆 + 徽章 + 按能量缩放的能量圈；没有贴图） ----
 const spawn: ObjectPainter = (obj, ctx) => {
@@ -212,7 +144,7 @@ const tower: ObjectPainter = (obj, ctx) => {
   return prims;
 };
 
-// ---- controller（controller.metadata.js：黑色底座 + 等级刻度 + 徽章 + 外圈） ----
+// ---- controller（controller.metadata.js：黑色底座 + 等级刻度 + 徽章 + 升级进度扇形 + 外圈） ----
 const controller: ObjectPainter = (obj, ctx) => {
   const layer = zLayer(4);
   const level = Math.max(0, Math.min(8, num(obj, "level") ?? 0));
@@ -225,6 +157,7 @@ const controller: ObjectPainter = (obj, ctx) => {
     prims.push(officialSprite(obj, `level${i + 1}`, "controller-level", { width: 100, anchorY: 1, rotation: (i * 2 * Math.PI) / 8, layer }));
   }
   prims.push(badgeSpot(obj, ctx, 37, layer));
+  prims.push(...controllerProgress(obj, layer)); // #45
   prims.push({ part: "ring", kind: "circle", layer, x, y, radius: u(40), stroke: { color: 0x080808, width: u(10) } });
   return prims;
 };
@@ -264,6 +197,7 @@ export const OFFICIAL_PAINTERS: ObjectPainters = {
   tower,
   controller,
   source,
+  ...OFFICIAL_STRUCTURE_PAINTERS, ...OFFICIAL_WORLD_PAINTERS, // #45
 };
 
 const OFFICIAL_OBJECT_PAINTERS: ObjectPainters = { ...ROOM_OBJECT_PAINTERS, ...OFFICIAL_PAINTERS };

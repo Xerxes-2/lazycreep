@@ -112,6 +112,7 @@ export function buildRoomScene(
     zoom: view.zoom ?? 1,
     selectedId: view.selectedId,
     users: room.state.users,
+    gameTime: room.state.gameTime,
     ownerColor: ownerColorRule(theme, room.state.users, { me: view.me, allies: view.allies }),
   };
 
