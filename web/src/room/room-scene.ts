@@ -10,8 +10,9 @@ import { barsVisible, extraBars, ownerColorRule, selectionHighlight, stackBars }
 import { ROOM_OBJECT_PAINTERS } from "./room-painters.ts";
 import type { RoomState } from "./room-state.ts";
 import { roomVisualPrimitives } from "./room-visual.ts";
-import { DEFAULT_ROOM_DISPLAY, type RoomDisplay } from "./display-options.ts";
+import { DEFAULT_ROOM_DISPLAY, showSayBubbles, type RoomDisplay } from "./display-options.ts";
 import { nameLabel } from "./name-labels.ts";
+import { sayBubble } from "./say-bubbles.ts";
 import type { ArtStyle } from "../art/art-style.ts";
 import type { SeasonArt } from "../art/season-art.ts";
 import { ROOM_ART } from "./room-art.ts";
@@ -104,6 +105,7 @@ export function buildRoomScene(
     const showBars = barsVisible(ctx, id);
     const label = display.names && showBars ? nameLabel(obj, ctx) : undefined;
     if (label) drafts.push(label);
+    if (showBars && showSayBubbles(display)) drafts.push(...sayBubble(obj));
     const shown = drafts.filter(
       (d) => d.kind !== "bar" || (showBars && (display.bars || d.part !== "hits")),
     );

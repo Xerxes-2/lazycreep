@@ -2,8 +2,8 @@
  * Room View 的显示选项（#26）：say 气泡、RoomVisual、血条、玩家名四个开关，存 `msc.roomDisplay`（可导出）；
  * #49 加了光照（官方画风的发光图元）。
  *
- * RoomVisual、血条、玩家名经 `RoomSceneView.display` 作用于 buildRoomScene；
- * say 开关这里只存储，画 say 气泡的代码用 `showSayBubbles(view.display)` 读它。
+ * 各开关经 `RoomSceneView.display` 作用于 buildRoomScene；
+ * say 开关由 `showSayBubbles` 读出，气泡画法在 say-bubbles.ts（#22）。
  */
 import { createSignal, type Accessor } from "solid-js";
 import { isRecord, readJson, writeJson, type KeyValueStorage, type StoredKey } from "../storage/local-store.ts";
