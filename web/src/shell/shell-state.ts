@@ -31,9 +31,17 @@ export interface ReplayAt {
   readonly latest?: boolean;
 }
 
-/** navigate 交给 Room View 的请求：打开房间，给了 replay 就以该 Tick 进入 Replay */
+/** navigate 交给 Room View 的请求：打开房间，给了 replay 就以该 Tick 进入 Replay（也是 Room View 回报的位置） */
 export interface RoomRequest extends RoomTarget {
   readonly replay?: ReplayAt;
+}
+
+/** Replay 的 Tick；latest 只在为 true 时出现 */
+export const replayTick = (tick: number, latest?: boolean): ReplayAt => (latest ? { tick, latest: true } : { tick });
+
+/** 以 tick 打开 target 的 Replay：navigate 的参数，也是 Room View 回报 Replay 位置的形状 */
+export function replayAt(target: RoomTarget, tick: number, latest?: boolean): RoomRequest {
+  return { shard: target.shard, room: target.room, replay: replayTick(tick, latest) };
 }
 
 /** 此刻的位置：Main View 显示什么、在哪个 Shard、哪个房间、是否在 Replay 及其 Tick */
@@ -123,7 +131,7 @@ export interface ShellState {
   /** 每次 navigate 到房间产生的新请求（只给 Room View 用，据此切房间） */
   readonly roomRequest: Accessor<RoomRequest | undefined>;
   /** Room View 回报它此刻显示的房间与 Replay 起始 Tick（只给 Room View 用） */
-  reportRoom(target: RoomTarget | undefined, replayTick?: number, latest?: boolean): void;
+  reportRoom(at: RoomRequest | undefined): void;
 
   // ---- Sidebar（宽屏与窄屏各自一份开合，以下都作用于当前布局的那份） ----
   readonly sidebarOpen: Accessor<boolean>;
@@ -185,10 +193,10 @@ export function createShellState(
       if (to.shard !== undefined && settings.server().sharded && to.shard !== settings.shard()) settings.setShard(to.shard);
       if (to.room !== undefined) {
         const target = { shard: shard ?? "", room: to.room };
-        const replayAt = to.replay && { tick: to.replay.tick, ...(to.replay.latest ? { latest: true } : {}) };
+        const at = to.replay && replayTick(to.replay.tick, to.replay.latest);
         setRoom(target);
-        setReplay(replayAt);
-        setRoomRequest(replayAt ? { ...target, replay: replayAt } : target);
+        setReplay(at);
+        setRoomRequest(at ? { ...target, replay: at } : target);
       }
       const view = to.view ?? (to.room !== undefined ? "room" : undefined);
       if (view) showMainView(view);
@@ -218,10 +226,10 @@ export function createShellState(
     toggleMainView: () => navigate({ view: mainView() === "map" ? "room" : "map" }),
     mainView,
     roomRequest,
-    reportRoom(target, tick, latest) {
+    reportRoom(at) {
       batch(() => {
-        setRoom(target && { shard: target.shard, room: target.room });
-        setReplay(target && tick !== undefined ? { tick, ...(latest ? { latest: true } : {}) } : undefined);
+        setRoom(at && { shard: at.shard, room: at.room });
+        setReplay(at?.replay && replayTick(at.replay.tick, at.replay.latest));
       });
     },
 

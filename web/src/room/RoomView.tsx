@@ -31,19 +31,14 @@ import type { ShortcutCommands } from "../customize/keybindings.ts";
 import { registerRoomShortcuts } from "../customize/room-shortcuts.ts";
 import type { RoomDisplay } from "./display-options.ts";
 import { RoomToolbar } from "./RoomToolbar.tsx";
+import { replayAt, replayTick, type RoomRequest, type RoomTarget } from "../shell/shell-state.ts";
 
 /** 数据来源：服务器（经共享 Source），或开发构建里的录制数据（FixtureSource） */
 type DataSource = "server" | "recording";
 
-interface Target {
-  readonly shard: string;
-  readonly room: string;
-}
-
+type Target = RoomTarget;
 /** 从外部打开的房间；给了 replay 就以该 Tick 进入 Replay */
-interface OpenRequest extends Target {
-  readonly replay?: { readonly tick: number; readonly latest?: boolean } | undefined;
-}
+type OpenRequest = RoomRequest;
 
 /** 按需加载 `fixtures/season/` 的录制数据，按原始时序播放。 */
 async function loadSeasonFixtures(): Promise<Source> {
@@ -74,10 +69,8 @@ export interface RoomViewProps {
   readonly open?: OpenRequest | undefined;
   /** 给了就显示“返回地图”按钮（#16） */
   readonly onBack?: (() => void) | undefined;
-  /** 显示的房间或 Replay 变化时回报（外壳状态记录当前位置，#24）；replayTick 是 Replay 的起始 Tick */
-  readonly onTarget?:
-    | ((target: Target | undefined, replayTick: number | undefined, latest: boolean | undefined) => void)
-    | undefined;
+  /** 显示的房间或 Replay 变化时回报（外壳状态记录当前位置，#24）；在 Replay 中时带 replay（起始 Tick） */
+  readonly onTarget?: ((at: OpenRequest | undefined) => void) | undefined;
   /** 选中对象的详情改画到这个元素里（Sidebar 的选中对象区块，#24）；不给时画在房间旁边 */
   readonly detailsMount?: HTMLElement | undefined;
   /** 选中对象变化时回报（id 为 undefined 表示取消选中；窄屏据此切到选中对象标签，#29） */
@@ -171,8 +164,9 @@ export function RoomView(props: RoomViewProps) {
   });
 
   createEffect(() => {
+    const current = target();
     const request = replay.active() ? replay.request() : undefined;
-    props.onTarget?.(target(), request?.tick, request?.latest);
+    props.onTarget?.(current && (request ? replayAt(current, request.tick, request.latest) : current));
   });
 
   registerRoomShortcuts(props.shortcuts, { replay, target, liveTick: () => roomState()?.gameTime });
@@ -189,7 +183,7 @@ export function RoomView(props: RoomViewProps) {
           setTarget({ shard: opened.shard, room: opened.room });
           if (opened.replay) {
             const { tick, latest } = opened.replay;
-            replay.open({ shard: opened.shard, room: opened.room, tick, ...(latest ? { latest: true } : {}) });
+            replay.open({ shard: opened.shard, room: opened.room, ...replayTick(tick, latest) });
           } else replay.close();
         });
       },

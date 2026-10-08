@@ -19,7 +19,7 @@
  */
 import { batch, createEffect, createSignal, onCleanup, type Accessor } from "solid-js";
 import type { Settings } from "../settings/settings.ts";
-import type { ShellLocation, ShellState } from "./shell-state.ts";
+import { replayTick, type ShellLocation, type ShellState } from "./shell-state.ts";
 
 export type Route =
   | { readonly kind: "map"; readonly server: string; readonly shard?: string }
@@ -186,7 +186,7 @@ export function createUrlRouter(shell: ShellState, settings: RouterSettings, win
       const shard = settings.server().sharded && route.shard !== undefined ? { shard: route.shard } : {};
       if (route.kind === "map") shell.navigate({ view: "map", ...shard });
       else if (route.kind === "room") shell.navigate({ room: route.room, ...shard });
-      else shell.navigate({ room: route.room, ...shard, replay: { tick: route.tick, ...(route.latest ? { latest: true } : {}) } });
+      else shell.navigate({ room: route.room, ...shard, replay: replayTick(route.tick, route.latest) });
     });
   };
   const fromAddress = () => {

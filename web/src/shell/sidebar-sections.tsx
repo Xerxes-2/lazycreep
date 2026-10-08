@@ -28,7 +28,7 @@ import { DisplayOptionsSection, RoomInfoSection } from "../room/RoomSidebarSecti
 import type { SourceFactory } from "../settings/SettingsPage.tsx";
 import type { Settings } from "../settings/settings.ts";
 import type { Source } from "../source/source.ts";
-import type { MainViewMode, ShellState } from "./shell-state.ts";
+import { replayAt, type MainViewMode, type ShellState } from "./shell-state.ts";
 
 /** 区块可用的页面级数据与动作 */
 export interface SectionContext {
@@ -110,7 +110,7 @@ export const SIDEBAR_SECTIONS: Readonly<Record<MainViewMode, readonly SidebarSec
           feed={ctx.pvp}
           combatants={sectionCombatants(ctx, section.shown)}
           onOpenRoom={(target) => ctx.shell.navigate(target)}
-          onReplay={({ tick, ...target }) => ctx.shell.navigate({ ...target, replay: { tick, latest: true } })}
+          onReplay={({ tick, ...target }) => ctx.shell.navigate(replayAt(target, tick, true))}
         />
       ),
     },

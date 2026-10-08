@@ -16,7 +16,7 @@ import type { AlertSettings } from "../alert/alert-settings.ts";
 import { visibleOrKept } from "../alert/keep-awake.ts";
 import { mediaQuery, NARROW_QUERY } from "../shell/breakpoint.ts";
 import { createSheetTabs, revealSelection } from "../shell/bottom-sheet.tsx";
-import { createShellState, type ShellState } from "../shell/shell-state.ts";
+import { createShellState, replayAt, type ShellState } from "../shell/shell-state.ts";
 import { Sidebar } from "../shell/Sidebar.tsx";
 import type { SectionContext } from "../shell/sidebar-sections.tsx";
 import { shownVisibility } from "../shell/view-visibility.ts";
@@ -169,9 +169,7 @@ export function MapAndRoom(props: MapAndRoomProps) {
               onBack={() => shell.navigate({ view: "map" })}
               display={display.display()}
               onShownState={setRoomState}
-              onEnterReplay={(target, tick) =>
-                shell.navigate({ shard: target.shard, room: target.room, replay: { tick, latest: true } })
-              }
+              onEnterReplay={(target, tick) => shell.navigate(replayAt(target, tick, true))}
             />
           </div>
         </div>
