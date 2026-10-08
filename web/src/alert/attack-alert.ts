@@ -11,10 +11,10 @@
 import { createEffect, createMemo, createSignal, onCleanup, untrack, type Accessor } from "solid-js";
 import { ALWAYS_VISIBLE, pollWhileVisible } from "../power/visibility.ts";
 import type { PvpFeed } from "../pvp/pvp-feed.ts";
-import type { Source, Unsubscribe, UserInfo } from "../source/source.ts";
+import { isNotPlayer, type Source, type Unsubscribe, type UserInfo } from "../source/source.ts";
 import type { KeyValueStorage } from "../storage/local-store.ts";
 import { loadAlertMemory, saveAlertMemory } from "./alert-memory.ts";
-import { NOT_PLAYERS, createAlertDetector, myRoomsFrom, type Alert, type AlertConfig, type AlertContext } from "./alert-detector.ts";
+import { createAlertDetector, myRoomsFrom, type Alert, type AlertConfig, type AlertContext } from "./alert-detector.ts";
 
 /** 用户信息（我的房间）的刷新间隔：新占或丢失的房间 10 分钟内跟上 */
 export const ME_REFRESH_MS = 10 * 60_000;
@@ -100,7 +100,7 @@ export function createAttackAlert(options: AttackAlertOptions): AttackAlert {
 
   const lookups = new Set<string>();
   const lookUp = (src: Source, id: string) => {
-    if (lookups.has(id) || NOT_PLAYERS.has(id) || id === me()?.id || usernames()[id] !== undefined) return;
+    if (lookups.has(id) || isNotPlayer(id) || id === me()?.id || usernames()[id] !== undefined) return;
     lookups.add(id);
     src.getUsername(id).then(
       (name) => {

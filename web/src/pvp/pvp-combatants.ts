@@ -2,12 +2,11 @@
  * PvP Overview 的参战者（#34）：从一个房间的 roomMap2 帧得出在场玩家与各自的物体数。纯函数。
  *
  * - roomMap2 每帧按用户 id 给出该玩家在房间里的位置点（官方世界地图的小点）；键里另有地形 / 道路类（w、r、pb……）
- *   与 NPC（2 Invader、3 Source Keeper），沿用 Attack Alert 的 NOT_PLAYERS 排除
+ *   与 NPC（2 Invader、3 Source Keeper），由 source.ts 的 playerPoints 排除
  * - 只能给“物体数”（位置点数），不能给单位数：roomMap2 不区分 creep 与建筑，房间所有者的建筑也计在内
  * - 名字与 GCL 来自 Source.getPlayer（user/find）；资料未到时只有 id
  */
-import { NOT_PLAYERS } from "../alert/alert-detector.ts";
-import type { PlayerProfile, RoomMapUpdate } from "../source/source.ts";
+import { playerPoints, type PlayerProfile, type RoomMapUpdate } from "../source/source.ts";
 
 /** 引擎常量（screeps/common lib/constants.js） */
 const GCL_POW = 2.4;
@@ -39,8 +38,7 @@ export function combatantsFrom(
 ): Combatant[] {
   const lowerAllies = new Set([...allies].map((a) => a.toLowerCase()));
   const list: Combatant[] = [];
-  for (const [id, points] of Object.entries(frame)) {
-    if (NOT_PLAYERS.has(id) || points.length === 0) continue;
+  for (const [id, points] of playerPoints(frame)) {
     const found = profile(id);
     list.push({
       id,

@@ -9,8 +9,7 @@
  * - 玩家资料（名字、GCL）用 Source.getPlayer 查；同一玩家只请求一次（本 feed 记下已请求的，Source 自己也缓存）
  */
 import { createEffect, createMemo, createSignal, onCleanup, untrack, type Accessor } from "solid-js";
-import type { PlayerProfile, RoomMapUpdate, Source, Unsubscribe } from "../source/source.ts";
-import { NOT_PLAYERS } from "../alert/alert-detector.ts";
+import { playerPoints, type PlayerProfile, type RoomMapUpdate, type Source, type Unsubscribe } from "../source/source.ts";
 import { combatantsFrom, type Combatant } from "./pvp-combatants.ts";
 import type { PvpShardGroup } from "./pvp-overview.ts";
 
@@ -45,9 +44,7 @@ const keyOf = (shard: string, room: string) => `${shard}/${room}`;
 
 /** 帧里只留玩家（去掉地形 / 道路类键、NPC 与空列表） */
 function playersOnly(frame: RoomMapUpdate): RoomMapUpdate {
-  const out: Record<string, ReadonlyArray<readonly [number, number]>> = {};
-  for (const [id, points] of Object.entries(frame)) if (!NOT_PLAYERS.has(id) && points.length > 0) out[id] = points;
-  return out;
+  return Object.fromEntries(playerPoints(frame));
 }
 
 const countsKey = (frame: RoomMapUpdate) =>

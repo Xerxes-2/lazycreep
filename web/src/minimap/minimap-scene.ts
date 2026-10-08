@@ -8,7 +8,7 @@
 import { parseRoomName, roomName, worldOffset } from "../map/map-state.ts";
 import type { Color, Primitive, Scene } from "../scene/scene.ts";
 import type { Theme } from "../scene/theme.ts";
-import type { RoomMapUpdate, RoomStats, WorldSize } from "../source/source.ts";
+import { playerPoints, type RoomMapUpdate, type RoomStats, type WorldSize } from "../source/source.ts";
 
 export interface MinimapInput {
   /** 当前房间 */
@@ -34,9 +34,6 @@ export interface MinimapCell {
 }
 
 const LAYER = { tile: 0, ownership: 10, units: 20, frame: 30 } as const;
-
-/** roomMap2 里不是玩家的键：墙、路、Power Bank、传送门、Source、控制器、矿物、Keeper Lair */
-const CATEGORIES = new Set(["w", "r", "pb", "p", "s", "c", "m", "k"]);
 
 const ROOM_TILES = 50;
 const OWNED_ALPHA = 0.35;
@@ -92,8 +89,7 @@ export function buildMinimapScene(input: MinimapInput): Scene {
       });
     }
 
-    for (const [key, points] of Object.entries(input.positions[room] ?? {})) {
-      if (CATEGORIES.has(key)) continue;
+    for (const [key, points] of playerPoints(input.positions[room] ?? {}, { includeNpc: true })) {
       const fill = input.ownerColor(key);
       points.forEach(([px, py], i) =>
         out.push({

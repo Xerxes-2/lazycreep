@@ -90,6 +90,28 @@ export interface HistoryChunk {
 /** roomMap2 一帧：键为类别（w 墙、r 路、pb、p、s、c、m、k）或用户 id，值为坐标列表。 */
 export type RoomMapUpdate = Readonly<Record<string, ReadonlyArray<readonly [number, number]>>>;
 
+/** roomMap2 里的地形 / 设施类键：墙、路、Power Bank、传送门、Source、控制器、矿物、Keeper Lair */
+const ROOM_MAP_CATEGORIES: ReadonlySet<string> = new Set(["w", "r", "pb", "p", "s", "c", "m", "k"]);
+/** roomMap2 里 NPC 的“用户 id”：2 Invader、3 Source Keeper */
+const NPC_USERS: ReadonlySet<string> = new Set(["2", "3"]);
+
+/** roomMap2 的这个键不是玩家（地形 / 设施类键或 NPC） */
+export const isNotPlayer = (key: string): boolean => ROOM_MAP_CATEGORIES.has(key) || NPC_USERS.has(key);
+
+/**
+ * 取出 roomMap2 一帧里各玩家的位置点（用户 id → 坐标），跳过地形 / 设施类键与空列表；
+ * NPC 默认也跳过，`includeNpc` 时保留（Minimap 照官方画法把 Invader / Source Keeper 也画成点）。
+ */
+export function playerPoints(
+  frame: RoomMapUpdate,
+  options?: { readonly includeNpc?: boolean },
+): Array<readonly [id: string, points: ReadonlyArray<readonly [number, number]>]> {
+  return Object.entries(frame).filter(
+    ([key, points]) =>
+      points.length > 0 && !ROOM_MAP_CATEGORIES.has(key) && (options?.includeNpc === true || !NPC_USERS.has(key)),
+  );
+}
+
 export interface RoomMapOptions {
   /**
    * 页面不可见时也保留这条订阅（默认随页面隐藏暂停，#14）。

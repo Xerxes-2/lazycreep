@@ -14,7 +14,7 @@
  * 所以关页期间打过、仍在 PvP 列表里的战斗重新打开时会补报一次。
  */
 import type { PvpFeedData, PvpShardGroup } from "../pvp/pvp-overview.ts";
-import type { RoomMapUpdate, UserInfo } from "../source/source.ts";
+import { playerPoints, type RoomMapUpdate, type UserInfo } from "../source/source.ts";
 import { emptyAlertMemory, type AlertMemory } from "./alert-memory.ts";
 
 export type AlertReason = "pvp" | "nuke" | "stranger";
@@ -52,9 +52,6 @@ export const FRESH_PVP_TICKS = 10;
 
 /** 缺席不超过这么多帧不清零：边界上进进出出的 creep 仍算在场 */
 export const ABSENCE_GRACE_TICKS = 5;
-
-/** roomMap2 里不是玩家的键，以及 NPC（2 Invader、3 Source Keeper） */
-export const NOT_PLAYERS: ReadonlySet<string> = new Set(["w", "r", "pb", "p", "s", "c", "m", "k", "2", "3"]);
 
 export interface AlertContext {
   /** 我的用户 id */
@@ -171,8 +168,8 @@ export function createAlertDetector(memory: AlertMemory = emptyAlertMemory()): A
       const key = roomKey(shard, room);
       const seen = presence.get(key) ?? new Map<string, Presence>();
       presence.set(key, seen);
-      for (const [id, points] of Object.entries(frame)) {
-        if (NOT_PLAYERS.has(id) || id === context.me || points.length === 0) continue;
+      for (const [id] of playerPoints(frame)) {
+        if (id === context.me) continue;
         const entry = seen.get(id);
         if (entry) {
           entry.ticks += 1;
