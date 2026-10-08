@@ -91,6 +91,41 @@ describe("赛季对象的官方贴图", () => {
     expect(images(s, "m")).toHaveLength(1);
   });
 
+  describe("新赛季对象：由下发的 metadata 驱动", () => {
+    const foo = {
+      resources: { foo: "/season-static/season99/renderer/foo.png" },
+      metadata: {
+        foo: {
+          zIndex: 3,
+          processors: [
+            { type: "sprite", layer: "lighting", payload: { texture: "glow", width: 400, height: 400 } },
+            { type: "sprite", once: true, payload: { texture: "foo", width: 120, height: 80, tint: { $calc: "playerColor" } } },
+          ],
+        },
+      },
+    };
+    const fooScene = (art: SeasonArt | undefined, artStyle: "official" | "geometric" = "official") =>
+      buildRoomScene(
+        { state: roomStateFrom({ objects: { f: { type: "foo", x: 10, y: 10, user: "me1" } }, users }) },
+        { theme, me: "me1", artStyle, ...(art ? { seasonArt: art } : {}) },
+      );
+
+    it("官方表与本地赛季画法都没有的类型，按 metadata 的尺寸画它的主贴图，按需主人色染色", () => {
+      const s = fooScene(seasonArt(foo, new Set(["foo"])));
+      expect(images(s, "f")).toEqual([
+        expect.objectContaining({ url: "/season-static/season99/renderer/foo.png", x: 9.9, y: 10.1, width: 1.2, height: 0.8, tint: theme.owned }),
+      ]);
+    });
+
+    it("预检失败、没有配置或几何画风时退回几何占位", () => {
+      const placeholder = (s: Scene) => of(s, "f").map((p) => p.key);
+      const expected = ["f/placeholder", "f/placeholder-label"];
+      expect(placeholder(fooScene(seasonArt(foo, new Set())))).toEqual(expected);
+      expect(placeholder(fooScene(undefined))).toEqual(expected);
+      expect(placeholder(fooScene(seasonArt(foo, new Set(["foo"])), "geometric"))).toEqual(expected);
+    });
+  });
+
   it("几何画风不用赛季贴图", () => {
     const s = scene({ seasonArt: seasonArt(renderer, ALL) });
     expect(of(s, "r")).toEqual(of(scene({}), "r"));

@@ -32,8 +32,10 @@ describe("赛季贴图的预检", () => {
     const art = createSeasonArtLoader(preflight).forSource(new FixtureSource(bundle, { speed: Infinity }));
     expect(art()).toBeUndefined();
     await flush();
+    // 下发资源里的每一张都预检，不只是本地画法认识的
     expect(preflight.mock.calls.map(([url]) => url).sort()).toEqual([
       "/season-static/season11/renderer/T.png",
+      "/season-static/season11/renderer/extractor.svg",
       "/season-static/season11/renderer/reactor-core.png",
       "/season-static/season11/renderer/reactor-edge.png",
     ]);
@@ -60,7 +62,7 @@ describe("赛季贴图的预检", () => {
     await flush();
     expect(a).toBe(b);
     expect(getVersion).toHaveBeenCalledTimes(1);
-    expect(preflight).toHaveBeenCalledTimes(3);
+    expect(preflight).toHaveBeenCalledTimes(4);
   });
 
   it("版本信息里没有渲染器配置（MMO）或取版本失败时，没有贴图也不预检", async () => {

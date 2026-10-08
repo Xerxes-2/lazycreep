@@ -7,15 +7,18 @@
  * 照下发 metadata 改写成静态图元：reactor 是炉芯 `reactor-core` + 外圈 `reactor-edge`（官方在装着钍时
  * 让外圈旋转，我们不做动画）+ 有主人时的徽章位（半径 29）；钍矿是 `T` 贴图；lighting 图层的 glow 见 official-lighting.ts（#49）。
  * 掉落的钍官方没有专门的画法，用同一张 `T` 贴图，按数量缩放（与几何画法的大小一致）。
+ * 这几类有本地增强（储量条、徽章、数量缩放），保留专用画法；其余 metadata 里出现的新类型走
+ * {@link seasonMetadataPainter} 的通用画法。
  */
 import type { ArtStyle } from "../art/art-style.ts";
-import { seasonArtFor, type SeasonArt, type SeasonTexture } from "../art/season-art.ts";
+import { seasonArtFor, type SeasonArt } from "../art/season-art.ts";
 import type { Source } from "../source/source.ts";
 import { ROOM_OBJECT_PAINTERS } from "./room-painters.ts";
 import { LAYER, center, num, storeFraction, tileBar, type ObjectPainter, type ObjectPainters, type PaintContext, type PrimitiveDraft } from "./room-paint.ts";
 import type { RoomObject } from "./room-state.ts";
 import { THORIUM } from "./season-painters.ts";
 import { ownerBadge } from "./owner-badge.ts"; // #48
+import { zLayer } from "./official-sprite.ts";
 
 const THORIUM_TYPE = "T";
 
@@ -25,7 +28,7 @@ function sprite(
   ctx: PaintContext,
   part: string,
   objectType: string,
-  texture: SeasonTexture,
+  texture: string,
   layer: number,
   scale = 1,
 ): PrimitiveDraft | undefined {
@@ -85,6 +88,36 @@ export function withSeasonArt(painters: ObjectPainters, geometric: ObjectPainter
     mineral: mineral(paint(painters["mineral"]), geo("mineral")),
     energy: dropped(paint(painters["energy"]), geo("energy")),
     resource: dropped(paint(painters["resource"]), geo("resource")),
+  };
+}
+
+/**
+ * 官方表与本地赛季画法都没有条目、但服务器下发的 metadata 里有的对象类型（新赛季的对象）：
+ * 按 metadata 的尺寸以格子中心画它的主贴图（objects 图层上第一个贴图可用的 sprite），
+ * metadata 指定主人色时按主人色染色，层级按 metadata 的 zIndex。主贴图不可用时为 undefined（照旧画占位）。
+ */
+export function seasonMetadataPainter(objectType: string, art: SeasonArt | undefined): ObjectPainter | undefined {
+  const main = art?.mainSprite(objectType);
+  if (!main) return undefined;
+  return (obj, ctx) => {
+    const { x, y } = center(obj);
+    const width = main.width / 100;
+    const height = main.height / 100;
+    const tint = main.tint === "owner" ? ctx.ownerColor(obj["user"]) : main.tint;
+    return [
+      {
+        part: "body",
+        kind: "image",
+        layer: zLayer(main.zIndex),
+        x: x - width / 2,
+        y: y - height / 2,
+        width,
+        height,
+        url: main.url,
+        ...(tint === undefined ? {} : { tint }),
+        ...(main.alpha === undefined ? {} : { alpha: main.alpha }),
+      },
+    ];
   };
 }
 

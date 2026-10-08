@@ -17,6 +17,7 @@ import type { SeasonArt } from "../art/season-art.ts";
 import { paintersFor } from "./official-painters.ts";
 import { officialRoomLayers } from "./official-terrain.ts";
 import { officialLighting } from "./official-lighting.ts"; // #49
+import { seasonMetadataPainter } from "./season-official-painters.ts";
 
 export { LAYER, ROOM_OBJECT_PAINTERS };
 export type { ObjectPainter, ObjectPainters, PaintContext, PrimitiveDraft };
@@ -127,7 +128,11 @@ export function buildRoomScene(
   for (const [id, obj] of Object.entries(room.state.objects)) {
     if (num(obj, "x") === undefined || num(obj, "y") === undefined) continue;
     const type = obj["type"];
-    const paint = (typeof type === "string" && Object.hasOwn(painters, type) && painters[type]) || placeholder;
+    const paint =
+      (typeof type === "string" &&
+        ((Object.hasOwn(painters, type) && painters[type]) ||
+          (view.artStyle === "official" ? seasonMetadataPainter(type, view.seasonArt) : undefined))) ||
+      placeholder;
     const painted = paint(obj, ctx);
     const drafts = [...painted, ...extraBars(obj, painted, ctx)];
     if (id === ctx.selectedId) drafts.push(selectionHighlight(obj, ctx));
