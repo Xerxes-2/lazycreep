@@ -99,7 +99,7 @@ export function buildRoomScene(
       (typeof type === "string" && ((Object.hasOwn(table, type) && table[type]) || art.extraPainter(type, view.seasonArt))) ||
       placeholder;
     const painted = paint(obj, ctx);
-    const drafts = [...painted, ...extraBars(obj, painted, ctx)];
+    const drafts = art.bars ? [...painted, ...extraBars(obj, painted, ctx)] : painted.filter((d) => d.kind !== "bar");
     if (id === ctx.selectedId) drafts.push(selectionHighlight(obj, ctx));
     const showBars = barsVisible(ctx, id);
     const label = display.names && showBars ? nameLabel(obj, ctx) : undefined;

@@ -124,12 +124,23 @@ describe("官方画风：没有映射的类型退回几何画法", () => {
     for (const id of Object.keys(objects)) expect(of(a, id)).toEqual(of(b, id));
   });
 
-  it("血条、选中高亮、玩家名在官方画风下照常", () => {
+  it("官方画风不叠加通用血条与资源条；选中高亮照常", () => {
     const view = { ...official, zoom: BAR_MIN_ZOOM + 1, selectedId: "t" };
-    const s = scene({ t: { type: "tower", x: 20, y: 20, user: "foe1", hits: 1000, hitsMax: 3000 } }, view);
-    const parts = of(s, "t").map((p) => p.key.split("/")[1]);
-    expect(parts).toContain("hits");
-    expect(parts).toContain("selected");
+    const objects = {
+      t: { type: "tower", x: 20, y: 20, user: "foe1", hits: 1000, hitsMax: 3000 },
+      r: { type: "reactor", x: 25, y: 25, user: "foe1", store: { T: 500 }, storeCapacityResource: { T: 1000 } },
+    };
+    const s = scene(objects, view);
+    expect(s.primitives.filter((p) => p.kind === "bar")).toEqual([]);
+    expect(of(s, "t").map((p) => p.key.split("/")[1])).toContain("selected");
+  });
+
+  it("几何画风仍然叠加血条与资源条", () => {
+    const s = scene(
+      { t: { type: "tower", x: 20, y: 20, user: "foe1", hits: 1000, hitsMax: 3000 } },
+      { ...official, artStyle: "geometric", zoom: BAR_MIN_ZOOM + 1 },
+    );
+    expect(of(s, "t").map((p) => p.key.split("/")[1])).toContain("hits");
   });
 });
 

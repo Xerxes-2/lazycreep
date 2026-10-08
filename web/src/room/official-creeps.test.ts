@@ -119,7 +119,6 @@ describe("官方 creep：身体部件环（creepBuildBody）", () => {
   });
 });
 
-type Bar = Extract<Scene["primitives"][number], { kind: "bar" }>;
 
 describe("官方 creep：中心徽章", () => {
   const objects = {
@@ -155,13 +154,13 @@ describe("官方 creep：中心徽章", () => {
     expect(badgeOf(scene(objects, { ...near, zoom: BADGE_MIN_ZOOM }), "mine")).toHaveLength(1);
   });
 
-  it("血条在下、资源条在上（#36），选中高亮照常；中心按装载量画资源圆", () => {
+  it("官方画风不叠加通用血条与资源条（血量看部件环、装载看资源圆），选中高亮照常", () => {
     const s = scene(
       { c: { type: "creep", x: 5, y: 5, user: "me1", body: [{ type: "carry", hits: 100 }], hits: 50, hitsMax: 100, store: { energy: 25 }, storeCapacity: 50 } },
       { ...near, zoom: BAR_MIN_ZOOM + 10, selectedId: "c" },
     );
     const part = (name: string) => of(s, "c").find((p) => p.key === `c/${name}`);
-    expect((part("hits") as Bar).y).toBeGreaterThan((part("store") as Bar).y);
+    expect(of(s, "c").filter((p) => p.kind === "bar")).toEqual([]);
     expect(part("selected")).toBeDefined();
     expect(part("store-energy")).toMatchObject({ kind: "circle", radius: 0.1, fill: 0xffe56d });
   });

@@ -26,6 +26,11 @@ export interface RoomArt {
   lighting(state: RoomState): Primitive[];
   /** 是否取版本信息、预检并使用赛季贴图 */
   readonly seasonArt: boolean;
+  /**
+   * 是否叠加进度条（通用的血条 / 资源条，以及画法自带的条）。官方画风不叠加：
+   * 资源量由建筑填充与 creep 中心的资源圆表达，creep 血量由部件环表达。
+   */
+  readonly bars: boolean;
 }
 
 const N = 50;
@@ -67,6 +72,7 @@ const GEOMETRIC: RoomArt = {
   roomLayers: (_state, terrain, ctx) => (terrain ? terrainPrimitives(terrain, ctx.theme) : []),
   lighting: () => [],
   seasonArt: false,
+  bars: true,
 };
 
 /** 官方表缺条目的类型退回几何画法；赛季对象贴图不可用时也退回几何 */
@@ -76,6 +82,7 @@ const OFFICIAL: RoomArt = {
   roomLayers: officialRoomLayers,
   lighting: officialLighting,
   seasonArt: true,
+  bars: false,
 };
 
 export const ROOM_ART: Readonly<Record<ArtStyle, RoomArt>> = { official: OFFICIAL, geometric: GEOMETRIC };

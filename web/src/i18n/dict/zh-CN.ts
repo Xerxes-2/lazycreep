@@ -345,7 +345,7 @@ export const zhCN = {
   "roomSidebar.display.title": "显示选项",
   "roomSidebar.display.say": "creep 的 say 气泡",
   "roomSidebar.display.visual": "RoomVisual",
-  "roomSidebar.display.bars": "血条",
+  "roomSidebar.display.bars": "血条（几何画风）",
   "roomSidebar.display.names": "玩家名",
   // #49
   "roomSidebar.display.lighting": "光照（官方画风）",
