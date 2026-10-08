@@ -1,5 +1,5 @@
 # default {"width":50,"height":50,"background":2829099}
-{"key":"official-terrain","kind":"image","layer":0,"x":0,"y":0,"width":50,"height":50,"url":"data:image/svg+xml;… 40550 chars sha256:9bd2cf6595311d2d"}
+{"key":"official-terrain","kind":"image","layer":0,"x":0,"y":0,"width":50,"height":50,"url":"data:image/svg+xml;… 40547 chars sha256:ae6c414888e3bca1"}
 {"key":"official-road/0/12/1","kind":"line","layer":10,"points":[12.5,1.5,16.5,1.5],"stroke":{"color":5592405,"width":0.3}}
 {"key":"official-road/0/11/2","kind":"line","layer":10,"points":[11.5,2.5,12.5,2.5],"stroke":{"color":5592405,"width":0.3}}
 {"key":"official-road/0/17/2","kind":"line","layer":10,"points":[17.5,2.5,19.5,2.5],"stroke":{"color":5592405,"width":0.3}}
@@ -567,7 +567,7 @@
 {"kind":"text","x":1.5,"y":1.29,"text":"bucket 9941","size":0.6,"color":16777215,"align":"left","alpha":1,"stroke":{"color":0,"width":0.12},"key":"visual/0/0","layer":100}
 {"kind":"text","x":1.5,"y":2.09,"text":"cpu 19.7 ms light, mean 76.1 of 100","size":0.6,"color":16777215,"align":"left","alpha":1,"stroke":{"color":0,"width":0.12},"key":"visual/1/0","layer":100}
 # near {"width":50,"height":50,"background":2829099}
-{"key":"official-terrain","kind":"image","layer":0,"x":0,"y":0,"width":50,"height":50,"url":"data:image/svg+xml;… 40550 chars sha256:9bd2cf6595311d2d"}
+{"key":"official-terrain","kind":"image","layer":0,"x":0,"y":0,"width":50,"height":50,"url":"data:image/svg+xml;… 40547 chars sha256:ae6c414888e3bca1"}
 {"key":"official-road/0/12/1","kind":"line","layer":10,"points":[12.5,1.5,16.5,1.5],"stroke":{"color":5592405,"width":0.3}}
 {"key":"official-road/0/11/2","kind":"line","layer":10,"points":[11.5,2.5,12.5,2.5],"stroke":{"color":5592405,"width":0.3}}
 {"key":"official-road/0/17/2","kind":"line","layer":10,"points":[17.5,2.5,19.5,2.5],"stroke":{"color":5592405,"width":0.3}}
@@ -1144,7 +1144,7 @@
 {"kind":"text","x":1.5,"y":1.29,"text":"bucket 9941","size":0.6,"color":16777215,"align":"left","alpha":1,"stroke":{"color":0,"width":0.12},"key":"visual/0/0","layer":100}
 {"kind":"text","x":1.5,"y":2.09,"text":"cpu 19.7 ms light, mean 76.1 of 100","size":0.6,"color":16777215,"align":"left","alpha":1,"stroke":{"color":0,"width":0.12},"key":"visual/1/0","layer":100}
 # plain {"width":50,"height":50,"background":2829099}
-{"key":"official-terrain","kind":"image","layer":0,"x":0,"y":0,"width":50,"height":50,"url":"data:image/svg+xml;… 40550 chars sha256:9bd2cf6595311d2d"}
+{"key":"official-terrain","kind":"image","layer":0,"x":0,"y":0,"width":50,"height":50,"url":"data:image/svg+xml;… 40547 chars sha256:ae6c414888e3bca1"}
 {"key":"official-road/0/12/1","kind":"line","layer":10,"points":[12.5,1.5,16.5,1.5],"stroke":{"color":5592405,"width":0.3}}
 {"key":"official-road/0/11/2","kind":"line","layer":10,"points":[11.5,2.5,12.5,2.5],"stroke":{"color":5592405,"width":0.3}}
 {"key":"official-road/0/17/2","kind":"line","layer":10,"points":[17.5,2.5,19.5,2.5],"stroke":{"color":5592405,"width":0.3}}

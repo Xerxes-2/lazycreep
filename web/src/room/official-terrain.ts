@@ -10,6 +10,7 @@
  *   （composite-textures.ts 负责内联 PNG 与栅格化）。图元只有一个，Pixi 的逐图元比较几乎没有开销；
  *   代价是一次性栅格化（每个房间一次、constructedWall 变化时再一次、放大越过档位时再一次）与一张房间大小的纹理
  *   （尺寸按设备与缩放取档位，手机整房间约 1024²，上限 2048²，见 composite-textures.ts）。
+ * - 外观参数（墙底色、纹理强度、环境光）比官方调亮，见 TERRAIN_LOOK。
  * - lighting 图层：官方整个画面乘以 0x808080 的环境光，建筑另有光晕提亮（光晕见 official-lighting.ts，#49）；
  *   我们只把环境光（含墙的模糊阴影）乘进地形与道路的颜色，建筑保持原色。
  * - 沼泽噪声不流动（官方 swampTexture: 'animated' 的平移动画），出口标记（exit-*.svg）不画。
@@ -66,6 +67,28 @@ export function detectAdditiveBlend(): AdditiveBlend {
   }
 }
 
+/**
+ * 没有装饰时的默认地形外观。官方原参数（括号内）整体偏暗：墙近乎纯黑、纹理起伏只有 3/255 左右肉眼看不出。
+ * 用户 2026-10-08 在 W17S25 的并排对比（原样 / 轻度 / 中度 / 明显）里选了“轻度”：
+ * 墙仍明显比平原暗，纹理能看出来。
+ */
+const TERRAIN_LOOK = {
+  /** 墙底色（官方 #111111） */
+  wall: "#1c1c1c",
+  /** 墙噪声 noise1 的不透明度（官方 0.2） */
+  wallNoise: 0.3,
+  /** 地面纹理 ground（官方 0.3） */
+  ground: 0.7,
+  /** 地面遮罩 ground-mask，正片叠底（官方 0.15） */
+  groundMask: 0.3,
+  /** 沼泽底色的不透明度（官方 0.4） */
+  swamp: 0.6,
+  /** 沼泽两层噪声 noise2 各自的不透明度（官方 0.075） */
+  swampNoise: 0.15,
+  /** 整体环境光，正片叠底（官方 #808080） */
+  ambient: "#8c8c8c",
+} as const;
+
 function terrainSvg(walls: string, swamps: string, blend: AdditiveBlend): string {
   const full = `x="0" y="0" width="5000" height="5000"`;
   const tile = (id: string, name: Parameters<typeof officialTextureUrl>[0], size: number, filter = "") =>
@@ -89,25 +112,25 @@ function terrainSvg(walls: string, swamps: string, blend: AdditiveBlend): string
     `</defs>`,
     // 地面
     `<rect ${full} fill="#555555"/>`,
-    `<rect ${full} fill="url(#ground)" opacity="0.3"/>`,
-    `<rect ${full} fill="url(#groundMask)" opacity="0.15" style="mix-blend-mode:multiply"/>`,
+    `<rect ${full} fill="url(#ground)" opacity="${TERRAIN_LOOK.ground}"/>`,
+    `<rect ${full} fill="url(#groundMask)" opacity="${TERRAIN_LOOK.groundMask}" style="mix-blend-mode:multiply"/>`,
   ];
   if (swamps) {
     parts.push(
-      `<use href="#swamps" fill="#4a501e" stroke="#4a501e" stroke-width="50" paint-order="stroke" opacity="0.4"/>`,
-      // 官方噪声 alpha 0.3，遮罩精灵自身 alpha 0.25（Pixi 的精灵遮罩把它乘进去）
-      `<rect ${full} fill="url(#swampNoiseA)" opacity="0.075" clip-path="url(#swampClip)" ${add}/>`,
-      `<rect ${full} fill="url(#swampNoiseB)" opacity="0.075" clip-path="url(#swampClip)" ${add}/>`,
+      `<use href="#swamps" fill="#4a501e" stroke="#4a501e" stroke-width="50" paint-order="stroke" opacity="${TERRAIN_LOOK.swamp}"/>`,
+      // 官方噪声 alpha 0.3，遮罩精灵自身 alpha 0.25（Pixi 的精灵遮罩把它乘进去），合起来 0.075；这里按 TERRAIN_LOOK 加强
+      `<rect ${full} fill="url(#swampNoiseA)" opacity="${TERRAIN_LOOK.swampNoise}" clip-path="url(#swampClip)" ${add}/>`,
+      `<rect ${full} fill="url(#swampNoiseB)" opacity="${TERRAIN_LOOK.swampNoise}" clip-path="url(#swampClip)" ${add}/>`,
     );
   }
   if (walls) {
     parts.push(
-      `<use href="#walls" fill="#111111" stroke="#000000" stroke-width="10" paint-order="stroke"/>`,
-      `<rect ${full} fill="url(#wallNoise)" opacity="0.2" clip-path="url(#wallClip)" ${add}/>`,
+      `<use href="#walls" fill="${TERRAIN_LOOK.wall}" stroke="#000000" stroke-width="10" paint-order="stroke"/>`,
+      `<rect ${full} fill="url(#wallNoise)" opacity="${TERRAIN_LOOK.wallNoise}" clip-path="url(#wallClip)" ${add}/>`,
     );
   }
   // lighting 图层里与地形有关的部分：环境光、墙的模糊阴影、墙本身的 0x808080
-  parts.push(`<g style="mix-blend-mode:multiply"><rect ${full} fill="#808080"/>`);
+  parts.push(`<g style="mix-blend-mode:multiply"><rect ${full} fill="${TERRAIN_LOOK.ambient}"/>`);
   if (walls) {
     parts.push(
       `<use href="#walls" fill="#000000" filter="url(#shadow)" style="mix-blend-mode:multiply"/>`,

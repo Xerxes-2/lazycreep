@@ -107,6 +107,17 @@ describe("官方画风：地形", () => {
     expect(svg).toMatch(/fill="url\(#swampNoiseA\)"[^>]*clip-path="url\(#swampClip\)"/);
   });
 
+  it("没有装饰时的默认地形比官方原参数亮：墙底色 #1c1c1c、纹理加强、环境光 #8c8c8c（用户 2026-10-08 选定）", () => {
+    const svg = svgOf(terrainImage(sceneOf({}, terrainOf({ "1,1": 1, "4,4": 2 }))));
+    expect(svg).toContain(`<use href="#walls" fill="#1c1c1c"`);
+    expect(svg).toMatch(/fill="url\(#wallNoise\)" opacity="0.3"/);
+    expect(svg).toMatch(/fill="url\(#ground\)" opacity="0.7"/);
+    expect(svg).toMatch(/fill="url\(#groundMask\)" opacity="0.3"/);
+    expect(svg).toMatch(/<use href="#swamps" fill="#4a501e"[^>]*opacity="0.6"/);
+    expect(svg).toMatch(/fill="url\(#swampNoiseA\)" opacity="0.15"/);
+    expect(svg).toContain(`<rect x="0" y="0" width="5000" height="5000" fill="#8c8c8c"/>`);
+  });
+
   it("地形还没到时没有地形贴图，道路照画", () => {
     const s = sceneOf({ a: road(1, 1), b: road(2, 1) });
     expect(terrainImage(s)).toBeUndefined();
