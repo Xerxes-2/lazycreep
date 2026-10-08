@@ -288,6 +288,11 @@ export class SourceError extends Error {
 }
 
 /** getTime 的选项（#38） */
+export interface SnapshotOptions {
+  /** 可接受的已缓存快照的最大年龄（毫秒），比它旧就重新请求；默认用快照缓存的有效期（snapshot-cache.ts） */
+  readonly maxAgeMs?: number;
+}
+
 export interface TimeOptions {
   /** 可接受的已到达结果的最大年龄（毫秒）；0 表示只并入在途请求、不拿旧结果。默认用去重层的复用窗口 */
   readonly maxAgeMs?: number;
@@ -334,7 +339,7 @@ export interface Source {
   /** 房间的装饰（`game/room-decorations`，匿名即可，#61）；没有装饰时 objects 为空、无 wall / floor */
   getRoomDecorations(shard: string, room: string): Promise<RoomDecorations>;
   /** 房间快照（`game/room-objects`，匿名即可，#63）；缓存层只在内存里留约 10 秒（snapshot-cache.ts） */
-  getRoomSnapshot(shard: string, room: string): Promise<RoomSnapshot>;
+  getRoomSnapshot(shard: string, room: string, options?: SnapshotOptions): Promise<RoomSnapshot>;
   /**
    * 某个 Shard 的地图瓦片地址（map-tiles.ts）。必须给版本信息：赛季服的本赛季瓦片根地址在里面；
    * 版本信息取不到时传 undefined，用 Server 的默认根地址。

@@ -14,7 +14,7 @@ import type { SceneView, SceneViewOptions } from "../scene/pixi-scene-view.ts";
 import type { Scene } from "../scene/scene.ts";
 import { createSettings } from "../settings/settings.ts";
 import { SERVER_PRESETS } from "../source/servers.ts";
-import { SNAPSHOT_FRESH_MS } from "../source/snapshot-cache.ts";
+import { SNAPSHOT_FRESH_MS, SNAPSHOT_REFRESH_MS } from "../source/snapshot-cache.ts";
 import type { ConnectionState, HistoryChunk, RoomSnapshot, RoomTick, Source } from "../source/source.ts";
 import { withStaticCache } from "../source/static-cache.ts";
 import { RoomView } from "./RoomView.tsx";
@@ -202,7 +202,7 @@ describe("Room View 的房间快照（#63）", () => {
     expect(net.snapshotCalls).toEqual([]);
   });
 
-  it("邻居预加载取快照；10 秒内切过去命中缓存、立即画出，过期后重新请求", async () => {
+  it("邻居预加载取快照；有效期内切过去命中缓存、立即画出，过期后重新请求", async () => {
     const time = { now: 1_000_000 };
     const cached = withStaticCache(net.source, { storage: undefined, now: () => time.now });
     mount({ source: cached });
@@ -217,6 +217,43 @@ describe("Room View 的房间快照（#63）", () => {
     time.now += 2;
     open({ shard: SHARD, room: "W13S28" });
     await settle(() => expect(net.snapshotCalls.filter((room) => room === "W13S28")).toHaveLength(2));
+  });
+
+  it("停留期间每 30 秒在后台刷新邻居快照；页面隐藏时不刷新；换房间后旧房间的刷新停掉", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    try {
+      const time = { now: 1_000_000 };
+      const cached = withStaticCache(net.source, { storage: undefined, now: () => time.now });
+      mount({ source: cached });
+      const neighbors = ["W13S27", "W14S28", "W12S28", "W13S29"];
+      await settle(() => expect(net.snapshotCalls).toEqual(["W13S28", ...neighbors]));
+
+      // 邻居快照在打开房间后才取到，第一次刷新时还不满一个间隔，也要刷新
+      time.now += SNAPSHOT_REFRESH_MS * 0.6;
+      vi.advanceTimersByTime(SNAPSHOT_REFRESH_MS);
+      await settle(() => expect(net.snapshotCalls).toEqual(["W13S28", ...neighbors, ...neighbors]));
+
+      visibility.set(false);
+      time.now += SNAPSHOT_REFRESH_MS;
+      vi.advanceTimersByTime(SNAPSHOT_REFRESH_MS);
+      await pause(50);
+      expect(net.snapshotCalls).toHaveLength(9);
+
+      visibility.set(true);
+      open({ shard: SHARD, room: "W13S27" });
+      await settle(() => expect(net.snapshotCalls.length).toBeGreaterThan(9));
+      const before = net.snapshotCalls.length;
+      await pause(50);
+      time.now += SNAPSHOT_REFRESH_MS;
+      vi.advanceTimersByTime(SNAPSHOT_REFRESH_MS);
+      await pause(50);
+      // 只刷新 W13S27 的邻居（W13S26、W14S27、W12S27、W13S28），不再刷新 W13S28 的邻居
+      const refreshed = net.snapshotCalls.slice(before);
+      expect(refreshed).not.toContain("W14S28");
+      expect(refreshed).toEqual(expect.arrayContaining(["W13S26", "W14S27", "W12S27", "W13S28"]));
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("页面隐藏时不预加载邻居的快照", async () => {

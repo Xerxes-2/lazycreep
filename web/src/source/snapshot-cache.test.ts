@@ -1,12 +1,12 @@
 /**
- * #63：房间快照缓存。只在内存里，约 10 秒内有效（过期不用、重新请求）；同一房间并发只发一次；
+ * #63：房间快照缓存。只在内存里，约 60 秒内有效（过期不用、重新请求；后台刷新可要求更新）；同一房间并发只发一次；
  * 失败不缓存（照常拒绝，下次重新请求）；不持久化。
  */
 import { describe, expect, it } from "vitest";
 import { FixtureSource, fixtureBundle } from "./fixture-source.ts";
 import { SERVER_PRESETS } from "./servers.ts";
 import type { RoomSnapshot, ServerConfig, Source } from "./source.ts";
-import { SNAPSHOT_FRESH_MS } from "./snapshot-cache.ts";
+import { SNAPSHOT_FRESH_MS, SNAPSHOT_REFRESH_MS } from "./snapshot-cache.ts";
 import { staticCached } from "./static-cache.ts";
 
 const bundle = fixtureBundle(
@@ -66,8 +66,8 @@ const open = (net: ReturnType<typeof network>, options: { storage?: ReturnType<t
   staticCached(net.factory, { storage: options.storage ?? memoryStorage(), ...(options.now ? { now: options.now } : {}) })(SEASON, "t");
 
 describe("房间快照缓存", () => {
-  it("约 10 秒内同一个房间不再请求，给同一份快照", async () => {
-    expect(SNAPSHOT_FRESH_MS).toBe(10_000);
+  it("约 60 秒内同一个房间不再请求，给同一份快照", async () => {
+    expect(SNAPSHOT_FRESH_MS).toBe(60_000);
     const net = network();
     const time = clock();
     const source = open(net, { now: time.now });
@@ -83,6 +83,20 @@ describe("房间快照缓存", () => {
     const source = open(net, { now: time.now });
     await source.getRoomSnapshot(SHARD, "W1N1");
     time.advance(SNAPSHOT_FRESH_MS);
+    expect(await source.getRoomSnapshot(SHARD, "W1N1")).toEqual(snapshotOf("W1N1", 2));
+    expect(net.calls).toEqual(["W1N1", "W1N1"]);
+  });
+
+  it("maxAgeMs：比它旧的快照重新请求（后台刷新用），新的快照之后照常命中", async () => {
+    expect(SNAPSHOT_REFRESH_MS).toBe(30_000);
+    const net = network();
+    const time = clock();
+    const source = open(net, { now: time.now });
+    await source.getRoomSnapshot(SHARD, "W1N1");
+    time.advance(SNAPSHOT_REFRESH_MS - 1);
+    expect(await source.getRoomSnapshot(SHARD, "W1N1", { maxAgeMs: SNAPSHOT_REFRESH_MS })).toEqual(snapshotOf("W1N1", 1));
+    time.advance(1);
+    expect(await source.getRoomSnapshot(SHARD, "W1N1", { maxAgeMs: SNAPSHOT_REFRESH_MS })).toEqual(snapshotOf("W1N1", 2));
     expect(await source.getRoomSnapshot(SHARD, "W1N1")).toEqual(snapshotOf("W1N1", 2));
     expect(net.calls).toEqual(["W1N1", "W1N1"]);
   });

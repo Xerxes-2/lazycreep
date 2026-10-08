@@ -43,7 +43,8 @@ import { replayMsPerTick } from "../replay/replay-engine.ts";
 import { replayAt, replayTick, type RoomRequest, type RoomTarget } from "../shell/shell-state.ts";
 import { seasonArtFor } from "../art/season-art.ts";
 import type { DataSource } from "./data-source.ts";
-import { preloadNeighbors, roomDecorations, roomSnapshot } from "./neighbor-preload.ts";
+import { SNAPSHOT_REFRESH_MS } from "../source/snapshot-cache.ts";
+import { preloadNeighbors, refreshNeighborSnapshots, roomDecorations, roomSnapshot } from "./neighbor-preload.ts";
 
 type Target = RoomTarget;
 /** 从外部打开的房间；给了 replay 就以该 Tick 进入 Replay */
@@ -259,9 +260,16 @@ export function RoomView(props: RoomViewProps) {
       },
       (error: unknown) => alive && setTerrainError(errorMessage(t, error)),
     );
+    // 停留期间定期刷新邻居快照（#63），切过去时不至于过期；页面隐藏时这一轮跳过，Replay 不刷新
+    const refresh = live
+      ? setInterval(() => {
+          if (alive && untrack(visible)) void refreshNeighborSnapshots(src, current.shard, current.room, () => alive && untrack(visible));
+        }, SNAPSHOT_REFRESH_MS)
+      : undefined;
     onCleanup(() => {
       alive = false;
       off();
+      if (refresh !== undefined) clearInterval(refresh);
     });
   });
 
