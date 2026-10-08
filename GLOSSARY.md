@@ -67,9 +67,13 @@ _Avoid_: 实时、在线
 Room View 的另一种模式：读取某个房间的历史 Tick 序列，可拖动、步进、调速播放。第一版只做单房间 Replay。
 _Avoid_: 录像、回放视频
 
-**Art Style（画风）**:
-Room View 绘制房间对象的方式：Official（官方贴图）或 Geometric（简约几何图形），用户在设置中选择。
-_Avoid_: 皮肤、渲染风格
+**Action Animation（动作动画）**:
+对象在某个 Tick 内执行的动作（攻击、治疗、采集、建造等）以及受到的攻击与治疗，在 Room View 中以有限时长的视觉效果呈现，播完回到静止画面。
+_Avoid_: 特效、战斗动画
+
+**Movement Tween（移动补间）**:
+Room View 中 creep 在两个 Tick 之间从旧位置平滑移到新位置的过渡。
+_Avoid_: 移动动画、插帧
 
 **Badge（徽章）**:
 玩家在某个 Server 上设置的圆形标识，由类型、三种颜色、形变参数与翻转决定；同一玩家在不同 Server 上可以不同。
