@@ -6,7 +6,7 @@ import { For, Match, Switch } from "solid-js";
 import { useI18n } from "../i18n";
 import { BadgeIcon } from "../badge/BadgeIcon.tsx";
 import type { Accessor } from "solid-js";
-import { createCombatantFeed, type CombatantFeed, type RoomCombatants } from "./combatant-feed.ts";
+import { createCombatantFeed, type CombatantFeed, type Npc, type RoomCombatants } from "./combatant-feed.ts";
 import type { PvpFeed } from "./pvp-feed.ts";
 import type { Source } from "../source/source.ts";
 import type { RoomMapHub } from "../source/room-map-hub.ts";
@@ -33,12 +33,11 @@ export function pageCombatants(
   });
 }
 
-/** PvE 卡片的对手一行：房间里现在有哪些 NPC */
-export function PveOpponents(props: { readonly state: RoomCombatants }) {
+/** PvE 卡片的对手一行：记为 PvE 时见过的 NPC（已被打死的也算） */
+export function PveOpponents(props: { readonly npcs: readonly Npc[] }) {
   const { t } = useI18n();
-  const npcs = () => (props.state.kind === "ready" ? props.state.npcs : []);
   return (
-    <For each={npcs()}>
+    <For each={props.npcs}>
       {(npc) => (
         <li class="pvp-overview__player" data-npc={npc}>
           {t(`pvpCombatants.npc.${npc}`)}

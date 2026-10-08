@@ -9,13 +9,13 @@
 import { For, Show } from "solid-js";
 import { useI18n } from "../i18n";
 import { errorMessage } from "../settings/SettingsPage.tsx";
-import { looksLikePve, type CombatantFeed } from "./combatant-feed.ts";
+import type { CombatantFeed } from "./combatant-feed.ts";
 import { PveOpponents, PvpCombatants } from "./PvpCombatants.tsx";
 import type { PvpFeed } from "./pvp-feed.ts";
 import { PVP_WINDOWS, battleReplayTick, type PvpShardGroup, type RoomOwner } from "./pvp-overview.ts";
 
 export interface PvpOverviewProps {
-  /** pvp：玩家之间的战斗（另列飞行中的核弹）；pve：看起来是打 NPC 的房间（looksLikePve）。没有参战者数据的房间算 pvp */
+  /** pvp：玩家之间的战斗（另列飞行中的核弹）；pve：看起来是打 NPC 的房间（CombatantFeed.pve）。没有参战者数据的房间算 pvp */
   readonly mode: "pvp" | "pve";
   readonly feed: PvpFeed;
   /** 进入某房间的 Room View */
@@ -65,7 +65,7 @@ export function PvpOverview(props: PvpOverviewProps) {
   };
 
   const pve = props.mode === "pve";
-  const isPve = (shard: string, room: string) => props.combatants !== undefined && looksLikePve(props.combatants.of(shard, room));
+  const isPve = (shard: string, room: string) => props.combatants?.pve(shard, room) !== undefined;
   /** 本列表的房间：PvE 列表只要看起来是打 NPC 的，PvP 列表要其余的 */
   const listed = (group: PvpShardGroup) => group.rooms.filter((entry) => isPve(group.shard, entry.room) === pve);
   const titleId = `${props.mode}-overview-title`;
@@ -133,7 +133,7 @@ export function PvpOverview(props: PvpOverviewProps) {
                                 {(feed) => (
                                   <ul class="pvp-card__combatants" data-combatants={entry.room}>
                                     <Show when={pve}>
-                                      <PveOpponents state={feed().of(group.shard, entry.room)} />
+                                      <PveOpponents npcs={feed().pve(group.shard, entry.room) ?? []} />
                                     </Show>
                                     <PvpCombatants state={feed().of(group.shard, entry.room)} />
                                   </ul>

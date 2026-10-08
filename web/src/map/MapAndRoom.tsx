@@ -22,7 +22,6 @@ import { Sidebar } from "../shell/Sidebar.tsx";
 import type { SectionContext } from "../shell/sidebar-sections.tsx";
 import { shownVisibility } from "../shell/view-visibility.ts";
 import { createPvpFeed } from "../pvp/pvp-feed.ts";
-import { looksLikePve } from "../pvp/combatant-feed.ts";
 import { pageCombatants } from "../pvp/PvpCombatants.tsx";
 import { createMapLayerPrefs, mapLayers } from "./map-layer-toggles.ts";
 import { badgeLayer } from "./map-badge-layer.ts";
@@ -173,7 +172,7 @@ export function MapAndRoom(props: MapAndRoomProps) {
               layers={(shard) => {
                 const group = pvp.groups()?.find((g) => g.shard === shard);
                 // 在这里读分类：参战者帧到了地图跟着重画
-                const pve = new Set(group?.rooms.filter((r) => looksLikePve(combatants.of(shard, r.room))).map((r) => r.room));
+                const pve = new Set(group?.rooms.filter((r) => combatants.pve(shard, r.room)).map((r) => r.room));
                 return mapLayers(layerPrefs.enabled(), group, badges, pve);
               }}
               link={worldMap}
