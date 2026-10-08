@@ -35,6 +35,7 @@ import { RoomView, type RoomViewProps } from "../room/RoomView.tsx";
 import { createRoomDisplayOptions } from "../room/display-options.ts";
 import type { RoomState } from "../room/room-state.ts";
 import { MapView } from "./MapView.tsx";
+import { useSharedSource } from "../source/use-shared-source.ts";
 
 export interface MapAndRoomProps {
   readonly settings: Settings;
@@ -66,11 +67,7 @@ export function MapAndRoom(props: MapAndRoomProps) {
   const shell = props.shell ?? createShellState(browserStorage(), props.settings, narrow);
 
   // PvP 列表与所有权补查用的 Source（全页共享的同一个）
-  const source = createMemo(() => {
-    const created = props.sourceFor(props.settings.server(), props.settings.token() || undefined);
-    onCleanup(() => created.close());
-    return created;
-  });
+  const source = useSharedSource(props.sourceFor, props.settings);
   const ownership = createMemo(() => {
     const src = source();
     const hub = createOwnershipHub({ fetch: (shard, rooms) => src.getMapStats(shard, rooms) });

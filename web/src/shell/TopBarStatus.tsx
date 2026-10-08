@@ -16,6 +16,7 @@ import { pageVisibility, pollWhileVisible, type VisibilitySignal } from "../powe
 import type { SourceFactory } from "../settings/SettingsPage.tsx";
 import type { Settings } from "../settings/settings.ts";
 import type { ConnectionState, CpuUpdate, ShardInfo } from "../source/source.ts";
+import { useSharedSource } from "../source/use-shared-source.ts";
 
 /** 默认轮询间隔：每分钟 10 次，约占官方全局额度（120 次 / 分钟）的 8% */
 export const TICK_POLL_MS = 6000;
@@ -41,11 +42,7 @@ export function TopBarStatus(props: TopBarStatusProps) {
   const settings = props.settings;
   const page = props.visibility ?? pageVisibility();
 
-  const source = createMemo(() => {
-    const created = props.sourceFor(settings.server(), settings.token() || undefined);
-    onCleanup(() => created.close());
-    return created;
-  });
+  const source = useSharedSource(props.sourceFor, settings);
 
   const [connection, setConnection] = createSignal<ConnectionState>();
   createEffect(() => {

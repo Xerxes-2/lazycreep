@@ -12,6 +12,7 @@ import type { Settings } from "../settings/settings.ts";
 import { browserStorage, type KeyValueStorage } from "../storage/local-store.ts";
 import { appendConsole, emptyConsoleLog, filterConsole, type ConsoleLog } from "./console-log.ts";
 import { createConsoleSettings, MAX_CONSOLE_LIMIT } from "./console-settings.ts";
+import { useSharedSource } from "../source/use-shared-source.ts";
 
 export interface ConsoleViewProps {
   readonly settings: Settings;
@@ -37,11 +38,7 @@ export function ConsoleView(props: ConsoleViewProps) {
 
   // settings 的 server / token 按值判等：切 Shard 不会重建连接、清空日志
   const token = () => settings.token() || undefined;
-  const source = createMemo(() => {
-    const created = props.sourceFor(settings.server(), token());
-    onCleanup(() => created.close());
-    return created;
-  });
+  const source = useSharedSource(props.sourceFor, settings);
   const sharded = () => source().server.sharded;
 
   const [shardList, setShardList] = createSignal<readonly string[]>([]);

@@ -26,6 +26,7 @@ import { createOwnershipLoader } from "./ownership-loader.ts";
 import type { OwnershipHub } from "./ownership-hub.ts";
 import { findRoom, useMapInfo } from "./use-map-info.ts";
 import type { WorldMapLink } from "./world-map-link.ts";
+import { useSharedSource } from "../source/use-shared-source.ts";
 
 /** 每个房间至少这么多 CSS 像素时，点击房间进入 Room View */
 export const ENTER_ZOOM = 32;
@@ -81,11 +82,7 @@ export function MapView(props: MapViewProps) {
   const settings = props.settings;
   const visible = useVisible(props.visibility);
 
-  const source = createMemo(() => {
-    const created = props.sourceFor(settings.server(), settings.token() || undefined);
-    onCleanup(() => created.close());
-    return created;
-  });
+  const source = useSharedSource(props.sourceFor, settings);
 
   const [shards, setShards] = createSignal<readonly ShardInfo[]>();
   const [loadError, setLoadError] = createSignal<string>();

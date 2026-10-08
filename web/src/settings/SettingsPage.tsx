@@ -3,6 +3,7 @@ import { useI18n, type MessageKey } from "../i18n";
 import type { Translate } from "../i18n/translator.ts";
 import { SourceError, type ServerConfig, type Source } from "../source/source.ts";
 import type { Settings } from "./settings.ts";
+import { useSharedSource } from "../source/use-shared-source.ts";
 
 /** 按 Server 与 token 建 Source；应用里是 LiveSource，测试里是 FixtureSource。 */
 export type SourceFactory = (server: ServerConfig, token: string | undefined) => Source;
@@ -151,11 +152,7 @@ export function SettingsPage(props: { settings: Settings; sourceFor: SourceFacto
   const { t } = useI18n();
   const settings = props.settings;
 
-  const source = createMemo(() => {
-    const created = props.sourceFor(settings.server(), settings.token() || undefined);
-    onCleanup(() => created.close());
-    return created;
-  });
+  const source = useSharedSource(props.sourceFor, settings);
 
   const shards = createAsync(() => {
     const src = source();
