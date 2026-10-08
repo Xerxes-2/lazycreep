@@ -10,6 +10,7 @@
  */
 import { badgeSvgUrl } from "../badge/badge-image.ts";
 import { parseBadge } from "../badge/badge.ts";
+import { u } from "./official-sprite.ts";
 import { center, type PaintContext, type PrimitiveDraft } from "./room-paint.ts";
 import type { RoomObject } from "./room-state.ts";
 
@@ -32,8 +33,6 @@ export interface OwnerBadgeOptions {
    */
   readonly box?: { readonly size: number; readonly top: number };
 }
-
-const u = (value: number) => value / 100;
 
 export function ownerBadge(obj: RoomObject, ctx: PaintContext, options: OwnerBadgeOptions): PrimitiveDraft[] {
   const user = obj["user"];

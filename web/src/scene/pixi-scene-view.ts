@@ -11,7 +11,6 @@ import { withPixelImages } from "./pixel-textures.ts";
 import type { ImagePrimitive, Primitive, Scene, Stroke } from "./scene.ts";
 import { defaultTextures, rasterPixelsPerUnit, rasterSize, type SvgRasterCache, type TextureLoader, type TextureSize } from "./texture-sources.ts";
 
-export type { TextureLoader };
 
 /** 世界坐标到画布 CSS 像素：screen = world * scale + (x, y) */
 export interface Viewport {

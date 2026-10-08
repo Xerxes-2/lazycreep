@@ -12,11 +12,11 @@
  */
 import type { SeasonArt } from "../art/season-art.ts";
 import { ROOM_OBJECT_PAINTERS } from "./room-painters.ts";
-import { LAYER, center, num, storeFraction, tileBar, type ObjectPainter, type ObjectPainters, type PaintContext, type PrimitiveDraft } from "./room-paint.ts";
+import { LAYER, num, storeFraction, tileBar, type ObjectPainter, type ObjectPainters, type PaintContext, type PrimitiveDraft } from "./room-paint.ts";
 import type { RoomObject } from "./room-state.ts";
 import { THORIUM } from "./season-painters.ts";
-import { ownerBadge } from "./owner-badge.ts"; // #48
-import { zLayer } from "./official-sprite.ts";
+import { ownerBadge } from "./owner-badge.ts";
+import { spriteAt, zLayer } from "./official-sprite.ts";
 
 const THORIUM_TYPE = "T";
 
@@ -31,11 +31,7 @@ function sprite(
   scale = 1,
 ): PrimitiveDraft | undefined {
   const found = ctx.seasonArt?.sprite(objectType, texture);
-  if (!found) return undefined;
-  const { x, y } = center(obj);
-  const width = (found.width / 100) * scale;
-  const height = (found.height / 100) * scale;
-  return { part, kind: "image", layer, x: x - width / 2, y: y - height / 2, width, height, url: found.url };
+  return found && spriteAt(obj, part, found.url, { width: found.width * scale, height: found.height * scale, layer });
 }
 
 /** 画法表里的一项；缺失时什么都不画 */
@@ -48,7 +44,7 @@ const reactor =
     const edge = sprite(obj, ctx, "edge", "reactor", "reactor-edge", LAYER.structure);
     if (!core || !edge) return fallback(obj, ctx);
     const prims: PrimitiveDraft[] = [core, edge];
-    prims.push(...ownerBadge(obj, ctx, { radius: 29, layer: LAYER.structure })); // #48
+    prims.push(...ownerBadge(obj, ctx, { radius: 29, layer: LAYER.structure }));
     const fraction = storeFraction(obj);
     if (fraction !== undefined) prims.push(tileBar(obj, "store", fraction, THORIUM, ctx));
     return prims;
@@ -98,23 +94,15 @@ export function seasonMetadataPainter(objectType: string, art: SeasonArt | undef
   const main = art?.mainSprite(objectType);
   if (!main) return undefined;
   return (obj, ctx) => {
-    const { x, y } = center(obj);
-    const width = main.width / 100;
-    const height = main.height / 100;
     const tint = main.tint === "owner" ? ctx.ownerColor(obj["user"]) : main.tint;
     return [
-      {
-        part: "body",
-        kind: "image",
+      spriteAt(obj, "body", main.url, {
+        width: main.width,
+        height: main.height,
         layer: zLayer(main.zIndex),
-        x: x - width / 2,
-        y: y - height / 2,
-        width,
-        height,
-        url: main.url,
         ...(tint === undefined ? {} : { tint }),
         ...(main.alpha === undefined ? {} : { alpha: main.alpha }),
-      },
+      }),
     ];
   };
 }

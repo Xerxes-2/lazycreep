@@ -5,7 +5,7 @@
 import { BufferImageSource, Texture } from "pixi.js";
 import { isPixelImageUrl } from "./image-sources.ts";
 import { decodePixelImage } from "./pixel-image.ts";
-import type { TextureLoader } from "./pixi-scene-view.ts";
+import type { TextureLoader } from "./texture-sources.ts";
 
 export function withPixelImages(loader: TextureLoader): TextureLoader {
   const made = new Map<string, Texture>();

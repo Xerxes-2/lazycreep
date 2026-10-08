@@ -31,6 +31,11 @@ export interface SpriteOptions {
 
 /** 以格子中心为锚点摆一张官方贴图（对应官方 `sprite` processor）。 */
 export function officialSprite(obj: RoomObject, part: string, name: OfficialSvgName, options: SpriteOptions): PrimitiveDraft {
+  return spriteAt(obj, part, officialArtUrl(name), options);
+}
+
+/** 同 {@link officialSprite}，贴图按 URL 给出（赛季服下发的贴图等） */
+export function spriteAt(obj: RoomObject, part: string, url: string, options: SpriteOptions): PrimitiveDraft {
   const { x, y } = center(obj);
   const width = u(options.width);
   const height = u(options.height ?? options.width);
@@ -45,7 +50,7 @@ export function officialSprite(obj: RoomObject, part: string, name: OfficialSvgN
     y: y - ay * height,
     width,
     height,
-    url: officialArtUrl(name),
+    url,
     ...(rotated ? { rotation: options.rotation, pivotX: x, pivotY: y } : {}),
     ...(options.tint === undefined ? {} : { tint: options.tint }),
     ...(options.alpha === undefined ? {} : { alpha: options.alpha }),
