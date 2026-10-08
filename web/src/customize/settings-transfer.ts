@@ -31,6 +31,7 @@ import { OWNERSHIP_BUDGET_STORAGE } from "../map/ownership-budget.ts";
 import { COLOR_SCHEME_STORAGE } from "./color-scheme.ts";
 import { KEYBINDINGS_STORAGE } from "./keybindings.ts";
 import { UI_THEME_STORAGE } from "./ui-theme.ts";
+import { RENDER_BACKEND_STORAGE } from "../scene/render-backend.ts";
 
 export const SETTINGS_FORMAT = "my-screeps-client/settings";
 export const SETTINGS_VERSION = 1;
@@ -40,6 +41,7 @@ export const STORED_KEYS: readonly StoredKey[] = [
   CONNECTION_STORAGE,
   LOCALE_STORAGE,
   UI_THEME_STORAGE,
+  RENDER_BACKEND_STORAGE,
   COLOR_SCHEME_STORAGE,
   KEYBINDINGS_STORAGE,
   ALLY_LIST_STORAGE,

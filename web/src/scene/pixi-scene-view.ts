@@ -11,6 +11,7 @@
  *   滤镜以 MULTIPLY 把合成好的光照图盖到世界里它之下的一切上（官方 lighting 图层的做法）。离屏合成只发生在
  *   本来就要画的帧里，不额外请求帧。Canvas 渲染器没有滤镜，那里不画光照组（官方同样在非 WebGL 时隐藏光照）
  */
+import { readRenderBackend, reportRenderBackend, type RenderBackend } from "./render-backend.ts";
 import { AlphaFilter, Container, Graphics, RendererType, Sprite, Text, Texture, Ticker, autoDetectRenderer, type Renderer } from "pixi.js";
 import { withCompositeImages } from "./composite-textures.ts";
 import { withPixelImages } from "./pixel-textures.ts";
@@ -37,6 +38,8 @@ export interface SceneViewOptions {
   readonly resolution?: number;
   /** 测试或特殊环境里换掉渲染器 */
   readonly renderer?: SceneRenderer;
+  /** 渲染接口偏好；默认读设置（render-backend.ts，默认 WebGL）。不支持 WebGPU 时 Pixi 退回 WebGL */
+  readonly backend?: RenderBackend;
   /** 安排一帧，默认 requestAnimationFrame */
   readonly schedule?: (frame: () => void) => void;
   /** 动画用的时钟（毫秒），默认 performance.now */
@@ -392,8 +395,11 @@ export async function createSceneView(options: SceneViewOptions): Promise<SceneV
       resolution: options.resolution ?? globalThis.devicePixelRatio ?? 1,
       autoDensity: true,
       antialias: true,
-      preference: "webgl",
+      preference: options.backend ?? readRenderBackend(),
     }));
+  reportRenderBackend(
+    renderer.type === RendererType.WEBGPU ? "webgpu" : renderer.type === RendererType.CANVAS ? "canvas" : "webgl",
+  );
   const schedule = options.schedule ?? ((frame: () => void) => requestAnimationFrame(frame));
   const now = options.now ?? (() => performance.now());
 

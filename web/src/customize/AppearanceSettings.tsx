@@ -6,6 +6,7 @@ import { useI18n, type MessageKey } from "../i18n";
 import type { StrangerColoring } from "../scene/theme.ts";
 import { colorToHex, hexToColor, PALETTE_KEYS, type ColorScheme } from "./color-scheme.ts";
 import { UI_THEME_PREFERENCES, type UiThemeStore } from "./ui-theme.ts";
+import { activeRenderBackend, readRenderBackend, RENDER_BACKENDS, writeRenderBackend, type RenderBackend } from "../scene/render-backend.ts";
 
 export interface AppearanceSettingsProps {
   readonly uiTheme: UiThemeStore;
@@ -15,6 +16,13 @@ export interface AppearanceSettingsProps {
 export function AppearanceSettings(props: AppearanceSettingsProps) {
   const { t } = useI18n();
   const theme = () => props.colors.theme();
+  const [backend, setBackend] = createSignal<RenderBackend>(readRenderBackend());
+  /** 选的和页面打开时用的不一样：要刷新才生效 */
+  const loadedWith = backend();
+  const chooseBackend = (choice: RenderBackend) => {
+    writeRenderBackend(choice);
+    setBackend(choice);
+  };
   const [playerName, setPlayerName] = createSignal("");
   const [playerColor, setPlayerColor] = createSignal("#ff8800");
 
@@ -46,6 +54,31 @@ export function AppearanceSettings(props: AppearanceSettingsProps) {
             </label>
           )}
         </For>
+      </fieldset>
+
+      <fieldset class="settings__group" data-testid="render-backend">
+        <legend>{t("customize.renderBackend.title")}</legend>
+        <For each={RENDER_BACKENDS}>
+          {(choice) => (
+            <label>
+              <input type="radio" name="render-backend" value={choice} checked={backend() === choice} onChange={() => chooseBackend(choice)} />
+              {t(`customize.renderBackend.${choice}` as MessageKey)}
+            </label>
+          )}
+        </For>
+        <p class="settings__muted" data-render-backend-active>
+          {t("customize.renderBackend.active", {
+            backend: activeRenderBackend() ? t(`customize.renderBackend.name.${activeRenderBackend()!}` as MessageKey) : "—",
+          })}
+        </p>
+        <Show when={backend() !== loadedWith}>
+          <p class="settings__muted" data-render-backend-reload>
+            {t("customize.renderBackend.reload")}{" "}
+            <button type="button" data-action="reload" onClick={() => location.reload()}>
+              {t("customize.renderBackend.reloadNow")}
+            </button>
+          </p>
+        </Show>
       </fieldset>
 
       <fieldset class="settings__group">
