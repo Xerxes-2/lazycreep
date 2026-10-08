@@ -211,7 +211,6 @@ export const zhCN = {
   "shell.menu.close": "关闭菜单",
   "shell.menu.back": "返回菜单列表",
   "shell.menu.server": "Server 与 token",
-  "shell.mainView": "主视图",
   "shell.sidebar": "侧栏",
   "shell.sidebar.toggle": "收起或展开侧栏",
   "shell.details.hint": "在房间视图里点选对象，详情显示在这里。",

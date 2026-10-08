@@ -52,16 +52,16 @@ describe("固定外壳（#24）", () => {
     container.remove();
   });
 
-  it("Main View 一次只显示一个视图：M 键与 Top Bar 按钮在 World Map 与 Room View 之间切换", () => {
+  it("Main View 一次只显示一个视图：M 键切换；Room View 里的“返回地图”回到 World Map；Top Bar 没有视图切换按钮", () => {
     mount();
+    expect(q("[data-action=main-view]")).toBeNull();
     expect(shownView()).toEqual(["map"]);
     press("m");
     expect(shownView()).toEqual(["room"]);
     press("M");
     expect(shownView()).toEqual(["map"]);
-    q<HTMLButtonElement>('[data-action=main-view][data-mode="room"]')!.click();
+    press("m");
     expect(shownView()).toEqual(["room"]);
-    expect(q('[data-action=main-view][data-mode="room"]')!.getAttribute("aria-pressed")).toBe("true");
     q<HTMLButtonElement>("button[data-action=back-to-map]")!.click();
     expect(shownView()).toEqual(["map"]);
   });

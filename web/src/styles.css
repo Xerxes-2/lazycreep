@@ -140,11 +140,6 @@ body {
   color: var(--accent);
 }
 
-.top-bar__views {
-  display: flex;
-  gap: 4px;
-}
-
 .top-bar__status {
   flex: 1;
   display: flex;

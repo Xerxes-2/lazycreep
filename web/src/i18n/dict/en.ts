@@ -213,7 +213,6 @@ export const en: Partial<Record<MessageKey, string>> = {
   "shell.menu.close": "Close menu",
   "shell.menu.back": "Back to the menu",
   "shell.menu.server": "Server and token",
-  "shell.mainView": "Main View",
   "shell.sidebar": "Sidebar",
   "shell.sidebar.toggle": "Collapse or expand the Sidebar",
   "shell.details.hint": "Select an object in the Room View to see its details here.",

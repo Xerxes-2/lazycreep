@@ -1,10 +1,11 @@
 /**
- * Top Bar（#24）：左端打开 Menu，随后是应用名与 Main View 切换；右端是 Sidebar、Console Panel 开合与语言切换。
+ * Top Bar（#24）：左端打开 Menu，随后是应用名；右端是 Sidebar、Console Panel 开合与语言切换。
+ * 不放 Main View 切换按钮：从 World Map 点房间进 Room View，Room View 里有“返回地图”，另有 M 键。
  * 状态信息（Server / Shard、连接、Tick、CPU，#25）放进 `top-bar__status` 槽位（children）。
  */
 import { Show, type ParentProps } from "solid-js";
-import { useI18n, type MessageKey } from "../i18n";
-import type { MainViewMode, ShellState } from "./shell-state.ts";
+import { useI18n } from "../i18n";
+import type { ShellState } from "./shell-state.ts";
 
 export interface TopBarProps {
   readonly shell: ShellState;
@@ -15,17 +16,6 @@ export interface TopBarProps {
 export function TopBar(props: ParentProps<TopBarProps>) {
   const { locale, setLocale, t } = useI18n();
   const shell = props.shell;
-  const viewButton = (mode: MainViewMode, label: MessageKey) => (
-    <button
-      type="button"
-      data-action="main-view"
-      data-mode={mode}
-      aria-pressed={shell.mainView() === mode}
-      onClick={() => shell.navigate({ view: mode })}
-    >
-      {t(label)}
-    </button>
-  );
   return (
     <header class="top-bar">
       <button
@@ -39,10 +29,6 @@ export function TopBar(props: ParentProps<TopBarProps>) {
         ☰
       </button>
       <h1 class="top-bar__title">{t("app.title")}</h1>
-      <div class="top-bar__views" role="group" aria-label={t("shell.mainView")}>
-        {viewButton("map", "worldMap.title")}
-        {viewButton("room", "roomView.title")}
-      </div>
       <div class="top-bar__status">{props.children}</div>
       <Show when={props.consoleToggle !== false}>
         <button type="button" data-action="toggle-console" aria-pressed={shell.consoleOpen()} onClick={() => shell.toggleConsole()}>
