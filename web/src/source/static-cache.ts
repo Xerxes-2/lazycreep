@@ -122,6 +122,9 @@ function serverStore(storage: KeyValueStorage | undefined, serverId: string) {
   };
 }
 
+/** 当前用户（getMe）的复用时长：回到 World Map 等短时间内的再次请求不再发 */
+export const ME_REUSE_MS = 60_000;
+
 /** 包装一个 Source：getShards / getWorldSize / getVersion / getTerrain / getRoomDecorations / getRoomSnapshot 走缓存，getTime 与 getMe 去重（#38），其余原样转发 */
 export function withStaticCache(source: Source, options: StaticCacheOptions): Source {
   const now = options.now ?? Date.now;
@@ -214,14 +217,21 @@ export function withStaticCache(source: Source, options: StaticCacheOptions): So
   const getTime = sharedTime((shard) => source.getTime(shard), now);
 
   /**
-   * 当前用户：只在途去重，不缓存（我的房间会变）。打开页面时徽章、地图、Minimap、Room View、攻击提醒同时要，
-   * 不去重就是 5–6 份 `auth/me` + `user/rooms`；浏览器还会把同一地址的并发 GET 排成队，最后一份要等好几秒。
+   * 当前用户：在途去重，结果只在内存里复用 {@link ME_REUSE_MS}（我的房间会变，不持久化）。
+   * 打开页面时徽章、地图、Minimap、Room View、攻击提醒同时要，每次回到 World Map 地图又要一次；
+   * 不去重就是 5–6 份 `auth/me` + `user/rooms`，浏览器还会把同一地址的并发 GET 排成队，最后一份要等好几秒。
    */
-  let me: Promise<UserInfo> | undefined;
-  const getMe = (): Promise<UserInfo> =>
-    (me ??= source.getMe().finally(() => {
-      me = undefined;
-    }));
+  let me: { at: number; value: Promise<UserInfo> } | undefined;
+  const getMe = (): Promise<UserInfo> => {
+    if (me && now() - me.at < ME_REUSE_MS) return me.value;
+    const entry = { at: now(), value: source.getMe() };
+    me = entry;
+    // 失败不复用：下次重新请求
+    entry.value.catch(() => {
+      if (me === entry) me = undefined;
+    });
+    return entry.value;
+  };
 
   return new Proxy(source, {
     get(target, prop) {

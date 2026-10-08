@@ -304,6 +304,14 @@ describe("LiveSource HTTP 请求", () => {
     expect(seen.map((r) => r.token)).toEqual([TOKEN, TOKEN]);
   });
 
+  it("同时在途的 auth/me 只发一次（CPU 频道的用户 id 与 getMe 共用）", async () => {
+    const { source, seen } = live({ token: TOKEN });
+    await Promise.all([source.getMe(), source.getMe()]);
+    expect(seen.filter((r) => r.url.pathname.endsWith("/auth/me"))).toHaveLength(1);
+    await source.getMe();
+    expect(seen.filter((r) => r.url.pathname.endsWith("/auth/me"))).toHaveLength(2);
+  });
+
   it("没有 token 时不带 X-Token", async () => {
     const { source, seen } = live();
     await source.getShards();

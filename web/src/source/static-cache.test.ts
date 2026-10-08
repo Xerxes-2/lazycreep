@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { FixtureSource, fixtureBundle } from "./fixture-source.ts";
 import { SERVER_PRESETS } from "./servers.ts";
 import type { ServerConfig, ServerVersion, ShardInfo, Source, UserInfo, WorldSize } from "./source.ts";
-import { SHARDS_FRESH_MS, WORLD_SIZE_FRESH_MS, staticCached } from "./static-cache.ts";
+import { ME_REUSE_MS, SHARDS_FRESH_MS, WORLD_SIZE_FRESH_MS, staticCached } from "./static-cache.ts";
 
 const bundle = fixtureBundle(
   Object.values(
@@ -89,21 +89,27 @@ describe("静态数据：在途去重", () => {
   });
 });
 
-describe("当前用户：在途去重、不缓存", () => {
-  it("同时多处要只发一次；结束后再要重新请求；失败也一样", async () => {
+describe("当前用户：在途去重，短时间复用", () => {
+  it("同时多处要只发一次；约 60 秒内复用，之后重新请求；失败不复用", async () => {
     const calls: Pending<UserInfo>[] = [];
     const factory = (server: ServerConfig): Source => {
       const base = new FixtureSource({ ...bundle, server }, { speed: Infinity });
       base.getMe = () => new Promise((resolve, reject) => calls.push({ resolve, reject }));
       return base;
     };
-    const source = staticCached(factory, { storage: memoryStorage() })(SEASON, "t");
+    const time = { now: 1_000_000 };
+    const source = staticCached(factory, { storage: memoryStorage(), now: () => time.now })(SEASON, "t");
     const me: UserInfo = { id: "u1", username: "me", rooms: {} };
     const both = Promise.all([source.getMe(), source.getMe()]);
     expect(calls).toHaveLength(1);
     calls[0]!.resolve(me);
     expect(await both).toEqual([me, me]);
 
+    time.now += ME_REUSE_MS - 1;
+    expect(await source.getMe()).toEqual(me);
+    expect(calls).toHaveLength(1);
+
+    time.now += 1;
     const failed = source.getMe();
     expect(calls).toHaveLength(2);
     calls[1]!.reject(new Error("down"));

@@ -93,6 +93,13 @@ interface RoomSubscription {
 
 type Query = Readonly<Record<string, string>>;
 
+/** `auth/me` 里用到的字段 */
+interface WireAuthMe {
+  readonly _id: string;
+  readonly username: string;
+  readonly badge?: unknown;
+}
+
 export class LiveSource implements Source {
   readonly server: ServerConfig;
   private readonly token: string | undefined;
@@ -104,6 +111,8 @@ export class LiveSource implements Source {
   private readonly socket: ChannelSocket;
   private room: RoomSubscription | undefined;
   private userId: Promise<string> | undefined;
+  /** 在途的 `auth/me`：CPU 频道要用户 id、getMe 要用户资料，打开页面时同时要，只发一次 */
+  private authMeInFlight: Promise<WireAuthMe> | undefined;
   private readonly pausable = new Set<PausableStream>();
   private hidden: boolean;
   private readonly offVisibility: Unsubscribe | undefined;
@@ -253,7 +262,7 @@ export class LiveSource implements Source {
   private userStream<T>(topic: string, listener: (data: T) => void, onError?: StreamErrorListener): Unsubscribe {
     let off: Unsubscribe | undefined;
     let cancelled = false;
-    const userId = (this.userId ??= this.api<{ _id: string }>("/auth/me").then((me) => me._id));
+    const userId = (this.userId ??= this.authMe().then((me) => me._id));
     userId.then(
       (id) => {
         if (!cancelled) off = this.pausableStream(`user:${id}/${topic}`, listener, onError);
@@ -342,8 +351,14 @@ export class LiveSource implements Source {
     return mapStatsFromWire(shard, await this.json<WireMapStats>(response, path), rooms);
   }
 
+  private authMe(): Promise<WireAuthMe> {
+    return (this.authMeInFlight ??= this.api<WireAuthMe>("/auth/me").finally(() => {
+      this.authMeInFlight = undefined;
+    }));
+  }
+
   async getMe(): Promise<UserInfo> {
-    const user = await this.api<{ _id: string; username: string; badge?: unknown }>("/auth/me");
+    const user = await this.authMe();
     const rooms = await this.api<{ shards: Readonly<Record<string, readonly string[]>> }>("/user/rooms", {
       id: user._id,
     });
