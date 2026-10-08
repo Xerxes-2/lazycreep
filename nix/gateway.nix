@@ -18,7 +18,7 @@ let
   caddyfile = ../gateway/Caddyfile;
 in
 writeShellApplication {
-  name = "my-screeps-gateway";
+  name = "lazycreep-gateway";
   runtimeInputs = [ caddy ];
   text = ''
     export MSC_WEB_ROOT="''${MSC_WEB_ROOT:-${web}}"

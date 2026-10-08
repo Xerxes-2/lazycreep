@@ -32,7 +32,7 @@
         {
           inherit (packages) web;
           # 允许名单与反代规则：起本地模拟上游，不触网
-          gateway = pkgs.runCommand "my-screeps-gateway-test" { nativeBuildInputs = [ pkgs.python3 ]; } ''
+          gateway = pkgs.runCommand "lazycreep-gateway-test" { nativeBuildInputs = [ pkgs.python3 ]; } ''
             python3 ${./gateway/test_gateway.py} ${./gateway/routes.json} ${pkgs.lib.getExe packages.gateway}
             touch $out
           '';

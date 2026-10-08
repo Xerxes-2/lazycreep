@@ -105,7 +105,7 @@ describe("设置导出 / 导入（#5）", () => {
 
   it("忽略未知键与类型不对的值；文件里的 token 不导入", () => {
     const report = importSettings(localStorage, {
-      format: "my-screeps-client/settings",
+      format: "lazycreep/settings",
       version: 1,
       settings: {
         "msc.allies": ["A"],
@@ -123,7 +123,7 @@ describe("设置导出 / 导入（#5）", () => {
 
   it("已删除的设置（#54 的画风）静默忽略：不写入、不列为无法识别；配色里已删除的颜色项也忽略", () => {
     const report = importSettings(localStorage, {
-      format: "my-screeps-client/settings",
+      format: "lazycreep/settings",
       version: 1,
       settings: {
         "msc.artStyle": "geometric",
@@ -143,7 +143,7 @@ describe("设置导出 / 导入（#5）", () => {
   it("不是设置文件时拒绝且不改动现有设置", () => {
     localStorage.setItem("msc.allies", '["Keep"]');
     expect(() => importSettings(localStorage, { hello: 1 })).toThrow();
-    expect(() => importSettings(localStorage, { format: "my-screeps-client/settings", version: 99, settings: {} })).toThrow();
+    expect(() => importSettings(localStorage, { format: "lazycreep/settings", version: 99, settings: {} })).toThrow();
     expect(localStorage.getItem("msc.allies")).toBe('["Keep"]');
   });
 

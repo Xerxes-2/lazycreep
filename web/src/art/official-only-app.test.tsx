@@ -97,7 +97,7 @@ describe("只有官方画风（#54）", () => {
   it("导入含画风字段的旧设置文件：不报错、不算无法识别的项、不写入，其余设置照常导入", async () => {
     mount();
     const report = importSettings(localStorage, {
-      format: "my-screeps-client/settings",
+      format: "lazycreep/settings",
       version: 1,
       settings: { "msc.artStyle": "geometric", "msc.allies": ["Friend"] },
     });
