@@ -78,6 +78,16 @@ function annularSector(cx: number, cy: number, inner: number, outer: number, fro
   return points;
 }
 
+/**
+ * 官方 creepBuildBody.js 画环时既用部件颜色画线（lineStyle），又把同一个颜色设成 tint；
+ * Pixi 的 tint 逐通道相乘，所以实际显示的是颜色的平方（c²/255），比颜色表更深、更饱和。
+ * 只在环上这样换算；详情里的部件网格按官方网页 CSS 的颜色，不染色。
+ */
+function selfTinted(color: Color): Color {
+  const ch = (shift: number) => Math.round((((color >> shift) & 0xff) ** 2) / 0xff) << shift;
+  return ch(16) | ch(8) | ch(0);
+}
+
 function bodyRing(obj: RoomObject, layer: number): PrimitiveDraft[] {
   const totals = new Map<string, number>();
   for (const { type, hits } of bodyOf(obj)) {
@@ -97,8 +107,8 @@ function bodyRing(obj: RoomObject, layer: number): PrimitiveDraft[] {
     const start = spec.back ? back : front;
     const angle = PART_ANGLE * (hits / MAX_PART_HITS);
     prims.push(
-      { part: `ring-${type}-r`, kind: "polygon", layer, points: annularSector(x, y, inner, outer, start, start + angle), fill: spec.color },
-      { part: `ring-${type}-l`, kind: "polygon", layer, points: annularSector(x, y, inner, outer, -(start + angle), -start), fill: spec.color },
+      { part: `ring-${type}-r`, kind: "polygon", layer, points: annularSector(x, y, inner, outer, start, start + angle), fill: selfTinted(spec.color) },
+      { part: `ring-${type}-l`, kind: "polygon", layer, points: annularSector(x, y, inner, outer, -(start + angle), -start), fill: selfTinted(spec.color) },
     );
     if (spec.back) back += angle;
     else front += angle;

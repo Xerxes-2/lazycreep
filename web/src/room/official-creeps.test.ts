@@ -14,6 +14,11 @@ import { roomStateFrom } from "./room-state.ts";
 import { seasonArt } from "../art/season-art.ts";
 import { FixtureSource, fixtureBundle } from "../source/fixture-source.ts";
 
+/** 官方身体环实际显示的颜色：颜色表（work 0xfde574、attack 0xf72e41、move 0xaab7c5）用自身染色，逐通道 c²/255 */
+const WORK = 0xfbce35;
+const ATTACK = 0xef0811;
+const MOVE = 0x718398;
+
 const theme = DEFAULT_THEME;
 const MY_BADGE = { type: 5, color1: "#ba0e09", color2: "#ffbf00", color3: "#ffbf00", param: -68, flip: false };
 const FOE_BADGE = { type: 24, color1: "#112233", color2: "#445566", color3: "#778899", param: 0, flip: true };
@@ -77,34 +82,41 @@ describe("官方 creep：身体部件环（creepBuildBody）", () => {
   const s = scene({ c: { type: "creep", x: 10, y: 10, user: "me1", body, hits: 550, hitsMax: 800 } });
   const ring = ringOf(s, "c");
 
+  it("环的颜色是官方实际显示的颜色：颜色表的颜色再用自身染色（Pixi tint 逐通道相乘），比颜色表更深、更饱和", () => {
+    const fills = new Set(ring.map((p) => p.fill));
+    expect(fills).toEqual(new Set([WORK, ATTACK, MOVE]));
+    // 颜色表原值（浅、泛白）不再出现
+    for (const raw of [0xfde574, 0xf72e41, 0xaab7c5]) expect(fills.has(raw)).toBe(false);
+  });
+
   it("同类部件合并成一段、左右对称各一块；carry、tough 与 0 HP 部件不进环", () => {
     const byType = new Map<number, number>();
     for (const p of ring) byType.set(p.fill!, (byType.get(p.fill!) ?? 0) + 1);
     expect(byType).toEqual(new Map([
-      [0xfde574, 2], // work
-      [0xf72e41, 2], // attack
-      [0xaab7c5, 2], // move
+      [WORK, 2],
+      [ATTACK, 2],
+      [MOVE, 2],
     ]));
   });
 
   it("弧长按存活 HP 计（每 100 HP 一份），受伤部件按比例缩短", () => {
     const spans = (fill: number) => ring.filter((p) => p.fill === fill).map(span);
-    for (const v of spans(0xfde574)) expect(v).toBeCloseTo(1.5 * PART, 3);
-    for (const v of spans(0xf72e41)) expect(v).toBeCloseTo(PART, 3);
-    for (const v of spans(0xaab7c5)) expect(v).toBeCloseTo(2 * PART, 3);
+    for (const v of spans(WORK)) expect(v).toBeCloseTo(1.5 * PART, 3);
+    for (const v of spans(ATTACK)) expect(v).toBeCloseTo(PART, 3);
+    for (const v of spans(MOVE)) expect(v).toBeCloseTo(2 * PART, 3);
   });
 
   it("前侧从正上方往两边排、HP 少的在前；move 在背面从正下方往两边排", () => {
     const at = (fill: number) => ring.filter((p) => p.fill === fill).map((p) => bearing(p, 10.5, 10.5));
-    const [attackA, attackB] = at(0xf72e41).map(Math.abs);
-    const [workA, workB] = at(0xfde574).map(Math.abs);
+    const [attackA, attackB] = at(ATTACK).map(Math.abs);
+    const [workA, workB] = at(WORK).map(Math.abs);
     expect(attackA).toBeCloseTo(PART / 2, 3);
     expect(attackB).toBeCloseTo(PART / 2, 3);
     expect(workA).toBeCloseTo(PART + 0.75 * PART, 3);
     expect(workB).toBeCloseTo(PART + 0.75 * PART, 3);
-    for (const b of at(0xaab7c5)) expect(Math.PI - Math.abs(b)).toBeCloseTo(PART, 3);
+    for (const b of at(MOVE)) expect(Math.PI - Math.abs(b)).toBeCloseTo(PART, 3);
     // 左右各一块
-    expect(at(0xf72e41).map(Math.sign).sort()).toEqual([-1, 1]);
+    expect(at(ATTACK).map(Math.sign).sort()).toEqual([-1, 1]);
   });
 
   it("有存活的 tough 时叠一圈 tough 贴图（120 单位），没有就不画；boost 不改变画法", () => {
