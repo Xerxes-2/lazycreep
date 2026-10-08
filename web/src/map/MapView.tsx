@@ -295,6 +295,8 @@ export function MapView(props: MapViewProps) {
   const update = (change: (cam: Viewport) => Viewport) => {
     const cam = camera();
     if (cam) setCamera(change(cam));
+    // 用户自己拖动 / 缩放了，就不再追着“回到地图时居中的房间”
+    props.link?.setFocusRoom(undefined);
   };
 
   /** 鼠标悬停 / 点按的房间（#28）；所有者随 MapState 更新 */
@@ -347,6 +349,20 @@ export function MapView(props: MapViewProps) {
   createEffect(() => {
     const link = props.link;
     if (link) onCleanup(link.bindCenterOn(centerOnRoom));
+  });
+
+  // 从 Room View 回到地图：以刚才的房间为中心、保持缩放。意图在用户拖动 / 缩放前一直有效，
+  // 所以地图显示后画布尺寸才测出来时会重新对准一次。
+  createEffect(() => {
+    const room = props.link?.focusRoom();
+    const state = mapState();
+    const { width, height } = canvasSize();
+    if (!room || !state || props.active === false) return;
+    const cam = untrack(camera);
+    if (!cam) return;
+    const at = findRoom(state, room);
+    if (!at) return;
+    setCamera(centerOn(at.x, at.y, width, height, cam.scale));
   });
 
   onMount(() => {

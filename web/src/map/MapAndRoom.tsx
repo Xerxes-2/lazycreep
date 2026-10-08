@@ -10,7 +10,7 @@
  * 地图、PvP Overview 与告警共用一个 OwnershipHub（同一份 map-stats 缓存与额度）与一个 PvP feed；
  * 所有 roomMap2（告警、Minimap、PvP 参战者、地图）经同一个订阅中心（source/room-map-hub.ts），总数受预算约束。
  */
-import { createMemo, createSignal, onCleanup, Show, type Accessor, type JSX } from "solid-js";
+import { createEffect, createMemo, createSignal, on, onCleanup, Show, untrack, type Accessor, type JSX } from "solid-js";
 import { pageVisibility, type VisibilitySignal } from "../power/visibility.ts";
 import { AttackAlert } from "../alert/AttackAlert.tsx";
 import type { AlertSettings } from "../alert/alert-settings.ts";
@@ -98,6 +98,18 @@ export function MapAndRoom(props: MapAndRoomProps) {
   // 窄屏底部面板的当前标签（#29）
   const tabs = createSheetTabs();
   const worldMap = createWorldMapLink();
+  // 从 Room View 回到地图（返回按钮、M 键、Top Bar、URL 都走 navigate）：以刚才的房间为中心
+  createEffect(
+    on(
+      () => shell.mainView(),
+      (view, previous) => {
+        if (view !== "map" || previous !== "room") return;
+        const room = untrack(() => shell.location().room);
+        if (room) worldMap.setFocusRoom(room);
+      },
+      { defer: true },
+    ),
+  );
   const layerPrefs = createMapLayerPrefs(browserStorage());
   // Room View 的区块（#26）：选中对象、房间状态、显示选项
   const [selectedId, setSelectedId] = createSignal<string>();
