@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createSignal } from "solid-js";
 import { render } from "solid-js/web";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { App } from "../App";
 import { I18nProvider } from "../i18n";
 import { createSettings } from "../settings/settings.ts";
-import { TopBarStatus } from "./TopBarStatus.tsx";
+import { TopBarStatus, type LiveTick } from "./TopBarStatus.tsx";
+import { LIVE_FRESH_MS } from "../power/tick-clock.ts";
 import { FixtureSource, fixtureBundle } from "../source/fixture-source.ts";
 import { TIME_REUSE_MS } from "../source/shared-time.ts";
 import type { ConnectionState, CpuUpdate, StreamErrorListener, Unsubscribe } from "../source/source.ts";
@@ -149,6 +151,63 @@ describe("Top Bar 状态（#25）", () => {
     );
     expect(reported[0]).toBeUndefined();
     await settle(() => expect(reported.some((ms) => typeof ms === "number" && ms > 0)).toBe(true));
+  });
+
+  it("Tick 速度先用 Shard 列表里服务器给的平均 Tick 时长", async () => {
+    localStorage.setItem("msc.settings", JSON.stringify({ serverId: "season", customServers: [], token: "", shards: {} }));
+    const reported: (number | undefined)[] = [];
+    dispose = render(
+      () => (
+        <I18nProvider>
+          <TopBarStatus
+            settings={createSettings(localStorage)}
+            sourceFor={() => new ProbeSource(bundle, { speed: Infinity })}
+            tickPollMs={60_000}
+            onMsPerTick={(ms) => reported.push(ms)}
+          />
+        </I18nProvider>
+      ),
+      container,
+    );
+    await settle(() => expect(reported.at(-1)).toBeCloseTo(3814.57, 1));
+    expect(container.querySelector("[data-status=tick]")!.textContent).toMatch(/3815 ms\/Tick/);
+  });
+
+  it("Room View 在流时 Tick 取房间流、不发 game/time；断流后恢复校准", async () => {
+    vi.useFakeTimers({ toFake: ["performance"] });
+    try {
+      localStorage.setItem("msc.settings", JSON.stringify({ serverId: "season", customServers: [], token: "", shards: {} }));
+      let source!: ProbeSource;
+      const [liveTick, setLiveTick] = createSignal<LiveTick>();
+      dispose = render(
+        () => (
+          <I18nProvider>
+            <TopBarStatus
+              settings={createSettings(localStorage)}
+              sourceFor={() => (source = new ProbeSource(bundle, { speed: Infinity }))}
+              tickPollMs={10}
+              liveTick={liveTick}
+            />
+          </I18nProvider>
+        ),
+        container,
+      );
+      const tickText = () => container.querySelector("[data-status=tick]")!.textContent!;
+      await settle(() => expect(source.timeRequests.length).toBeGreaterThan(0));
+      setLiveTick({ shard: "shardSeason", gameTime: 2_000_000, at: performance.now() });
+      await settle(() => expect(tickText()).toContain("2000000"));
+      const during = source.timeRequests.length;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(source.timeRequests.length).toBe(during);
+      // 别的 Shard 的房间流不算
+      setLiveTick({ shard: "shardB", gameTime: 5, at: performance.now() });
+      expect(tickText()).toContain("2000000");
+
+      vi.advanceTimersByTime(LIVE_FRESH_MS);
+      await settle(() => expect(source.timeRequests.length).toBeGreaterThan(during));
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("game/time 去重（#38）不吞掉 Top Bar 的采样：轮询间隔短于复用窗口时，每次轮询仍是一次新请求", async () => {

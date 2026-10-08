@@ -30,7 +30,7 @@ import { RouteNotice } from "./shell/RouteNotice.tsx";
 import { createShellState } from "./shell/shell-state.ts";
 import { registerShellShortcuts } from "./shell/shell-shortcuts.ts";
 import { TopBar } from "./shell/TopBar.tsx";
-import { TopBarStatus } from "./shell/TopBarStatus.tsx";
+import { TopBarStatus, type LiveTick } from "./shell/TopBarStatus.tsx";
 import { createUrlRouter, isReplayAddress } from "./shell/url-router.ts";
 import { LiveSource } from "./source/live-source.ts";
 import { sharedSources } from "./source/shared-source.ts";
@@ -89,6 +89,9 @@ function Shell(props: ShellOwnProps) {
   const dataSource = import.meta.env.DEV ? createDataSourceChoice() : undefined;
   // Top Bar 实测的 Tick 速度，Room View 在 Live 下按它算动画时长（#55）
   const [liveMsPerTick, setLiveMsPerTick] = createSignal<number>();
+  /** Room View 房间流的最新 Tick，交给 Top Bar（tick-clock.ts） */
+  const [liveTick, setLiveTick] = createSignal<LiveTick>();
+  const onLiveTick = (shard: string, gameTime: number) => setLiveTick({ shard, gameTime, at: performance.now() });
   // 导入设置后界面重建：回到导入那一项，显示导入结果
   if (props.lastImport) shell.openMenu("transfer");
 
@@ -145,6 +148,7 @@ function Shell(props: ShellOwnProps) {
           sourceFor={sourceFor}
           {...(props.tickPollMs === undefined ? {} : { tickPollMs: props.tickPollMs })}
           onMsPerTick={setLiveMsPerTick}
+          liveTick={liveTick}
         />
       </TopBar>
       <MapAndRoom
@@ -154,7 +158,7 @@ function Shell(props: ShellOwnProps) {
         allies={allies.set()}
         alerts={alerts}
         theme={colors.theme()}
-        roomView={{ shortcuts, dataSource: dataSource?.source, msPerTick: liveMsPerTick }}
+        roomView={{ shortcuts, dataSource: dataSource?.source, msPerTick: liveMsPerTick, onLiveTick }}
         createView={boot.wrapView(props.createView ?? createSceneView)}
         narrow={narrow}
         bottom={

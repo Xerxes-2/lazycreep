@@ -98,6 +98,8 @@ export interface RoomViewProps {
   readonly display?: RoomDisplay | undefined;
   /** Live 下的 Tick 速度（Top Bar 实测，毫秒 / Tick）：动画时长按它算（#55）；测出来之前按 1000 ms */
   readonly msPerTick?: Accessor<number | undefined> | undefined;
+  /** Live 房间流每来一帧带 Tick 号的数据就报一次（Top Bar 在流期间以它为准，不发 `game/time`） */
+  readonly onLiveTick?: ((shard: string, gameTime: number) => void) | undefined;
   /** 画面上的房间状态变化时回报（#26：房间信息区块） */
   readonly onShownState?: ((state: RoomState | undefined) => void) | undefined;
   /** 给了就由它进入 Replay（外壳经 navigate 打开 `#/replay?…`，#26）；不给时 Room View 自己打开 */
@@ -238,6 +240,7 @@ export function RoomView(props: RoomViewProps) {
             // 第一帧是全量：整体替换快照（不当增量合并，否则快照里已不存在的对象会残留）
             const first = !streaming;
             streaming = true;
+            if (tick.gameTime !== undefined) props.onLiveTick?.(current.shard, tick.gameTime);
             setRoomState((state) => reduceLiveTick(first ? undefined : state, tick));
           },
           setStreamError,

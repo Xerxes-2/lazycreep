@@ -3,31 +3,45 @@
  *
  * - 数据都来自全页共享 Source 的一份租约；租约按 `settings.server()` / `token()` 建，二者按值判等，
  *   所以切 Shard 不重建租约。
- * - Tick 不依赖 Room View：可见期间每 `tickPollMs` 轮询一次 `game/time`（匿名接口，一次一个整数），
- *   Tick 速度由相邻采样的 Tick 差与到达时间差估计（#14 的 TickRate）。页面隐藏时不轮询。
- *   WebSocket 上没有不依赖房间的逐 Tick 时间：`time` 帧只在连接时发一次，CPU 帧不带 Tick 号且到达时间不规则（实测）。
+ * - Tick 与 Tick 速度不必很准（tick-clock.ts）：Room View 在流时取房间流的 gameTime；否则 Tick 速度用
+ *   Shard 列表里服务器给的平均 Tick 时长，Tick 号按它从最近一次 `game/time` 往前推，每 `tickPollMs` 校准一次。
+ *   页面隐藏时不校准也不推算。WebSocket 上没有不依赖房间的逐 Tick 时间：`time` 帧只在连接时发一次，
+ *   CPU 帧不带 Tick 号且到达时间不规则（实测）。
  * - CPU 订阅 `user:<id>/cpu`，只在有 token 时订阅；页面隐藏时由 LiveSource 暂停该频道（#14）。
  *   该频道的负载只有 `{cpu, memory}`，没有 bucket（实测），所以显示 CPU 与 Memory。
  */
-import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onCleanup, Show, type Accessor } from "solid-js";
 import { useI18n, type MessageKey } from "../i18n";
 import { TopBarBadge } from "../badge/TopBarBadge.tsx";
-import { createTickRate } from "../power/tick-rate.ts";
-import { pageVisibility, pollWhileVisible, type VisibilitySignal } from "../power/visibility.ts";
+import { createTickClock } from "../power/tick-clock.ts";
+import { pageVisibility, pollWhileVisible, whileVisible, type VisibilitySignal } from "../power/visibility.ts";
 import type { SourceFactory } from "../settings/SettingsPage.tsx";
 import type { Settings } from "../settings/settings.ts";
 import type { ConnectionState, CpuUpdate, ShardInfo } from "../source/source.ts";
 import { useSharedSource } from "../source/use-shared-source.ts";
 
-/** 默认轮询间隔：每分钟 10 次，约占官方全局额度（120 次 / 分钟）的 8% */
-export const TICK_POLL_MS = 6000;
+/** 默认校准间隔：每分钟至多 1 次 `game/time`；Room View 在流时不发 */
+export const TICK_POLL_MS = 60_000;
+/** Tick 时长还不知道时推算 Tick 号的更新间隔 */
+const ADVANCE_FALLBACK_MS = 3000;
+
+/** Room View 房间流的一帧的 Tick */
+export interface LiveTick {
+  readonly shard: string;
+  readonly gameTime: number;
+  /** 到达时刻（performance.now()） */
+  readonly at: number;
+}
 
 export interface TopBarStatusProps {
   readonly settings: Settings;
   /** 应是全页共享的 Source */
   readonly sourceFor: SourceFactory;
   readonly visibility?: VisibilitySignal;
+  /** 校准（`game/time`）间隔；默认 TICK_POLL_MS */
   readonly tickPollMs?: number;
+  /** Room View 房间流的最新 Tick（只在 Live 时有）：在流期间以它为准、不发 `game/time` */
+  readonly liveTick?: Accessor<LiveTick | undefined>;
   /** 实测的 Tick 速度（毫秒 / Tick；测出来之前与换 Shard 后为 undefined）：外壳转给 Room View 算动画时长（#55） */
   readonly onMsPerTick?: (ms: number | undefined) => void;
 }
@@ -84,23 +98,52 @@ export function TopBarStatus(props: TopBarStatusProps) {
     setTick(undefined);
     setMsPerTick(undefined);
     if (current === undefined) return;
-    const rate = createTickRate();
+    const clock = createTickClock();
     let alive = true;
-    const off = pollWhileVisible(
+    const show = () => {
+      setTick(clock.tick());
+      setMsPerTick(clock.msPerTick());
+    };
+
+    // 服务器给的平均 Tick 时长（Shard 列表里本来就有）
+    createEffect(() => {
+      clock.setServerMs(shards()?.find((s) => s.name === current)?.tickMs);
+      show();
+    });
+    // Room View 的房间流：每 Tick 一帧
+    createEffect(() => {
+      const live = props.liveTick?.();
+      if (!live || live.shard !== current) return;
+      clock.live(live.gameTime, live.at);
+      show();
+    });
+    // 校准：Room View 在流时不发
+    const offCalibrate = pollWhileVisible(
       page,
       async () => {
-        // 只并入在途请求、不拿已到达的复用结果：Tick 速度要真实的到达时刻（#38）
+        if (clock.streaming()) return;
+        // 只并入在途请求、不拿已到达的复用结果：校准要真实的到达时刻（#38）
         const time = await src.getTime(current, { maxAgeMs: 0 });
         if (!alive) return;
-        rate.record(time);
-        setTick(time);
-        setMsPerTick(rate.msPerTick());
+        clock.calibrate(time);
+        show();
       },
       props.tickPollMs ?? TICK_POLL_MS,
     );
+    // 推算的 Tick 号：可见期间每到下一个 Tick 更新一次文字（只改 DOM 文本，不渲染画布）
+    const offAdvance = whileVisible(page, () => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const next = () => {
+        show();
+        timer = setTimeout(next, Math.max(500, clock.msPerTick() ?? ADVANCE_FALLBACK_MS));
+      };
+      next();
+      return () => clearTimeout(timer);
+    });
     onCleanup(() => {
       alive = false;
-      off();
+      offCalibrate();
+      offAdvance();
     });
   });
 
