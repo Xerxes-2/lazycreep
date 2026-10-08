@@ -5,10 +5,11 @@
  * - 徽章取房间流的 `users[obj.user].badge`，经 parseBadge → badgeSvg 成 `data:image/svg+xml` URL 的 image 图元。
  *   URL 按徽章内容缓存（badgeSvgUrl），适配层按 URL 共享一张纹理（同一玩家的 creep 与 controller 等按其中最大的尺寸栅格化）。
  * - 官方尺寸：controller 半径 37、spawn 与 powerSpawn 38（各自 metadata 的 ellipse3 / ellipse4）、creep / powerCreep 26。
- * - 没有主人：不画。有主人但没有可用徽章（如 Source Keeper）：照官方退路画主人色的纯色圆。
+ * - 没有主人：不画。有主人但没有可用徽章（如 Source Keeper）：照官方退路画纯色圆（主人色；powerSpawn 是 0x555555）。
  * - creep 等小徽章在缩放低于 {@link BADGE_MIN_ZOOM} 时也退成纯色圆。
  */
 import { badgeSvgUrl } from "../badge/badge-image.ts";
+import type { Color } from "../scene/scene.ts";
 import { parseBadge } from "../badge/badge.ts";
 import { u } from "./official-sprite.ts";
 import { center, type PaintContext, type PrimitiveDraft } from "./room-paint.ts";
@@ -32,6 +33,8 @@ export interface OwnerBadgeOptions {
    * 上沿在中心上方 top 处；官方单位。纯色圆退路仍在格子中心、按 radius。
    */
   readonly box?: { readonly size: number; readonly top: number };
+  /** 纯色圆退路的颜色；默认主人色（官方 spawn 的 badgeColor）。powerSpawn 是固定的 0x555555 */
+  readonly fallbackColor?: Color;
 }
 
 export function ownerBadge(obj: RoomObject, ctx: PaintContext, options: OwnerBadgeOptions): PrimitiveDraft[] {
@@ -40,7 +43,7 @@ export function ownerBadge(obj: RoomObject, ctx: PaintContext, options: OwnerBad
   const { x, y } = center(obj);
   const badge = parseBadge(ctx.users[user]?.["badge"]);
   if (!badge || (options.minZoom && ctx.zoom < BADGE_MIN_ZOOM)) {
-    return [{ part: "badge", kind: "circle", layer: options.layer, x, y, radius: u(options.radius), fill: ctx.ownerColor(user) }];
+    return [{ part: "badge", kind: "circle", layer: options.layer, x, y, radius: u(options.radius), fill: options.fallbackColor ?? ctx.ownerColor(user) }];
   }
   const size = u(options.box?.size ?? 2 * options.radius);
   const top = options.box ? y - u(options.box.top) : y - size / 2;

@@ -481,15 +481,19 @@ const road: ObjectPainter = (obj, ctx) => {
   return [{ part: "body", kind: "circle", layer: LAYER.road, x, y, radius: ROAD_RADIUS, fill: roadColor(ctx.decorations?.floor, ctx.lighting) }];
 };
 
+/** 公开 rampart 的颜色（rampart.metadata.js 的 rampartColor，未开 userOwnerColor）：自己绿、别人红 */
+const PUBLIC_RAMPART = { mine: 0x44ff44, others: 0xff4444 } as const;
+
 /**
- * rampart：公开的逐格画 rampart.svg（alpha 0.5、主人色染色）；非公开的画在房间级的合并图层里，
- * 这里只留一个不画任何东西的方块，供点选。
+ * rampart：公开的逐格画 rampart.svg（alpha 0.5，官方固定色：自己 0x44FF44、别人 0xFF4444）；非公开的画在
+ * 房间级的合并图层里，这里只留一个不画任何东西的方块，供点选。
  */
 const rampart: ObjectPainter = (obj, ctx) => {
   const { x, y } = center(obj);
   const cell = { part: "body", layer: LAYER.rampart, x: x - 0.5, y: y - 0.5, width: 1, height: 1 } as const;
   if (!obj["isPublic"]) return [{ ...cell, kind: "rect" }];
-  return [{ ...cell, kind: "image", url: officialArtUrl("rampart"), tint: ctx.ownerColor(obj["user"]), alpha: 0.5 }];
+  const tint = ctx.me !== undefined && obj["user"] === ctx.me ? PUBLIC_RAMPART.mine : PUBLIC_RAMPART.others;
+  return [{ ...cell, kind: "image", url: officialArtUrl("rampart"), tint, alpha: 0.5 }];
 };
 
 /**

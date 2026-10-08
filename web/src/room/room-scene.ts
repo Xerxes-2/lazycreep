@@ -130,6 +130,7 @@ export function buildRoomScene(
     ...(animation ? { animation } : {}),
     ...(decorations ? { decorations } : {}),
     ...(display.lighting ? { lighting: true } : {}),
+    ...(view.me === undefined ? {} : { me: view.me }),
     ...(display.animation ? { facings: { before: room.facing ?? NO_FACINGS, after: nextFacings(room.facing, previous, room.state) } } : {}),
   };
 

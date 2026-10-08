@@ -2,12 +2,12 @@
  * 玩家建筑的官方画法（spawn、extension、storage、tower、controller、source，terminal、link、lab、factory、
  * nuker、observer、power spawn、extractor、container）。
  * 照 screeps/renderer `metadata/src/objects/<类型>.metadata.js`（commit 见 public/official-art/SOURCE.txt）改写；
- * lighting 图层（glow）与闪烁不做，闪烁的部件取一个静态透明度；有界动画（ADR 0008）只有塔开火时炮塔转向（#55）。
+ * lighting 图层（glow 与遮罩）在 official-lighting.ts；闪烁不做，闪烁的部件取一个静态透明度；有界动画（ADR 0008）只有塔开火时炮塔转向（#55）。
  * 并入 official-painters.ts 的映射表。
  */
 import type { OfficialSvgName } from "../art/official-art.ts";
 import type { Color } from "../scene/scene.ts";
-import type { ObjectPainter, ObjectPainters, PrimitiveDraft } from "./room-paint.ts";
+import type { ObjectPainter, ObjectPainters, PaintContext, PrimitiveDraft } from "./room-paint.ts";
 import { center, num } from "./room-paint.ts";
 import type { RoomObject } from "./room-state.ts";
 import { ownerBadge } from "./owner-badge.ts";
@@ -225,7 +225,8 @@ const powerSpawn: ObjectPainter = (obj, ctx) => {
     { part: "outer", kind: "circle", layer, x, y, radius: 0.75, fill: 0x222222, stroke: { color: 0xcccccc, width: 0.07 } },
     { part: "ring", kind: "circle", layer, x, y, radius: 0.68, fill: 0x222222, stroke: { color: POWER, width: 0.1 } },
     circle(obj, "inner", 59, 0x181818, layer),
-    ...ownerBadge(obj, ctx, { radius: 38, layer }),
+    // 官方 powerSpawn 的 userBadge 退路色是 ellipse4 的 0x555555，不是主人色
+    ...ownerBadge(obj, ctx, { radius: 38, layer, fallbackColor: 0x555555 }),
   ];
   const arc = progressArc(obj, "power", 50, powerFraction, POWER, 10, layer);
   if (arc) prims.push(arc);
@@ -236,7 +237,16 @@ const powerSpawn: ObjectPainter = (obj, ctx) => {
 // ---- extractor（extractor.metadata.js：主人色贴图；冷却时的旋转不做） ----
 const extractor: ObjectPainter = (obj, ctx) => [officialSprite(obj, "body", "extractor", { width: 200, tint: ownerTint(obj, ctx), layer: zLayer(0) })];
 
-// ---- spawn（spawn.metadata.js：三个同心圆 + 徽章 + 按能量缩放的能量圈；没有贴图） ----
+// ---- spawn（spawn.metadata.js：三个同心圆 + 徽章 + 孵化弧 + 按能量缩放的能量圈；没有贴图） ----
+/** 孵化进度（官方 spawningAngle）：已过的时间占 needTime 的比例；不在孵化时 0 */
+function spawningFraction(obj: RoomObject, gameTime: number | undefined): number {
+  const spawning = obj["spawning"];
+  if (gameTime === undefined || typeof spawning !== "object" || spawning === null) return 0;
+  const { spawnTime, needTime } = spawning as Record<string, unknown>;
+  if (typeof spawnTime !== "number" || typeof needTime !== "number" || needTime <= 0) return 0;
+  return (needTime - (spawnTime - gameTime)) / needTime;
+}
+
 const spawn: ObjectPainter = (obj, ctx) => {
   const layer = zLayer(8);
   const cap = energyCapacity(obj);
@@ -246,6 +256,9 @@ const spawn: ObjectPainter = (obj, ctx) => {
     circle(obj, "inner", 59, 0x181818, layer),
     ...ownerBadge(obj, ctx, { radius: 38, layer }),
   ];
+  // 官方孵化时外圈的缩放脉动是常驻动画，不做
+  const arc = progressArc(obj, "spawning", 50, spawningFraction(obj, ctx.gameTime), 0xcccccc, 10, layer);
+  if (arc) prims.push(arc);
   if (scale > 0) prims.push(circle(obj, "energy", 38 * Math.min(1, scale), ENERGY, layer));
   return prims;
 };
@@ -378,12 +391,33 @@ const tower: ObjectPainter = (obj, ctx) => {
   return prims;
 };
 
-// ---- controller（controller.metadata.js：黑色底座 + 等级刻度 + 徽章 + 升级进度扇形 + 外圈） ----
+// ---- controller（controller.metadata.js：状态圈 + 黑色底座 + 等级刻度 + 徽章 + 升级进度扇形 + 外圈） ----
+/**
+ * 官方最先画的三种 0.05 透明圆（半径 110）：自己预定（绿）、别人预定或禁止升级（红，官方画两层）、安全模式。
+ * 官方的闪烁（blinking 0.05 → 0.4）是常驻动画，取静止值 0.05。
+ */
+function controllerStatus(obj: RoomObject, ctx: PaintContext, layer: number): PrimitiveDraft[] {
+  const ring = (part: string, fill: Color): PrimitiveDraft => ({ ...circle(obj, part, 110, fill, layer), alpha: 0.05 }) as PrimitiveDraft;
+  const reservation = obj["reservation"];
+  const reservedBy = typeof reservation === "object" && reservation !== null ? (reservation as Record<string, unknown>)["user"] : undefined;
+  const reserved = reservedBy !== undefined && reservedBy !== null;
+  const mine = reserved && ctx.me !== undefined && reservedBy === ctx.me;
+  const upgradeBlocked = num(obj, "upgradeBlocked");
+  const blocked = (upgradeBlocked !== undefined && ctx.gameTime !== undefined && upgradeBlocked > ctx.gameTime) || (reserved && !mine);
+  const safeMode = num(obj, "safeMode");
+  const out: PrimitiveDraft[] = [];
+  if (mine) out.push(ring("reserved", 0x33ff33));
+  if (blocked) out.push(ring("blocked", 0xff3333), ring("blocked-2", 0xff3333));
+  if (safeMode !== undefined && ctx.gameTime !== undefined && safeMode > ctx.gameTime) out.push(ring("safe-mode", 0xffd180));
+  return out;
+}
+
 const controller: ObjectPainter = (obj, ctx) => {
   const layer = zLayer(4);
   const level = Math.max(0, Math.min(8, num(obj, "level") ?? 0));
   const { x, y } = center(obj);
   const prims: PrimitiveDraft[] = [
+    ...controllerStatus(obj, ctx, layer),
     { part: "halo", kind: "circle", layer, x, y, radius: u(92), fill: 0xffffff, alpha: 0.05 },
     officialSprite(obj, "body", "controller", { width: 200, tint: 0x000000, layer }),
   ];
@@ -412,7 +446,9 @@ const source: ObjectPainter = (obj) => {
       width: 0.4,
       height: 0.4,
       radius: 0.15,
-      fill: 0x111111,
+      // 官方整块 Graphics 染 0x595026：填充 0x111111 × 0x595026；描边是白色 × 染色，染色在 0x595026 与 0x0e0c04
+      // 之间来回（常驻动画，不做），取起点 0x595026
+      fill: 0x060502,
       stroke: { color: 0x595026, width: 0.15 },
     },
   ];

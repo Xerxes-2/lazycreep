@@ -62,6 +62,8 @@ export interface PaintContext {
    * 没有时（光照关闭）地形与道路照旧自带环境光
    */
   readonly lighting?: boolean;
+  /** 当前用户 id（官方按“是不是自己”取固定颜色的部件用：公开 rampart、controller 的预定圈）；未知时为 undefined */
+  readonly me?: string | undefined;
 }
 
 /** 画法播放动画需要的上下文（action-animation.ts 的构件都收它） */
