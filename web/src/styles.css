@@ -166,7 +166,14 @@ body {
 .top-bar__tick,
 .top-bar__cpu {
   white-space: nowrap;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: var(--font-numeric);
+}
+
+/* Tick 与 CPU 是次要文字（#39） */
+.top-bar__cpu,
+.top-bar__tick {
+  font-size: var(--fs-small);
+  color: var(--color-secondary);
 }
 
 .top-bar__connection::before {
@@ -185,11 +192,11 @@ body {
 }
 
 .top-bar__connection[data-connection="unauthorized"] {
-  color: #d64545;
+  color: var(--color-danger);
 }
 
 .top-bar__connection[data-connection="unauthorized"]::before {
-  color: #d64545;
+  color: var(--color-danger);
 }
 
 .shell__body {
@@ -600,8 +607,8 @@ body {
 }
 
 .settings__help {
-  color: var(--muted);
-  font-size: 0.9rem;
+  color: var(--color-secondary);
+  font-size: var(--fs-small);
 }
 
 .settings__help p {
@@ -1363,23 +1370,33 @@ body {
 .map-layers label {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-3);
   min-height: 28px;
 }
 
+/* 指向房间（#39）：房间名粗体占首行，其余标签 / 值两列对齐 */
 .map-pointed {
   display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 2px 8px;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--space-2) var(--space-4);
   margin: 0;
+}
+
+.map-pointed dt {
+  font-size: var(--fs-small);
+  color: var(--color-secondary);
 }
 
 .map-pointed dd {
   margin: 0;
+  overflow-wrap: anywhere;
+  font-variant-numeric: var(--font-numeric);
 }
 
 .map-pointed__room {
-  font-weight: 600;
+  font-size: var(--fs-body);
+  font-weight: var(--weight-strong);
+  color: var(--color-primary);
 }
 
 /* URL 导航（#32）：无效地址的提示 */
@@ -1436,31 +1453,34 @@ body {
   margin: 0 auto;
 }
 
+/* 房间信息（#39）：标签 / 值两列对齐；标签次要色小字，值等宽数字 */
 .room-info {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
-  gap: 4px 10px;
+  gap: var(--space-2) var(--space-4);
+  align-items: baseline;
   margin: 0;
 }
 
 .room-info dt {
-  color: var(--muted);
+  font-size: var(--fs-small);
+  color: var(--color-secondary);
 }
 
 .room-info dd {
   margin: 0;
   overflow-wrap: anywhere;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: var(--font-numeric);
 }
 
 .display-options {
   display: grid;
-  gap: 6px;
+  gap: var(--space-1);
 }
 
 .display-options__item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-3);
   min-height: 32px;
 }

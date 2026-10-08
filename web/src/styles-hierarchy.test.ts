@@ -91,6 +91,34 @@ describe("Sidebar 的通用层级套用变量（#39）", () => {
   });
 });
 
+describe("其他区块套用同一套层级（#39）", () => {
+  const expectations: readonly (readonly [string, readonly RegExp[]])[] = [
+    // 房间信息：标签 / 值两列对齐，标签次要色，值等宽数字
+    [".room-info", [/grid-template-columns:\s*max-content\s+minmax\(0,\s*1fr\)/, /gap:\s*var\(--space-/]],
+    [".room-info dt", [/color:\s*var\(--color-secondary\)/, /font-size:\s*var\(--fs-small\)/]],
+    [".room-info dd", [/font-variant-numeric:\s*var\(--font-numeric\)/]],
+    // 指向房间：房间名粗体，标签次要色
+    [".map-pointed", [/grid-template-columns:\s*max-content\s+minmax\(0,\s*1fr\)/]],
+    [".map-pointed dt", [/color:\s*var\(--color-secondary\)/]],
+    [".map-pointed__room", [/font-weight:\s*var\(--weight-strong\)/, /color:\s*var\(--color-primary\)/]],
+    // 显示选项与图层开关：正文字号，统一间距
+    [".display-options__item", [/gap:\s*var\(--space-/]],
+    [".map-layers label", [/gap:\s*var\(--space-/]],
+    // Top Bar 状态：Tick 与 CPU 是次要文字
+    [".top-bar__cpu,\n.top-bar__tick", [/color:\s*var\(--color-secondary\)/, /font-size:\s*var\(--fs-small\)/]],
+  ];
+
+  it.each(expectations)("%s", (selector, patterns) => {
+    const body = rule(selector);
+    for (const pattern of patterns) expect(body, selector).toMatch(pattern);
+    usesTokens(body);
+  });
+
+  it("未授权的连接状态用危险色", () => {
+    expect(rule('.top-bar__connection[data-connection="unauthorized"]')).toMatch(/color:\s*var\(--color-danger\)/);
+  });
+});
+
 describe("PvP 卡片适配 260px 的 Sidebar（#39）", () => {
   /** 选择器含 pvp 的全部规则体 */
   const pvpRules = [...styles.matchAll(/(?:^|\n)([^{}\n]*pvp[^{}\n]*)\{([^}]*)\}/g)].map((m) => ({ selector: m[1]!.trim(), body: m[2]! }));
