@@ -160,6 +160,26 @@ describe("Minimap（#27）", () => {
     expect(roomMaps.filter((k) => NEAR_W13S28.includes(k) && k !== `${SHARD}/W13S28`)).toEqual([]);
   });
 
+  it("Replay 中只画地形与所有权：不订阅 roomMap2、没有位置点，区块上标注；回到 Live 恢复", async () => {
+    mount();
+    shell.navigate({ shard: SHARD, room: "W13S28" });
+    await settle(() => expect(minimapSubscriptions(NEAR_W13S28)).toEqual(NEAR_W13S28));
+    expect(container.querySelector("[data-testid=minimap-replay-note]")).toBeNull();
+
+    shell.navigate({ shard: SHARD, room: "W13S28", replay: { tick: 1024950 } });
+    expect(minimapSubscriptions(NEAR_W13S28)).toEqual([]);
+    expect(container.querySelector("[data-testid=minimap-replay-note]")).not.toBeNull();
+    await settle(() => {
+      const scene = scenes.get(minimapCanvas()!)!;
+      expect(scene.primitives.filter((p) => p.kind === "image")).toHaveLength(9);
+      expect(scene.primitives.filter((p) => p.kind === "circle")).toEqual([]);
+    });
+
+    shell.navigate({ shard: SHARD, room: "W13S28" });
+    await settle(() => expect(minimapSubscriptions(NEAR_W13S28)).toEqual(NEAR_W13S28));
+    expect(container.querySelector("[data-testid=minimap-replay-note]")).toBeNull();
+  });
+
   it("Replay 中点相邻格：以同一 Tick 打开该房间的 Replay", async () => {
     mount();
     shell.navigate({ shard: SHARD, room: "W13S28", replay: { tick: 1024950 } });

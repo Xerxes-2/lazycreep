@@ -199,6 +199,7 @@ export const zhCN = {
   "minimap.title": "小地图",
   "minimap.label": "以 {room} 为中心的 3×3 房间，点相邻房间切换过去",
   "minimap.noRoom": "还没有打开房间。",
+  "replay.minimapNoUnits": "回放中不显示单位",
 
   "shell.menu": "菜单",
   "shell.menu.open": "打开菜单",

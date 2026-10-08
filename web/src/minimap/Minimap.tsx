@@ -6,7 +6,9 @@
  * （Minimap 优先级仅次于告警；中心按动画帧合并分发，Scene 每帧至多重建一次）。区块不在屏幕上（不在 Room View、Sidebar 收起、区块折叠）
  * 或页面不可见时退掉全部订阅、不构建 Scene。
  *
- * 点相邻格经 shell.navigate 切房间；Replay 中以同一 Tick 打开该房间的 Replay。世界外的格子不可点。
+ * 点相邻格经 shell.navigate 切房间；Replay 中以同一（当前）Tick 打开该房间的 Replay。世界外的格子不可点。
+ * Replay 中只画地形与所有权：roomMap2 只有即时数据，与正在复盘的 Tick 对不上，所以不订阅、不画位置点，
+ * 区块上标注“回放中不显示单位”。
  */
 import { createEffect, createMemo, createSignal, onCleanup, onMount, Show, type Accessor } from "solid-js";
 import { useI18n } from "../i18n";
@@ -102,9 +104,10 @@ export function Minimap(props: { readonly ctx: SectionContext; readonly shown: A
 
   // roomMap2：每格一个，经订阅中心（按动画帧合并分发）
   const [positions, setPositions] = createSignal<Readonly<Record<string, RoomMapUpdate>>>({});
+  const replaying = createMemo(() => ctx.shell.location().replay !== undefined);
   const watched = createMemo<readonly RoomRef[]>(() => {
     const current = shard();
-    return active() && current !== undefined ? cells().map((room) => ({ shard: current, room })) : [];
+    return active() && !replaying() && current !== undefined ? cells().map((room) => ({ shard: current, room })) : [];
   });
   const granted = useRoomMapLease(
     ctx.roomMaps,
@@ -142,7 +145,7 @@ export function Minimap(props: { readonly ctx: SectionContext; readonly shown: A
       size: world,
       tileUrl: (room) => src.tileUrl(at.shard, room),
       rooms: known?.rooms ?? {},
-      positions: positions(),
+      positions: replaying() ? {} : positions(),
       ownerColor: color,
       theme,
     });
@@ -214,6 +217,11 @@ export function Minimap(props: { readonly ctx: SectionContext; readonly shown: A
     <div class="minimap">
       <Show when={!where()}>
         <p class="settings__muted">{t("minimap.noRoom")}</p>
+      </Show>
+      <Show when={where() && replaying()}>
+        <p class="settings__muted" data-testid="minimap-replay-note">
+          {t("replay.minimapNoUnits")}
+        </p>
       </Show>
       <Show when={viewError()}>
         {(message) => (

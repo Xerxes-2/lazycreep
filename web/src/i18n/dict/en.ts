@@ -201,6 +201,7 @@ export const en: Partial<Record<MessageKey, string>> = {
   "minimap.title": "Minimap",
   "minimap.label": "3×3 rooms around {room}; click a neighbouring room to go there",
   "minimap.noRoom": "No room open yet.",
+  "replay.minimapNoUnits": "Units are not shown during Replay",
 
   "shell.menu": "Menu",
   "shell.menu.open": "Open menu",
