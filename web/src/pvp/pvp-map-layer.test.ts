@@ -8,7 +8,11 @@ import { aggregatePvp, type PvpFeedData } from "./pvp-overview.ts";
 import { pvpMapLayers } from "./pvp-map-layer.ts";
 
 /** 102×102 的世界：W13S28 在世界坐标 (37, 79)，E0S0 在 (51, 51) */
-const state = mapStateFrom({ shard: "s", size: { width: 102, height: 102 }, tiles: { room: () => "", block: () => "" } });
+const state = mapStateFrom({
+  shard: "s",
+  size: { width: 102, height: 102 },
+  tiles: { room: () => "", block: () => "", sector: () => "" },
+});
 
 const nuke: Nuke = { id: "n1", shard: "s", room: "E0S0", x: 25, y: 10, landTime: 60_000, launchRoom: "W13S28" };
 const data: PvpFeedData = {

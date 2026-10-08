@@ -129,13 +129,13 @@ describe("World Map 页面", () => {
     container.remove();
   });
 
-  it("世界尺寸来自 Server，整张地图放进画布，远看时用 zoom2 块瓦片", async () => {
+  it("世界尺寸来自 Server，整张地图放进画布，远看时用 zoom1 扇区瓦片", async () => {
     mount();
     await settle(() => expect(shown.length).toBeGreaterThan(0));
     expect(lastScene()).toMatchObject({ width: 102, height: 102 });
     const tiles = lastScene().primitives.filter((p): p is ImagePrimitive => p.kind === "image");
     expect(tiles.length).toBeGreaterThan(0);
-    expect(tiles.every((p) => p.url.startsWith("/map-tiles/shardSeason/zoom2/"))).toBe(true);
+    expect(tiles.every((p) => p.url.startsWith("/map-tiles/shardSeason/zoom1/"))).toBe(true);
     expect(lastViewport()!.scale).toBeCloseTo(Math.min(canvas.width, canvas.height) / 102);
   });
 

@@ -232,6 +232,10 @@ describe("FixtureSource 一次性数据", () => {
     expect(source.blockTileUrl(SHARD, "W16S28")).toBe("/map-tiles/shardSeason/zoom2/W16S28.png");
   });
 
+  it("zoom1 扇区瓦片 URL 按扇区角房间命名", () => {
+    expect(source.sectorTileUrl(SHARD, "W19S20")).toBe("/map-tiles/shardSeason/zoom1/W19S20.png");
+  });
+
   it("世界尺寸以房间计", async () => {
     expect(await source.getWorldSize(SHARD)).toEqual({ width: 102, height: 102 });
   });

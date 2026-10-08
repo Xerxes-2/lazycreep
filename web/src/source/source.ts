@@ -309,6 +309,11 @@ export interface Source {
    * 传入的房间必须是块角（有符号坐标都是 4 的倍数），否则 CDN 返回 403。
    */
   blockTileUrl(shard: string, cornerRoom: string): string;
+  /**
+   * zoom1 扇区瓦片：一张图（200×200）覆盖 10×10 个房间，按扇区西北角的房间命名；
+   * 传入的房间必须是扇区角（有符号坐标都是 10 的倍数，如 W9N9、E0S0、E10S10），否则 CDN 返回 403。
+   */
+  sectorTileUrl(shard: string, cornerRoom: string): string;
   getWorldSize(shard: string): Promise<WorldSize>;
   /**
    * 房间的所有权、矿物与区域状态（`POST game/map-stats`，statName `minerals0`，

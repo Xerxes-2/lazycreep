@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_THEME } from "../scene/theme.ts";
 import type { ImagePrimitive, Primitive, RectPrimitive } from "../scene/scene.ts";
 import type { MapStats } from "../source/source.ts";
-import { MAP_LAYER, ROOM_TILE_MIN_ZOOM, buildMapScene, type MapView } from "./map-scene.ts";
+import { BLOCK_TILE_MIN_ZOOM, MAP_LAYER, ROOM_TILE_MIN_ZOOM, buildMapScene, type MapView } from "./map-scene.ts";
 import { applyMapStats, mapStateFrom, roomAtWorld, type MapState } from "./map-state.ts";
 
 const ME = "me-id";
@@ -12,6 +12,7 @@ const OTHER2 = "other3-id";
 const tiles = {
   room: (room: string) => `/tiles/${room}.png`,
   block: (corner: string) => `/tiles/zoom2/${corner}.png`,
+  sector: (corner: string) => `/tiles/zoom1/${corner}.png`,
 };
 
 /** 一个 102×102 的世界（与赛季服相同），W50 在世界坐标 0，E0 在 51。 */
@@ -104,7 +105,7 @@ describe("buildMapScene", () => {
     });
 
     it("块角在 0 两侧都按 4 对齐：E0S0、W3N3、E0N3", () => {
-      const scene = buildMapScene(world(), view({ zoom: 5, visible: { x0: 50.5, y0: 50.5, x1: 51.5, y1: 51.5 } }));
+      const scene = buildMapScene(world(), view({ zoom: BLOCK_TILE_MIN_ZOOM, visible: { x0: 50.5, y0: 50.5, x1: 51.5, y1: 51.5 } }));
       expect(images(scene.primitives).map((p) => p.url).sort()).toEqual(
         ["/tiles/zoom2/E0N3.png", "/tiles/zoom2/E0S0.png", "/tiles/zoom2/W3N3.png", "/tiles/zoom2/W3S0.png"].sort(),
       );
@@ -123,11 +124,44 @@ describe("buildMapScene", () => {
     });
 
     it("整个世界可见时块瓦片铺满世界", () => {
-      const scene = buildMapScene(world(), view({ zoom: 6 }));
+      const scene = buildMapScene(world(), view({ zoom: BLOCK_TILE_MIN_ZOOM }));
       // 有符号 x 从 -51 到 50：块角 -52..48，共 26 列；y 同理
       expect(images(scene.primitives)).toHaveLength(26 * 26);
       const keys = scene.primitives.map((p) => p.key);
       expect(new Set(keys).size).toBe(keys.length);
+    });
+
+    it("远景（低于 zoom2 阈值）用 zoom1 扇区瓦片：一张盖 10×10 个房间，按扇区西北角房间命名", () => {
+      const scene = buildMapScene(
+        world(),
+        view({ zoom: BLOCK_TILE_MIN_ZOOM - 1, visible: { x0: W13S28.x, y0: W13S28.y, x1: W13S28.x + 1, y1: W13S28.y + 1 } }),
+      );
+      // W13S28 在 x = -14，所在扇区的西北角是 x = -20（W19）、y = 20（S20）
+      expect(images(scene.primitives)).toEqual([
+        expect.objectContaining({ url: "/tiles/zoom1/W19S20.png", x: 31, y: 71, width: 10, height: 10 }),
+      ]);
+    });
+
+    it("扇区角在 0 两侧都按 10 对齐：E0S0、W9N9、E0N9、W9S0", () => {
+      const scene = buildMapScene(world(), view({ zoom: 5, visible: { x0: 50.5, y0: 50.5, x1: 51.5, y1: 51.5 } }));
+      expect(images(scene.primitives).map((p) => p.url).sort()).toEqual(
+        ["/tiles/zoom1/E0N9.png", "/tiles/zoom1/E0S0.png", "/tiles/zoom1/W9N9.png", "/tiles/zoom1/W9S0.png"].sort(),
+      );
+    });
+
+    it("整个世界可见的远景只用扇区角瓦片：102×102 的世界共 12×12 张", () => {
+      const scene = buildMapScene(world(), view({ zoom: 6 }));
+      const shown = images(scene.primitives);
+      // 有符号 x 从 -51 到 50：扇区角 -60..50，共 12 列；y 同理
+      expect(shown).toHaveLength(12 * 12);
+      for (const tile of shown) {
+        const corner = /zoom1\/([WE])(\d+)([NS])(\d+)\.png$/.exec(tile.url)!;
+        const signed = (dir: string, n: number) => (dir === "W" || dir === "N" ? -n - 1 : n);
+        expect(Math.abs(signed(corner[1]!, Number(corner[2])) % 10)).toBe(0);
+        expect(Math.abs(signed(corner[3]!, Number(corner[4])) % 10)).toBe(0);
+        expect(tile).toMatchObject({ width: 10, height: 10 });
+      }
+      expect(new Set(shown.map((p) => p.key)).size).toBe(shown.length);
     });
   });
 

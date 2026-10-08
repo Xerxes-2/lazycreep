@@ -12,7 +12,11 @@ const OTHER = "other-id";
 const NOW = 1_800_000_000_000;
 const DAY = 86_400_000;
 
-const tiles = { room: (room: string) => `/t/${room}.png`, block: (corner: string) => `/t/z2/${corner}.png` };
+const tiles = {
+  room: (room: string) => `/t/${room}.png`,
+  block: (corner: string) => `/t/z2/${corner}.png`,
+  sector: (corner: string) => `/t/z1/${corner}.png`,
+};
 
 function world(stats: Partial<MapStats> = {}): MapState {
   const base = mapStateFrom({ shard: "s", size: { width: 102, height: 102 }, tiles, me: ME });

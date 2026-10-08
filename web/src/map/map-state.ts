@@ -11,12 +11,14 @@
  */
 import type { MapStats, RoomStats, RoomUser, WorldSize } from "../source/source.ts";
 
-/** 瓦片地址；通常来自 Source.tileUrl / blockTileUrl。 */
+/** 瓦片地址；通常来自 Source.tileUrl / blockTileUrl / sectorTileUrl。 */
 export interface MapTiles {
   /** 单房间瓦片 */
   room(room: string): string;
   /** zoom2 块瓦片（4×4 个房间），参数是块西北角的房间 */
   block(cornerRoom: string): string;
+  /** zoom1 扇区瓦片（10×10 个房间），参数是扇区西北角的房间 */
+  sector(cornerRoom: string): string;
 }
 
 export interface MapState {

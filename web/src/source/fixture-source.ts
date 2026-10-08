@@ -280,6 +280,10 @@ export class FixtureSource implements Source {
     return `${this.server.tileRoot}/${shard}/zoom2/${cornerRoom}.png`;
   }
 
+  sectorTileUrl(shard: string, cornerRoom: string): string {
+    return `${this.server.tileRoot}/${shard}/zoom1/${cornerRoom}.png`;
+  }
+
   async getWorldSize(shard: string): Promise<WorldSize> {
     const body = await this.body<WorldSizeFixture>("worldSize", `${shard} 的世界尺寸`, (f) => f.meta.shard === shard);
     return { width: body.width, height: body.height };

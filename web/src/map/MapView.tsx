@@ -137,7 +137,11 @@ export function MapView(props: MapViewProps) {
           mapStateFrom({
             shard: current,
             size,
-            tiles: { room: (room) => src.tileUrl(current, room), block: (room) => src.blockTileUrl(current, room) },
+            tiles: {
+              room: (room) => src.tileUrl(current, room),
+              block: (room) => src.blockTileUrl(current, room),
+              sector: (room) => src.sectorTileUrl(current, room),
+            },
             me: untrack(me),
           }),
         );

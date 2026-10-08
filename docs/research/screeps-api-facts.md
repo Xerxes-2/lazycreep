@@ -59,6 +59,7 @@ World map (`/map/:shard`), room view, history replay, overview + per-room/power 
 - `/api/game/room-terrain` is limited to 360/h, far too few for a whole shard. The official client uses pre-rendered PNG tiles on the Screeps CDN instead:
   - Per room: `https://d3os7yery2usni.cloudfront.net/map/<shard>/<room>.png` (200 for `shard3/E0N0`, `shardSeason/E0N0`; ~0.5–1 KB each).
   - Zoomed blocks: `https://d3os7yery2usni.cloudfront.net/map/<shard>/zoom2/<room>.png`, keyed by the block's corner room (`shardSeason/zoom2/E0S0` -> 200, ~10 KB; `E0N0`/`W0N0` -> 403, i.e. not a block corner).
+  - Sector tiles (verified 2026-10-08, #35): `https://d3os7yery2usni.cloudfront.net/map/<shard>/zoom1/<room>.png`, 200×200 px covering 10×10 rooms (20 px/room), keyed by the sector's north-west corner room whose signed coordinates are multiples of 10 (`W9N9`, `E0S0`, `W59N59`, `E50S50` -> 200, ~20 KB inside the world, ~1 KB at the border; `W8N8` -> 403). The 102×102 season world needs 12×12 = 144 of them versus 676 zoom2 blocks.
   - `https://screeps.com/assets/map/...` redirects to the store; not a valid path.
 - **No CORS headers** on the CDN. `<img>` usage works cross-origin, but WebGL textures need CORS, so the Gateway must proxy the CDN path as well.
 
