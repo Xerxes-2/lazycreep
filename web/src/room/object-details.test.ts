@@ -182,18 +182,16 @@ describe("对象详情", () => {
     };
     const text = (d: ObjectDetails, key: string) => d.fields.find((f) => f.key === key)?.text;
 
-    it("运转中：连续运转多少 Tick（自哪个 Tick 起）、按每 Tick 1 个 T 还能运转多少 Tick", () => {
+    it("运转中：连续运转多少 Tick（自哪个 Tick 起）", () => {
       const d = describeObject(reactor, users, 1041831);
       expect(text(d, "streak")).toEqual({ key: "since", params: { ticks: 374, tick: 1041457 } });
-      expect(field(d, "fuelLeft")).toBe("220");
       expect(field(d, "store")).toBe("T 220 / 1000");
       expect(d.raw).toEqual([]);
     });
 
-    it("没在运转（launchTime 为 null）：显示未运转，不给还能运转多久", () => {
+    it("没在运转（launchTime 为 null）：显示未运转", () => {
       const d = describeObject({ ...reactor, launchTime: null, store: { T: 0 } }, users, 1041831);
       expect(text(d, "streak")).toEqual({ key: "idle" });
-      expect(field(d, "fuelLeft")).toBeUndefined();
     });
   });
 

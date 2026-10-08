@@ -110,7 +110,6 @@ export const zhCN = {
   "roomDetails.field.structureOwner": "原建筑所有者",
   "roomDetails.field.structureId": "原建筑 id",
   "roomDetails.field.streak": "连续运转",
-  "roomDetails.field.fuelLeft": "还能运转（Tick）",
   "roomDetails.value.idle": "未运转",
   "roomDetails.value.since": "{ticks} Tick（自 Tick {tick} 起）",
   "roomDetails.value.sinceTick": "自 Tick {tick} 起",

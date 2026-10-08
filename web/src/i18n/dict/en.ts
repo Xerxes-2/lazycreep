@@ -112,7 +112,6 @@ export const en: Partial<Record<MessageKey, string>> = {
   "roomDetails.field.structureOwner": "Structure owner",
   "roomDetails.field.structureId": "Structure id",
   "roomDetails.field.streak": "Running streak",
-  "roomDetails.field.fuelLeft": "Can keep running (ticks)",
   "roomDetails.value.idle": "Not running",
   "roomDetails.value.since": "{ticks} ticks (since tick {tick})",
   "roomDetails.value.sinceTick": "Since tick {tick}",
