@@ -6,6 +6,7 @@
  *   或显式 requestRender() 时安排一帧，同一帧内多次请求合并成一次 render
  */
 import { Container, Graphics, Sprite, Text, Texture, Ticker, autoDetectRenderer, type Renderer } from "pixi.js";
+import { withCompositeImages } from "./composite-textures.ts";
 import { withPixelImages } from "./pixel-textures.ts";
 import type { ImagePrimitive, Primitive, Scene, Stroke } from "./scene.ts";
 import { defaultTextures, svgPixelsPerUnit, type SvgRasterCache, type TextureLoader } from "./texture-sources.ts";
@@ -149,7 +150,10 @@ function createTextureCache(loader: TextureLoader, limit: number, onLoaded: () =
       const slot = slots.get(url);
       if (!slot) return;
       slot.users.delete(sprite);
-      if (slot.users.size === 0) {
+      if (slot.users.size === 0 && loader.transient?.(url)) {
+        slots.delete(url);
+        if (slot.texture) loader.unload(url);
+      } else if (slot.users.size === 0) {
         idle.add(url);
         evict();
       }
@@ -326,13 +330,13 @@ export async function createSceneView(options: SceneViewOptions): Promise<SceneV
   };
 
   const textures = createTextureCache(
-    withPixelImages(
+    withCompositeImages(withPixelImages(
       options.textures ??
         defaultTextures({
           ...(options.svgRasters ? { svg: options.svgRasters } : {}),
           pixelsPerUnit: svgPixelsPerUnit(options.resolution ?? globalThis.devicePixelRatio ?? 1),
         }),
-    ),
+    )),
     options.textureCacheSize ?? 512,
     () => requestRender(),
   );

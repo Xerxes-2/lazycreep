@@ -1,7 +1,7 @@
 /**
  * 官方房间美术（ADR 0006）：screeps/renderer 的 metadata/images 下全部 117 个 SVG（ISC），
  * 原样放在 `web/public/official-art/`，随构建产物发布并进入 PWA 预缓存；LICENSE.txt 与来源 commit
- * （SOURCE.txt）在同一目录。PNG 纹理不打包，由用到它的票按需加载。
+ * （SOURCE.txt）在同一目录。地形用到的 PNG 纹理见 official-textures.ts（按需加载、不预缓存）。
  *
  * Scene 的 image 图元用 {@link officialArtUrl} 得到的同源 URL 引用贴图；适配层按 URL 栅格化一次并缓存。
  */

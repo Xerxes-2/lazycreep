@@ -28,5 +28,6 @@ export function withPixelImages(loader: TextureLoader): TextureLoader {
       made.delete(url);
       texture.destroy(true);
     },
+    transient: (url) => loader.transient?.(url) ?? false,
   };
 }

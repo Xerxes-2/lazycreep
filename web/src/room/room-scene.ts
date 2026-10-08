@@ -15,6 +15,7 @@ import { nameLabel } from "./name-labels.ts";
 import type { ArtStyle } from "../art/art-style.ts";
 import type { SeasonArt } from "../art/season-art.ts";
 import { paintersFor } from "./official-painters.ts";
+import { officialRoomLayers } from "./official-terrain.ts";
 
 export { LAYER, ROOM_OBJECT_PAINTERS };
 export type { ObjectPainter, ObjectPainters, PaintContext, PrimitiveDraft };
@@ -120,7 +121,8 @@ export function buildRoomScene(
     ...(view.seasonArt ? { seasonArt: view.seasonArt } : {}),
   };
 
-  const primitives: Primitive[] = room.terrain ? terrainPrimitives(room.terrain, theme) : [];
+  const primitives: Primitive[] =
+    view.artStyle === "official" ? officialRoomLayers(room.state, room.terrain, ctx) : room.terrain ? terrainPrimitives(room.terrain, theme) : [];
   for (const [id, obj] of Object.entries(room.state.objects)) {
     if (num(obj, "x") === undefined || num(obj, "y") === undefined) continue;
     const type = obj["type"];

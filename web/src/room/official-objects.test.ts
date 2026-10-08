@@ -185,8 +185,8 @@ async function finalState(room: string): Promise<RoomState> {
   return state!;
 }
 
-/** 由别的票接手的类型：道路 / rampart / 墙（#46）、creep（#48）、赛季对象（#47） */
-const OTHER_TICKETS = new Set(["road", "rampart", "constructedWall", "creep", "powerCreep", "reactor"]);
+/** 由别的票接手的类型：creep（#48）、赛季对象（#47）；道路 / rampart / 墙已由 #46 接手 */
+const OTHER_TICKETS = new Set(["creep", "powerCreep", "reactor"]);
 
 describe("官方画风：录制房间里的对象都不再落到几何画法", () => {
   beforeEach(() => vi.useFakeTimers());

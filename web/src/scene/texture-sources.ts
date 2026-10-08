@@ -96,6 +96,8 @@ export interface TextureSize {
 export interface TextureLoader {
   load(url: string, size?: TextureSize): Promise<Texture>;
   unload(url: string): void;
+  /** 为 true 的贴图没有图元在用时立即卸载，不闲置等淘汰（#46 的大张合成贴图）；默认 false */
+  transient?(url: string): boolean;
 }
 
 export interface DefaultTexturesOptions {

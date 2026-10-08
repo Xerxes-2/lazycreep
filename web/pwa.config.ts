@@ -33,6 +33,8 @@ export const pwaOptions = {
   workbox: {
     // 官方美术（#42）：SVG 由上一条覆盖，随附的 ISC LICENSE 与来源说明也一并预缓存
     globPatterns: ["**/*.{js,css,html,svg,png,ico,woff2,webmanifest}", "official-art/*.txt"],
+    // 官方 PNG 纹理（#46，约 316 KB）只在官方画风画地形时按需请求、走 HTTP 缓存，不预缓存
+    globIgnores: ["official-art/textures/**"],
     navigateFallback: "index.html",
     navigateFallbackDenylist: [GATEWAY_PATHS],
     runtimeCaching: [],

@@ -262,6 +262,27 @@ describe("Pixi 适配层", () => {
         expect(textures.unloads).toEqual([]);
       });
 
+      it("transient 的贴图（#46 的合成贴图）没有图元在用就立即卸载，不闲置", async () => {
+        const frames = manualFrames();
+        const textures = manualTextures();
+        const view = await createSceneView({
+          width: 400,
+          height: 300,
+          renderer: await canvasRenderer(),
+          schedule: frames.schedule,
+          textures: { ...textures.textures, transient: (url: string) => url.startsWith("/big/") },
+        });
+        views.push(view);
+        view.show(imageScene(tile("t", "/big/W1N1"), tile("s", "/t/a.png", 1)));
+        await textures.resolve("/big/W1N1");
+        await textures.resolve("/t/a.png");
+        view.show(imageScene(tile("t", "/big/W2N2")));
+        expect(textures.unloads).toEqual(["/big/W1N1"]);
+        // 回到原来的贴图要重新加载
+        view.show(imageScene(tile("t", "/big/W1N1")));
+        expect(textures.loads).toEqual(["/big/W1N1", "/t/a.png", "/big/W2N2", "/big/W1N1"]);
+      });
+
       it("加载失败不抛错，也不触发渲染", async () => {
         const { view, step, textures } = await withTextures();
         view.show(imageScene(tile("a", "/t/missing.png")));

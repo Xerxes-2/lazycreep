@@ -19,6 +19,7 @@ import type { Color } from "../scene/scene.ts";
 import { center, num, type ObjectPainter, type ObjectPainters, type PrimitiveDraft } from "./room-paint.ts";
 import { ROOM_OBJECT_PAINTERS } from "./room-painters.ts";
 import { withSeasonArt } from "./season-official-painters.ts";
+import { CONNECTED_PAINTERS } from "./official-terrain.ts";
 import type { RoomObject } from "./room-state.ts";
 import { ENERGY, badgeSpot, circle, energyCapacity, energyStore, officialSprite, ownerTint, u, zLayer } from "./official-sprite.ts";
 import { OFFICIAL_STRUCTURE_PAINTERS, controllerProgress } from "./official-structures.ts";
@@ -199,6 +200,7 @@ export const OFFICIAL_PAINTERS: ObjectPainters = {
   controller,
   source,
   ...OFFICIAL_STRUCTURE_PAINTERS, ...OFFICIAL_WORLD_PAINTERS, // #45
+  ...CONNECTED_PAINTERS, // #46
 };
 
 const OFFICIAL_OBJECT_PAINTERS: ObjectPainters = withSeasonArt({ ...ROOM_OBJECT_PAINTERS, ...OFFICIAL_PAINTERS });

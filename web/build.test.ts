@@ -135,3 +135,20 @@ describe("官方美术随构建产物发布（#42）", () => {
     expect(precached.has("official-art/LICENSE.txt")).toBe(true);
   });
 });
+
+describe("官方 PNG 纹理按需加载（#46）", () => {
+  const textureDir = join(here, "public/official-art/textures");
+  const pngs = readdirSync(textureDir).filter((f) => f.endsWith(".png"));
+
+  it("4 张纹理在产物里，但不在 PWA 预缓存清单里", () => {
+    expect(pngs.sort()).toEqual(["ground-mask.png", "ground.png", "noise1.png", "noise2.png"]);
+    const sw = readFileSync(join(outDir, "sw.js"), "utf8");
+    const precached = [...sw.matchAll(/url:"([^"]+)"/g)].map((m) => m[1]!);
+    for (const png of pngs) {
+      expect(files).toContain(`official-art/textures/${png}`);
+      expect(precached.filter((url) => url.includes(png)), png).toEqual([]);
+    }
+    // 应用图标等其他 PNG 照常预缓存
+    expect(precached).toContain("icon-192.png");
+  });
+});
