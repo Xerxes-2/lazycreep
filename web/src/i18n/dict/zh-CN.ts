@@ -207,6 +207,8 @@ export const zhCN = {
   "shell.sidebar": "侧栏",
   "shell.sidebar.toggle": "收起或展开侧栏",
   "shell.details.hint": "在房间视图里点选对象，详情显示在这里。",
+  // World Map 单位图层（#44）
+  "worldMapSidebar.layers.units": "单位",
   // 窄屏（#29）
   "shell.sheet.tabs": "侧栏区块",
   "shell.sheet.close": "收起侧栏",

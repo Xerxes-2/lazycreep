@@ -8,24 +8,26 @@ import { nukeLayer, pvpHotspotLayer } from "../pvp/pvp-map-layer.ts";
 import { isRecord, readJson, writeJson, type KeyValueStorage, type StoredKey } from "../storage/local-store.ts";
 import { paintAlliedHighlight, paintMinerals, paintPowerBanks, paintRcl, paintZones } from "./map-info-layers.ts";
 import { paintOwnership, paintTiles, type MapLayerPainter } from "./map-scene.ts";
+import { paintUnits } from "./map-units.ts";
 
 const STORAGE_KEY = "msc.mapLayers";
 export const MAP_LAYERS_STORAGE: StoredKey = { key: STORAGE_KEY, kind: "json-object", role: "settings" };
 
 /** 开关，按 Sidebar 里的显示顺序 */
-export const MAP_LAYER_TOGGLES = ["ownership", "rcl", "minerals", "powerBanks", "zones", "pvp", "nukes"] as const;
+export const MAP_LAYER_TOGGLES = ["ownership", "rcl", "minerals", "powerBanks", "zones", "pvp", "nukes", "units"] as const;
 export type MapLayerToggle = (typeof MAP_LAYER_TOGGLES)[number];
 export type MapLayerSet = Readonly<Record<MapLayerToggle, boolean>>;
 
 const ALL_ON: MapLayerSet = Object.fromEntries(MAP_LAYER_TOGGLES.map((t) => [t, true])) as Record<MapLayerToggle, boolean>;
 
 /**
- * 按开关组成图层：地形瓦片、所有权（含我方 / 盟友高亮）、区域、RCL、矿物、Power Bank，
+ * 按开关组成图层：地形瓦片、所有权（含我方 / 盟友高亮）、单位（#44）、区域、RCL、矿物、Power Bank，
  * 再叠这个 Shard 的 PvP 热点与核弹（group 为 undefined 时没有）。
  */
 export function mapLayers(on: MapLayerSet, group?: PvpShardGroup): MapLayerPainter[] {
   const layers: MapLayerPainter[] = [paintTiles];
   if (on.ownership) layers.push(paintOwnership);
+  if (on.units) layers.push(paintUnits);
   if (on.zones) layers.push(paintZones);
   if (on.rcl) layers.push(paintRcl);
   if (on.minerals) layers.push(paintMinerals);

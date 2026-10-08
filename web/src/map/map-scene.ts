@@ -12,6 +12,7 @@ import { ownerColorRule } from "../room/room-detail-rules.ts";
 import { roomOwnership } from "../source/source.ts";
 import { paintAlliedHighlight, paintMinerals, paintPowerBanks, paintRcl, paintZones } from "./map-info-layers.ts";
 import { roomName, worldOffset, type MapState } from "./map-state.ts";
+import { paintUnits } from "./map-units.ts";
 
 /** 越大越靠上 */
 export const MAP_LAYER = {
@@ -179,6 +180,7 @@ export const paintOwnership: MapLayerPainter = (ctx) => {
 export const MAP_LAYERS: readonly MapLayerPainter[] = [
   paintTiles,
   paintOwnership,
+  paintUnits,
   paintZones,
   paintRcl,
   paintMinerals,

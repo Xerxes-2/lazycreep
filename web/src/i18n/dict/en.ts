@@ -209,6 +209,8 @@ export const en: Partial<Record<MessageKey, string>> = {
   "shell.sidebar": "Sidebar",
   "shell.sidebar.toggle": "Collapse or expand the Sidebar",
   "shell.details.hint": "Select an object in the Room View to see its details here.",
+  // World Map units layer (#44)
+  "worldMapSidebar.layers.units": "Units",
   // Narrow layout (#29)
   "shell.sheet.tabs": "Sidebar sections",
   "shell.sheet.close": "Collapse the Sidebar",

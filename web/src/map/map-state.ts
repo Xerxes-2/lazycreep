@@ -9,7 +9,7 @@
  * 扩展点（#3 PvP 热点等）：在这里加字段，然后在 map-scene 的 MAP_LAYERS 里加一层。
  * 房间级信息（RCL、矿物、新手区……）随 RoomStats 扩展（来自 map-stats）；Power Bank 来自 roomMap2。
  */
-import type { MapStats, RoomStats, RoomUser, WorldSize } from "../source/source.ts";
+import type { MapStats, RoomMapUpdate, RoomStats, RoomUser, WorldSize } from "../source/source.ts";
 
 /** 瓦片地址；通常来自 Source.tileUrl / blockTileUrl / sectorTileUrl。 */
 export interface MapTiles {
@@ -35,6 +35,8 @@ export interface MapState {
   readonly allies?: ReadonlySet<string>;
   /** 已订阅 roomMap2 的房间里的 Power Bank 位置（房间内格坐标）；没订阅过的房间不在里面 */
   readonly powerBanks: Readonly<Record<string, ReadonlyArray<readonly [number, number]>>>;
+  /** 订阅着 roomMap2 的房间最近一帧的全部点（单位图层，#44，见 map-units.ts）；退订的房间不在里面 */
+  readonly units: Readonly<Record<string, RoomMapUpdate>>;
 }
 
 export interface RoomCoord {
@@ -86,6 +88,7 @@ export function mapStateFrom(init: {
     rooms: {},
     users: {},
     powerBanks: {},
+    units: {},
   };
 }
 

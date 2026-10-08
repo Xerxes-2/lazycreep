@@ -6,8 +6,9 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { autoDetectRenderer, Texture } from "pixi.js";
-import type { Scene } from "./scene.ts";
+import type { ImagePrimitive, Scene } from "./scene.ts";
 import { createSceneView, type SceneRenderer, type SceneView } from "./pixi-scene-view.ts";
+import { encodePixelImage } from "./pixel-image.ts";
 
 function fake2dContext(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
   const noop = () => undefined;
@@ -238,6 +239,26 @@ describe("Pixi 适配层", () => {
         await textures.resolve("/t/a.png");
         expect(step()).toBe(2);
         expect(step()).toBe(2);
+      });
+
+      it("像素图就地解码成纹理、不经纹理加载器，以加色混合画出；淘汰时也不经加载器卸载", async () => {
+        const { view, step, textures } = await withTextures(0);
+        const rgba = new Uint8Array(2 * 2 * 4);
+        rgba.set([255, 242, 70, 255], 0);
+        const first = encodePixelImage({ width: 2, height: 2, rgba });
+        rgba.set([255, 150, 0, 255], 12);
+        const second = encodePixelImage({ width: 2, height: 2, rgba });
+        const units = (url: string): ImagePrimitive => ({ ...(tile("u", url) as ImagePrimitive), blend: "add" });
+
+        view.show(imageScene(tile("t", "/t/a.png"), units(first)));
+        expect(step()).toBe(1);
+        await Promise.resolve();
+        expect(step()).toBe(2);
+        view.show(imageScene(tile("t", "/t/a.png"), units(second)));
+        await Promise.resolve();
+        expect(step()).toBe(3);
+        expect(textures.loads).toEqual(["/t/a.png"]);
+        expect(textures.unloads).toEqual([]);
       });
 
       it("加载失败不抛错，也不触发渲染", async () => {

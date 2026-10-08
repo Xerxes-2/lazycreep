@@ -2,14 +2,16 @@
  * World Map 信息层的数据接线（#17），供 MapView 调用：
  * - Ally List 写进 MapState（着色与高亮由 buildMapScene 的层负责）
  * - 放大到 ICON_MIN_ZOOM 以上时经 roomMap2 订阅中心订阅可见房间（World Map 优先级最低，预算不够时先被截），
- *   把 Power Bank 写进 MapState
+ *   把 Power Bank 与全部点（单位图层，#44）写进 MapState；退订的房间的点随即丢掉
  * 矿物、RCL 与区域状态随 map-stats 由所有权加载器带回，这里不另发请求。
  */
 import { createEffect, createMemo, type Accessor, type Setter } from "solid-js";
-import { ROOM_MAP_PRIORITY, useRoomMapLease, type RoomMapHub } from "../source/room-map-hub.ts";
+import { ROOM_MAP_PRIORITY, roomMapKey, useRoomMapLease, type RoomMapHub } from "../source/room-map-hub.ts";
+import type { RoomMapUpdate } from "../source/source.ts";
 import { ICON_MIN_ZOOM } from "./map-info-layers.ts";
 import type { WorldRect } from "./map-scene.ts";
 import { applyPowerBanks, parseRoomName, withAllies, worldOffset, type MapState } from "./map-state.ts";
+import { applyRoomUnits, retainUnits } from "./map-units.ts";
 import { roomsByDistance } from "./room-map-feed.ts";
 
 export interface MapInfoOptions {
@@ -49,15 +51,46 @@ export function useMapInfo(options: MapInfoOptions): void {
     if (!w || !focus || !options.enabled() || focus.zoom < ICON_MIN_ZOOM) return [];
     return roomsByDistance(w.size, focus.rect).map((room) => ({ shard: w.shard, room }));
   });
-  useRoomMapLease(
+
+  // 订阅中心在一个动画帧里把各房间的最新一帧逐个分发：先攒下，同一轮分发结束后一次写进 MapState，
+  // Scene 每帧只重建一次（否则可见的上百个房间各触发一次）
+  let pending: Map<string, { shard: string; frame: RoomMapUpdate }> | undefined;
+  const commit = () => {
+    const batch = pending;
+    pending = undefined;
+    if (!batch) return;
+    setMapState((state) => {
+      let next = state;
+      for (const [room, { shard, frame }] of batch) {
+        if (!next || next.shard !== shard) continue;
+        next = applyRoomUnits(applyPowerBanks(next, room, frame["pb"] ?? []), room, frame);
+      }
+      return next;
+    });
+  };
+  const granted = useRoomMapLease(
     options.roomMaps,
     {
       priority: ROOM_MAP_PRIORITY.worldMap,
-      onFrame: (shard, room, frame) =>
-        setMapState((state) => (state && state.shard === shard ? applyPowerBanks(state, room, frame["pb"] ?? []) : state)),
+      onFrame: (shard, room, frame) => {
+        if (!pending) {
+          pending = new Map();
+          queueMicrotask(commit);
+        }
+        pending.set(room, { shard, frame });
+      },
     },
     wanted,
   );
+
+  createEffect(() => {
+    const channels = granted();
+    setMapState((state) => {
+      if (!state) return state;
+      const rooms = new Set([...Object.keys(state.units)].filter((room) => channels.has(roomMapKey(state.shard, room))));
+      return retainUnits(state, rooms);
+    });
+  });
 }
 
 /** 搜索框里的房间名 → 房间中心的世界坐标；不是房间名或在世界之外时 undefined。 */

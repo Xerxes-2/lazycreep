@@ -101,6 +101,8 @@ export interface ImagePrimitive extends PrimitiveBase {
   readonly width: number;
   readonly height: number;
   readonly url: string;
+  /** 混合方式，默认正常；"add" 为加色混合（World Map 单位图层） */
+  readonly blend?: "add";
 }
 
 export type Primitive =

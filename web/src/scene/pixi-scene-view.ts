@@ -16,6 +16,7 @@ import {
   autoDetectRenderer,
   type Renderer,
 } from "pixi.js";
+import { withPixelImages } from "./pixel-textures.ts";
 import type { ImagePrimitive, Primitive, Scene, Stroke } from "./scene.ts";
 
 /** 世界坐标到画布 CSS 像素：screen = world * scale + (x, y) */
@@ -38,7 +39,7 @@ export interface SceneViewOptions {
   readonly renderer?: SceneRenderer;
   /** 安排一帧，默认 requestAnimationFrame */
   readonly schedule?: (frame: () => void) => void;
-  /** image 图元的纹理加载与卸载，默认 fetch + createImageBitmap */
+  /** image 图元的纹理加载与卸载，默认 fetch + createImageBitmap；像素图（pixel-image.ts）总是就地解码，不经它 */
   readonly textures?: TextureLoader;
   /** 没有图元在用的纹理最多留多少张，超出时先卸载最早闲置的；默认 512 */
   readonly textureCacheSize?: number;
@@ -121,6 +122,7 @@ function createTextureCache(loader: TextureLoader, limit: number, onLoaded: () =
     sprite.position.set(p.x, p.y);
     sprite.setSize(p.width, p.height);
     sprite.alpha = p.alpha ?? 1;
+    sprite.blendMode = p.blend ?? "normal";
   };
 
   const evict = () => {
@@ -346,7 +348,7 @@ export async function createSceneView(options: SceneViewOptions): Promise<SceneV
   };
 
   const textures = createTextureCache(
-    options.textures ?? fetchTextures(),
+    withPixelImages(options.textures ?? fetchTextures()),
     options.textureCacheSize ?? 512,
     () => requestRender(),
   );
