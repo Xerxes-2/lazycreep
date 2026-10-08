@@ -1,5 +1,6 @@
 /**
- * 玩家名（#26 的显示选项）：creep 与 power creep 上方标出主人的玩家名。
+ * 玩家名（#26 的显示选项）：creep 与 power creep 下方标出主人的玩家名。
+ * 放在下方、格子之外：上方留给 say 气泡（#22），也避开格子下沿以内的血条 / 资源条。
  * 与血条同一条缩放规则（barsVisible）：看不清时只给选中对象画。
  */
 import { LAYER, center, type PaintContext, type PrimitiveDraft } from "./room-paint.ts";
@@ -19,7 +20,7 @@ export function nameLabel(obj: RoomObject, ctx: PaintContext): PrimitiveDraft | 
     kind: "text",
     layer: LAYER.label,
     x,
-    y: y - 0.7,
+    y: y + 0.7,
     text: name,
     size: 0.32,
     color: ctx.ownerColor(user),

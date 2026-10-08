@@ -35,7 +35,7 @@ const nameLabels = (scene: Scene) =>
   scene.primitives.filter((p) => p.kind === "text" && p.text === "Xerxes_2");
 
 describe("显示选项 → Room View 的 Scene", () => {
-  it("默认全开：RoomVisual、血条、creep 上方的玩家名都画出来", () => {
+  it("默认全开：RoomVisual、血条、creep 下方的玩家名都画出来", () => {
     const display = createRoomDisplayOptions(memoryStorage()).display();
     expect(display).toEqual({ say: true, visual: true, bars: true, names: true, lighting: true });
     const scene = build({ ...near, display });
@@ -44,7 +44,7 @@ describe("显示选项 → Room View 的 Scene", () => {
     const [label, ...more] = nameLabels(scene);
     expect(more).toEqual([]);
     expect(label).toMatchObject({ objectId: "c1", kind: "text" });
-    expect(label!.kind === "text" && label!.y).toBeLessThan(10.5);
+    expect(label!.kind === "text" && label!.y).toBeGreaterThan(10.5);
   });
 
   it("玩家名与血条一样，缩小到看不清时只给选中对象画", () => {
