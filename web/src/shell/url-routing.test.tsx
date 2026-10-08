@@ -170,8 +170,8 @@ describe("URL 导航（#32）", () => {
 
   it("“回看”打开的 Replay 写进地址（起始 Tick 与 latest）", async () => {
     mount();
-    await settle(() => expect(q('.pvp-overview tr[data-room="W17N21"]')).not.toBeNull());
-    q('.pvp-overview tr[data-room="W17N21"]')!.querySelector<HTMLButtonElement>("[data-action=replay-battle]")!.click();
+    await settle(() => expect(q('.pvp-overview [data-room="W17N21"]')).not.toBeNull());
+    q('.pvp-overview [data-room="W17N21"]')!.querySelector<HTMLButtonElement>("[data-action=replay-battle]")!.click();
     await flush();
     expect(location.hash).toBe("#!/season/history/shardSeason/W17N21?t=1025136&latest=1");
     expect(shownView()).toEqual(["room"]);

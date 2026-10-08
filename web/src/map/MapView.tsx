@@ -6,7 +6,7 @@
  * 视口按 Server + Shard 记在组件里：地图隐藏再显示、切走 Shard 再切回来都保持原样。
  * 是 Main View 的一种模式（#24）。
  */
-import { createEffect, createMemo, createSignal, For, on, onCleanup, onMount, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, on, onCleanup, onMount, Show, untrack } from "solid-js";
 import { useI18n } from "../i18n";
 import { useVisible } from "../power/use-visible.ts";
 import type { VisibilitySignal } from "../power/visibility.ts";
@@ -416,23 +416,6 @@ export function MapView(props: MapViewProps) {
   return (
     <section class="world-map" aria-labelledby="world-map-title">
       <h2 id="world-map-title">{t("worldMap.title")}</h2>
-      <div class="world-map__bar">
-        <Show when={source().server.sharded}>
-          <label>
-            {t("worldMap.shard")}
-            <select name="world-map-shard" onChange={(e) => settings.setShard(e.currentTarget.value)}>
-              <For each={shards() ?? []}>
-                {(info) => (
-                  <option value={info.name} selected={info.name === shard()}>
-                    {info.name}
-                  </option>
-                )}
-              </For>
-            </select>
-          </label>
-        </Show>
-        <span class="world-map__hint">{t("worldMap.hint")}</span>
-      </div>
       <Show when={!mapState() && !loadError() && !sizeError()}>
         <p class="settings__muted">{t("worldMap.loading")}</p>
       </Show>
@@ -453,7 +436,7 @@ export function MapView(props: MapViewProps) {
           </p>
         )}
       </Show>
-      <div class="world-map__canvas" ref={host} />
+      <div class="world-map__canvas" ref={host} title={t("worldMap.hint")} />
     </section>
   );
 }
