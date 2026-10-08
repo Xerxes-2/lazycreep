@@ -670,6 +670,7 @@ body {
 }
 
 .readings input,
+.readings select,
 .readings button {
   font: inherit;
   min-height: 36px;
@@ -701,18 +702,6 @@ body {
   font-size: 1.25rem;
 }
 
-.room-view__form {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  gap: 12px;
-}
-
-.room-view__form label {
-  display: grid;
-  gap: 4px;
-}
-
 .room-view input,
 .room-view select,
 .room-view button {
@@ -729,10 +718,6 @@ body {
   border-color: var(--accent);
   color: var(--accent);
   cursor: pointer;
-}
-
-.room-view__status {
-  font-variant-numeric: tabular-nums;
 }
 
 .room-view__canvas {

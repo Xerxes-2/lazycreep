@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createSignal } from "solid-js";
 import { render } from "solid-js/web";
 import { I18nProvider } from "../i18n";
 import type { Scene } from "../scene/scene.ts";
@@ -6,7 +7,8 @@ import type { SceneView, SceneViewOptions } from "../scene/pixi-scene-view.ts";
 import { createSettings } from "../settings/settings.ts";
 import { FixtureSource, fixtureBundle } from "../source/fixture-source.ts";
 import type { Source } from "../source/source.ts";
-import { RoomView } from "./RoomView.tsx";
+import type { DataSource } from "./data-source.ts";
+import { RoomView, type RoomViewProps } from "./RoomView.tsx";
 
 const bundle = fixtureBundle(
   Object.values(import.meta.glob<unknown>("../../../fixtures/season/*.json", { eager: true, import: "default" })),
@@ -17,6 +19,8 @@ let dispose: (() => void) | undefined;
 let shown: Scene[];
 let liveSources: Source[];
 let fixtureSources: Source[];
+let setOpen: (request: RoomViewProps["open"]) => void;
+let setDataSource: (source: DataSource) => void;
 
 /** 记录收到的 Scene，不真的画。 */
 async function fakeView(options: SceneViewOptions): Promise<SceneView> {
@@ -35,8 +39,12 @@ async function fakeView(options: SceneViewOptions): Promise<SceneView> {
 }
 
 function mount() {
-  dispose = render(
-    () => (
+  dispose = render(() => {
+    const [open, set] = createSignal<RoomViewProps["open"]>();
+    const [dataSource, setSource] = createSignal<DataSource>("server");
+    setOpen = set;
+    setDataSource = setSource;
+    return (
       <I18nProvider>
         <RoomView artStyle="geometric"
           settings={createSettings(localStorage)}
@@ -51,11 +59,12 @@ function mount() {
             return source;
           }}
           createView={fakeView}
+          open={open()}
+          dataSource={dataSource}
         />
       </I18nProvider>
-    ),
-    container,
-  );
+    );
+  }, container);
 }
 
 function field<T extends HTMLElement>(selector: string): T {
@@ -64,21 +73,13 @@ function field<T extends HTMLElement>(selector: string): T {
   return el;
 }
 
-function input(name: string, value: string) {
-  const el = field<HTMLInputElement | HTMLSelectElement>(`[name=${name}]`);
-  el.value = value;
-  el.dispatchEvent(new Event(el instanceof HTMLSelectElement ? "change" : "input", { bubbles: true }));
-}
-
+/** 从外部打开房间（外壳里由 World Map、Minimap、PvP 卡片与 URL 经 shell.navigate 交给 Room View） */
 function watch(shard: string, room: string) {
-  input("room-view-shard", shard);
-  input("room-view-room", room);
-  field<HTMLFormElement>("form[data-testid=room-view-form]").dispatchEvent(
-    new Event("submit", { bubbles: true, cancelable: true }),
-  );
+  setOpen({ shard, room });
 }
 
-const tick = () => field("[data-testid=room-view-tick]").textContent;
+/** 画面上的 Tick（Room View 根元素的 data-tick；没有时为 undefined） */
+const tick = () => field(".room-view").dataset.tick;
 const settle = (assertion: () => void) => vi.waitFor(assertion, { timeout: 3000, interval: 5 });
 
 describe("Room View 页面", () => {
@@ -97,17 +98,37 @@ describe("Room View 页面", () => {
     container.remove();
   });
 
-  it("选房间前不显示 Tick，画布已就位", async () => {
+  it("选房间前没有 Tick，画布已就位", async () => {
     mount();
-    expect(tick()).toBe("—");
-    expect(field("[data-testid=room-view-state]").textContent).toBe("已认证");
+    expect(tick()).toBeUndefined();
     await settle(() => expect(container.querySelector("canvas")).not.toBeNull());
     expect(shown).toHaveLength(0);
   });
 
+  it("画布上方没有房间表单与重复的状态文字，画布容器占满 Room View（#51）", async () => {
+    mount();
+    watch("shardSeason", "W13S28");
+    await settle(() => expect(tick()).toBe("1025238"));
+    const view = field(".room-view");
+    // 房间与 Shard 输入框、“打开”按钮、数据来源开关都不在 Room View 里
+    expect(view.querySelector("form, input, select")).toBeNull();
+    expect([...view.querySelectorAll("button")].map((b) => b.textContent)).not.toContain("打开");
+    // 连接状态与 Tick 速度只在 Top Bar
+    expect(view.querySelector(".room-view__status")).toBeNull();
+    expect(view.textContent).not.toMatch(/已认证|Tick 速度/);
+    // 根元素下只有读屏标题与画布舞台（无错误时）
+    expect([...view.children].map((el) => el.tagName === "H2" ? "h2" : el.className)).toEqual(["h2", "room-view__stage"]);
+    expect(view.querySelector(".room-view__stage > .room-view__frame > .room-view__canvas canvas")).not.toBeNull();
+    // 左侧按钮列（#26）仍浮在画布框里；Replay 控制条（#15 #26）仍在舞台里、画布框之后
+    expect(view.querySelector(".room-view__stage > .room-view__frame > .room-view__tools")).not.toBeNull();
+    setOpen({ shard: "shardSeason", room: "W13S28", replay: { tick: 1024937 } });
+    await settle(() => expect(view.querySelector(".room-view__stage > .room-view__frame + .room-view__replay")).not.toBeNull());
+    expect(view.dataset.mode).toBe("replay");
+  });
+
   it("选房间后画面逐 Tick 更新，界面显示当前 Tick", async () => {
     mount();
-    watch("shardSeason", "w13s28");
+    watch("shardSeason", "W13S28");
     await settle(() => expect(tick()).toBe("1025238"));
 
     // 首帧没有 gameTime，之后每帧一个新 Scene
@@ -124,9 +145,9 @@ describe("Room View 页面", () => {
 
   it("数据来源切到录制数据后由 FixtureSource 驱动", async () => {
     mount();
-    input("room-view-source", "recording");
+    setDataSource("recording");
     watch("shardSeason", "E13N21");
-    await settle(() => expect(tick()).not.toBe("—"));
+    await settle(() => expect(tick()).toBeDefined());
     expect(fixtureSources.length).toBeGreaterThan(0);
     expect(shown.at(-1)!.primitives.length).toBeGreaterThan(0);
   });

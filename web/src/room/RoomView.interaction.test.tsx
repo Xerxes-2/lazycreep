@@ -2,6 +2,7 @@
  * #12：Room View 的交互——点选与详情、缩放平移与视口持久化、相邻房间切换。
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createSignal } from "solid-js";
 import { render } from "solid-js/web";
 import { I18nProvider } from "../i18n";
 import type { Scene } from "../scene/scene.ts";
@@ -63,9 +64,13 @@ function trackingSource(): Source {
   return source;
 }
 
-function mount(detailsMount?: HTMLElement, open?: RoomViewProps["open"]) {
-  dispose = render(
-    () => (
+let setOpen: (request: RoomViewProps["open"]) => void;
+
+function mount(detailsMount?: HTMLElement, initial?: RoomViewProps["open"]) {
+  dispose = render(() => {
+    const [open, set] = createSignal<RoomViewProps["open"]>(initial);
+    setOpen = set;
+    return (
       <I18nProvider>
         <RoomView artStyle="geometric"
           settings={createSettings(localStorage)}
@@ -75,12 +80,11 @@ function mount(detailsMount?: HTMLElement, open?: RoomViewProps["open"]) {
           allies={new Set()}
           cameraStorage={{ getItem: (k) => storage.get(k) ?? null, setItem: (k, v) => void storage.set(k, v) }}
           detailsMount={detailsMount}
-          open={open}
+          open={open()}
         />
       </I18nProvider>
-    ),
-    container,
-  );
+    );
+  }, container);
 }
 
 function field<T extends HTMLElement>(selector: string): T {
@@ -89,22 +93,13 @@ function field<T extends HTMLElement>(selector: string): T {
   return el;
 }
 
-function input(name: string, value: string) {
-  const el = field<HTMLInputElement>(`[name=${name}]`);
-  el.value = value;
-  el.dispatchEvent(new Event("input", { bubbles: true }));
-}
-
+/** 从外部打开房间（外壳里由 World Map、Minimap、PvP 卡片与 URL 经 shell.navigate 交给 Room View） */
 function watch(room: string) {
-  input("room-view-shard", "shardSeason");
-  input("room-view-room", room);
-  field<HTMLFormElement>("form[data-testid=room-view-form]").dispatchEvent(
-    new Event("submit", { bubbles: true, cancelable: true }),
-  );
+  setOpen({ shard: "shardSeason", room });
 }
 
 const settle = (assertion: () => void) => vi.waitFor(assertion, { timeout: 3000, interval: 5 });
-const tick = () => field("[data-testid=room-view-tick]").textContent;
+const tick = () => field(".room-view").dataset.tick;
 const lastScene = () => shown.at(-1)!;
 const lastViewport = () => viewports.at(-1)!;
 

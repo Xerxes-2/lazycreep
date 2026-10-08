@@ -87,19 +87,16 @@ describe("快捷键接到页面（#5）", () => {
   });
 
   it("Live / Replay 切换", async () => {
+    // 按地址打开房间（#32）
+    history.replaceState(null, "", "/#!/season/room/shardSeason/W13S28");
     mount();
-    press(DEFAULT_KEYS["view.toggleMapRoom"]);
-    const room = container.querySelector<HTMLInputElement>("[name=room-view-room]")!;
-    room.value = "W13S28";
-    room.dispatchEvent(new Event("input", { bubbles: true }));
-    container.querySelector<HTMLFormElement>("[data-testid=room-view-form]")!.requestSubmit();
-    const status = () => container.querySelector(".room-view__status")!.textContent ?? "";
-    await settle(() => expect(container.querySelector("[data-testid=room-view-tick]")!.textContent).not.toBe("—"));
-    expect(status()).not.toContain("回放中");
+    const roomView = () => container.querySelector<HTMLElement>(".room-view")!.dataset;
+    await settle(() => expect(roomView().tick).toBeDefined());
+    expect(roomView().mode).toBe("live");
     press(DEFAULT_KEYS["replay.toggle"]);
-    await settle(() => expect(status()).toContain("回放中"));
+    await settle(() => expect(roomView().mode).toBe("replay"));
     press(DEFAULT_KEYS["replay.toggle"]);
-    await settle(() => expect(status()).not.toContain("回放中"));
+    await settle(() => expect(roomView().mode).toBe("live"));
   });
 
   it("重绑界面：冲突时提示，确认后改用并解除原绑定，立即生效", async () => {

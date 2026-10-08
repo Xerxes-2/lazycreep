@@ -21,6 +21,7 @@ import { I18nProvider, useI18n } from "./i18n";
 import { MapAndRoom } from "./map/MapAndRoom.tsx";
 import { pageVisibility } from "./power/visibility.ts";
 import { RawReadings } from "./readings/RawReadings.tsx";
+import { createDataSourceChoice } from "./room/data-source.ts";
 import { SettingsPage, type SourceFactory } from "./settings/SettingsPage.tsx";
 import { createSettings } from "./settings/settings.ts";
 import { mediaQuery, NARROW_QUERY } from "./shell/breakpoint.ts";
@@ -83,6 +84,8 @@ function Shell(props: ShellOwnProps) {
   registerShellShortcuts(shortcuts, shell, narrow);
   // URL 导航（#32）：地址 ↔ Main View 位置
   const router = createUrlRouter(shell, settings);
+  // Room View 的数据来源（#51）：只有开发构建能切到录制数据，开关在 Menu 的原始读数项里
+  const dataSource = import.meta.env.DEV ? createDataSourceChoice() : undefined;
   // 导入设置后界面重建：回到导入那一项，显示导入结果
   if (props.lastImport) shell.openMenu("transfer");
 
@@ -113,13 +116,13 @@ function Shell(props: ShellOwnProps) {
         <SettingsTransfer storage={browserStorage()} onImported={props.onImported} lastImport={props.lastImport} />
       ),
     },
-    // 开发用原始读数：生产构建不打包
+    // 开发用原始读数与数据来源开关：生产构建不打包
     ...(import.meta.env.DEV
       ? [
           {
             id: "readings",
             title: "readings.title",
-            render: () => <RawReadings settings={settings} sourceFor={sourceFor} />,
+            render: () => <RawReadings settings={settings} sourceFor={sourceFor} dataSource={dataSource} />,
           } satisfies MenuItemDef,
         ]
       : []),
@@ -148,7 +151,7 @@ function Shell(props: ShellOwnProps) {
         alerts={alerts}
         theme={colors.theme()}
         artStyle={artStyle.style()}
-        roomView={{ shortcuts }}
+        roomView={{ shortcuts, dataSource: dataSource?.source }}
         createView={boot.wrapView(props.createView ?? createSceneView)}
         narrow={narrow}
         bottom={

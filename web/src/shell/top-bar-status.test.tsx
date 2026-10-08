@@ -207,7 +207,7 @@ describe("Top Bar 状态（#25）", () => {
 
     q('.attack-alert__item[data-reason="stranger"]')!.querySelector<HTMLButtonElement>("[data-action=open-alert-room]")!.click();
     expect(shownView()).toEqual(["room"]);
-    expect(q<HTMLInputElement>("[name=room-view-room]")!.value).toBe("E13N21");
+    expect(q<HTMLElement>(".room-view")!.dataset.room).toBe("E13N21");
   });
 });
 

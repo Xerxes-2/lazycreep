@@ -60,14 +60,11 @@ export const en: Partial<Record<MessageKey, string>> = {
   "roomView.source": "Data source",
   "roomView.source.server": "Server",
   "roomView.source.recording": "Recorded data",
-  "roomView.open": "Open",
-  "roomView.tick": "Tick",
 
   "power.tickRate": "Tick speed",
   "power.msPerTick": "{ms} ms/Tick",
 
   "replay.enter": "Replay",
-  "replay.mode": "Replaying",
   "replay.backToLive": "Back to Live",
   "replay.play": "Play",
   "replay.pause": "Pause",

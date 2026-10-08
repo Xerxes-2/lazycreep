@@ -140,7 +140,7 @@ describe("快捷键目录（#30）", () => {
     mount();
     expect(mainView()).toBe("room");
     await settle(() => expect(q("[data-testid=replay-controls]")).not.toBeNull());
-    const tick = () => q("[data-testid=room-view-tick]")!.textContent;
+    const tick = () => q<HTMLElement>(".room-view")!.dataset.tick;
     await settle(() => expect(tick()).toBe("1024937"));
     const playLabel = () => q("[data-action=replay-toggle]")!.getAttribute("aria-label");
 
@@ -156,12 +156,12 @@ describe("快捷键目录（#30）", () => {
     press(" ");
     expect(playLabel()).toBe("播放");
 
-    const status = () => q(".room-view__status")!.textContent ?? "";
-    expect(status()).toContain("回放中");
+    const mode = () => q<HTMLElement>(".room-view")!.dataset.mode;
+    expect(mode()).toBe("replay");
     press("r");
-    await settle(() => expect(status()).not.toContain("回放中"));
+    await settle(() => expect(mode()).toBe("live"));
     press("r");
-    await settle(() => expect(status()).toContain("回放中"));
+    await settle(() => expect(mode()).toBe("replay"));
   });
 
   it("数字键不再有面板动作", () => {

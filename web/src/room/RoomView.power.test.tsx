@@ -1,8 +1,10 @@
 /**
- * Room View 的省电规则（#14）：无新 Tick 不重绘、页面不可见时暂停渲染、显示 Tick 速度。
+ * Room View 的省电规则（#14）：无新 Tick 不重绘、页面不可见时暂停渲染。
+ * Tick 速度与连接状态只在 Top Bar 显示（#25 #51），见 shell/top-bar-status.test.tsx。
  * 用真实的 Pixi 适配层配一个只计数的渲染器，观察 render() 的调用次数。
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createSignal } from "solid-js";
 import { render } from "solid-js/web";
 import { I18nProvider } from "../i18n";
 import { manualVisibility, type ManualVisibility } from "../power/visibility.ts";
@@ -58,9 +60,13 @@ function countingRenderer(options: SceneViewOptions): SceneRenderer {
   } as unknown as SceneRenderer;
 }
 
+let open: (request: { shard: string; room: string }) => void;
+
 function mount() {
-  dispose = render(
-    () => (
+  dispose = render(() => {
+    const [request, setRequest] = createSignal<{ shard: string; room: string }>();
+    open = setRequest;
+    return (
       <I18nProvider>
         <RoomView artStyle="geometric"
           settings={createSettings(localStorage)}
@@ -69,11 +75,11 @@ function mount() {
           createView={(options) =>
             createSceneView({ ...options, renderer: countingRenderer(options), schedule: (frame) => frame() })
           }
+          open={request()}
         />
       </I18nProvider>
-    ),
-    container,
-  );
+    );
+  }, container);
 }
 
 function field<T extends HTMLElement>(selector: string): T {
@@ -82,26 +88,15 @@ function field<T extends HTMLElement>(selector: string): T {
   return el;
 }
 
-function input(name: string, value: string) {
-  const el = field<HTMLInputElement>(`[name=${name}]`);
-  el.value = value;
-  el.dispatchEvent(new Event("input", { bubbles: true }));
-}
-
 async function watch() {
   mount();
   await vi.waitFor(() => expect(container.querySelector("canvas")).not.toBeNull());
-  input("room-view-shard", "shardSeason");
-  input("room-view-room", "W13S28");
-  field<HTMLFormElement>("form[data-testid=room-view-form]").dispatchEvent(
-    new Event("submit", { bubbles: true, cancelable: true }),
-  );
+  open({ shard: "shardSeason", room: "W13S28" });
   room.tick({ objects: { a: portal(10) } });
   await vi.waitFor(() => expect(renders).toBeGreaterThan(0));
 }
 
-const tickText = () => field("[data-testid=room-view-tick]").textContent;
-const rateText = () => field("[data-testid=room-view-tick-rate]").textContent;
+const tickText = () => field(".room-view").dataset.tick;
 const quiet = () => new Promise((resolve) => setTimeout(resolve, 50));
 
 describe("Room View 省电", () => {
@@ -153,49 +148,5 @@ describe("Room View 省电", () => {
     await vi.waitFor(() => expect(renders - before).toBe(1));
     await quiet();
     expect(renders - before).toBe(1);
-  });
-
-  it("显示服务器 Tick 速度（毫秒 / Tick），基于最近 Tick 的到达间隔", async () => {
-    vi.useFakeTimers({ toFake: ["performance"] });
-    await watch();
-    expect(rateText()).toBe("—");
-    room.tick({ gameTime: 101, objects: {} });
-    vi.advanceTimersByTime(3000);
-    room.tick({ gameTime: 102, objects: {} });
-    vi.advanceTimersByTime(4000);
-    room.tick({ gameTime: 103, objects: {} });
-    await vi.waitFor(() => expect(rateText()).toBe("3500 ms/Tick"));
-  });
-});
-
-describe("录制数据仅开发可用", () => {
-  beforeEach(() => {
-    localStorage.clear();
-    visibility = manualVisibility(true);
-    room = manualRoomSource();
-    container = document.createElement("div");
-    document.body.append(container);
-  });
-
-  afterEach(() => {
-    dispose?.();
-    dispose = undefined;
-    container.remove();
-    vi.unstubAllEnvs();
-  });
-
-  const modeSwitch = () => container.querySelector("select[name=room-view-source]");
-
-  it("开发构建显示数据来源开关", () => {
-    vi.stubEnv("DEV", true);
-    mount();
-    expect(modeSwitch()).not.toBeNull();
-  });
-
-  it("生产构建不显示数据来源开关", () => {
-    vi.stubEnv("DEV", false);
-    mount();
-    expect(modeSwitch()).toBeNull();
-    expect(field("[data-testid=room-view-state]").textContent).toBe("已认证");
   });
 });

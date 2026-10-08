@@ -73,6 +73,14 @@ describe("生产构建不包含录制回放", () => {
     }
   });
 
+  it("没有数据来源开关与原始读数（只在开发构建里，#51）", () => {
+    for (const file of files) {
+      const text = readFileSync(join(outDir, file), "latin1");
+      expect(text.includes("room-view-source"), file).toBe(false);
+      expect(text.includes("readings-title"), file).toBe(false);
+    }
+  });
+
   it("index.html 内联了不依赖脚本的启动画面（#33）", () => {
     const html = readFileSync(join(outDir, "index.html"), "utf8");
     // #boot 是 body 里 #root 之前的那一段

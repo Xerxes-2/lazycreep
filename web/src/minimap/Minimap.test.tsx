@@ -83,7 +83,8 @@ function mount() {
 
 const settle = (assertion: () => void) => vi.waitFor(assertion, { timeout: 3000, interval: 5 });
 const minimapCanvas = () => container.querySelector<HTMLCanvasElement>("[data-section='room.minimap'] canvas");
-const roomInput = () => container.querySelector<HTMLInputElement>("[name=room-view-room]")!;
+/** Room View 画面上的房间 */
+const shownRoom = () => container.querySelector<HTMLElement>(".room-view")!.dataset.room;
 
 /** 点 Minimap 的格子（col、row 为 0–2） */
 function tapCell(col: number, row: number) {
@@ -137,7 +138,7 @@ describe("Minimap（#27）", () => {
 
     tapCell(2, 1);
     expect(shell.location()).toMatchObject({ view: "room", shard: SHARD, room: "W12S28", replay: undefined });
-    await settle(() => expect(roomInput().value).toBe("W12S28"));
+    await settle(() => expect(shownRoom()).toBe("W12S28"));
     await settle(() => expect(minimapSubscriptions(NEAR_W12S28)).toEqual(NEAR_W12S28));
     // 只在旧 3×3 里的房间已退订，每个房间只有一条
     for (const gone of around(["W14S27", "W14S28", "W14S29"])) expect(roomMaps).not.toContain(gone);
@@ -189,7 +190,7 @@ describe("Minimap（#27）", () => {
     tapCell(1, 0);
     await settle(() => expect(shell.location()).toMatchObject({ view: "room", room: "W13S27", replay: { tick: 1024950 } }));
     // Room View 跟着进入该房间的 Replay（地址由 URL 路由写回，#32，见 shell/url-routing.test.tsx）
-    await settle(() => expect(document.querySelector<HTMLInputElement>("[name=room-view-room]")?.value).toBe("W13S27"));
+    await settle(() => expect(document.querySelector<HTMLElement>(".room-view")?.dataset.room).toBe("W13S27"));
     await settle(() => expect(document.querySelector(".room-view [data-testid=replay-controls]")).not.toBeNull());
   });
 });

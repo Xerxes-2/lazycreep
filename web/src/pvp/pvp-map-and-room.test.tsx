@@ -105,7 +105,7 @@ describe("PvP Overview 接入 World Map 与 Room View", () => {
     row("W17N21")!.querySelector<HTMLButtonElement>("[data-action=open-room]")!.click();
     expect(slot("map").hidden).toBe(true);
     expect(slot("room").hidden).toBe(false);
-    expect(container.querySelector<HTMLInputElement>("[name=room-view-room]")!.value).toBe("W17N21");
+    expect(container.querySelector<HTMLElement>(".room-view")!.dataset.room).toBe("W17N21");
     expect(container.querySelector("button[data-action=back-to-map]")).not.toBeNull();
   });
 
@@ -114,7 +114,7 @@ describe("PvP Overview 接入 World Map 与 Room View", () => {
     await settle(() => expect(row("W17N21")).not.toBeNull());
     row("W17N21")!.querySelector<HTMLButtonElement>("[data-action=replay-battle]")!.click();
     expect(slot("room").hidden).toBe(false);
-    await settle(() => expect(container.querySelector<HTMLInputElement>("[name=room-view-room]")?.value).toBe("W17N21"));
+    await settle(() => expect(container.querySelector<HTMLElement>(".room-view")?.dataset.room).toBe("W17N21"));
     await settle(() => expect(container.querySelector(".room-view .replay")).not.toBeNull());
   });
 
@@ -123,7 +123,7 @@ describe("PvP Overview 接入 World Map 与 Room View", () => {
     await settle(() => expect(row("W17N21")).not.toBeNull());
     row("W17N21")!.querySelector<HTMLButtonElement>("[data-action=replay-battle]")!.click();
     await settle(() => expect(container.querySelector(".room-view .replay")).not.toBeNull());
-    await settle(() => expect(container.querySelector<HTMLInputElement>("[name=room-view-room]")!.value).toBe("W17N21"));
+    await settle(() => expect(container.querySelector<HTMLElement>(".room-view")!.dataset.room).toBe("W17N21"));
     expect(slot("map").hidden).toBe(true);
   });
 

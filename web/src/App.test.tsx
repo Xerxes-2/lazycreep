@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render } from "solid-js/web";
 import { App } from "./App";
 import { FixtureSource, fixtureBundle } from "./source/fixture-source.ts";
+import type { Source } from "./source/source.ts";
 
 const bundle = fixtureBundle(
   Object.values(import.meta.glob<unknown>("../../fixtures/season/*.json", { eager: true, import: "default" })),
@@ -10,10 +11,17 @@ const bundle = fixtureBundle(
 let container: HTMLDivElement;
 let dispose: (() => void) | undefined;
 
-function mount() {
+function mount(sourceFor: () => Source = () => new FixtureSource(bundle)) {
   dispose?.();
   container.innerHTML = "";
-  dispose = render(() => <App sourceFor={() => new FixtureSource(bundle)} />, container);
+  dispose = render(() => <App sourceFor={sourceFor} />, container);
+}
+
+/** 服务器的房间流没有任何帧（只有录制数据能画出房间） */
+function silentServer(): Source {
+  const source = new FixtureSource(bundle, { speed: Infinity });
+  source.subscribeRoom = () => () => {};
+  return source;
 }
 
 function heading() {
@@ -43,6 +51,8 @@ describe("App", () => {
     dispose?.();
     dispose = undefined;
     container.remove();
+    vi.unstubAllEnvs();
+    history.replaceState(null, "", "/");
   });
 
   it("shows the application title in zh-CN by default", () => {
@@ -77,7 +87,30 @@ describe("App", () => {
   it("shows the room view", () => {
     mount();
     expect(container.querySelector("#room-view-title")?.textContent).toBe("房间视图");
-    expect(container.querySelector("[data-testid=room-view-tick]")?.textContent).toBe("—");
+    expect(container.querySelector<HTMLElement>(".room-view")!.dataset.tick).toBeUndefined();
+  });
+
+  it("开发构建：数据来源开关在 Menu 的原始读数项里，切到录制数据后 Room View 由录制数据驱动（#51）", async () => {
+    vi.stubEnv("DEV", true);
+    mount(silentServer);
+    expect(container.querySelector(".room-view select, .main-view select")).toBeNull();
+    openMenuItem("readings");
+    const select = container.querySelector<HTMLSelectElement>("[data-menu-content=readings] select[name=room-view-source]")!;
+    expect(select.value).toBe("server");
+    select.value = "recording";
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+    location.hash = "#!/season/room/shardSeason/W13S28";
+    await vi.waitFor(() => expect(container.querySelector<HTMLElement>(".room-view")!.dataset.tick).toBeDefined(), {
+      timeout: 5000,
+    });
+  });
+
+  it("生产构建：没有数据来源开关，也没有原始读数项（#14 #51）", () => {
+    vi.stubEnv("DEV", false);
+    mount();
+    container.querySelector<HTMLButtonElement>("[data-action=open-menu]")!.click();
+    expect(container.querySelector("[data-menu-item=readings]")).toBeNull();
+    expect(container.querySelector("select[name=room-view-source]")).toBeNull();
   });
 
   it("shows the settings page, translated with the interface language", () => {

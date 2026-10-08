@@ -101,14 +101,13 @@ function submit(selector: string) {
   field<HTMLFormElement>(selector).dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
 }
 
+/** 从外部打开房间（外壳里由 World Map、Minimap、PvP 卡片与 URL 经 shell.navigate 交给 Room View） */
 function watch(shard: string, room: string) {
-  input("room-view-shard", shard);
-  input("room-view-room", room);
-  submit("form[data-testid=room-view-form]");
+  setOpen({ shard, room });
 }
 
 const click = (action: string) => field<HTMLButtonElement>(`[data-action=${action}]`).click();
-const tick = () => field("[data-testid=room-view-tick]").textContent;
+const tick = () => field(".room-view").dataset.tick;
 const settle = (assertion: () => void) => vi.waitFor(assertion, { timeout: 3000, interval: 5 });
 const lastScene = () => shown.at(-1)!;
 /** 录制的历史 chunk 里一个对象（W13S28 的 source） */
@@ -141,7 +140,7 @@ describe("Room View 的 Replay", () => {
     mount(recordedSource, manualVisibility(), replayAt(1024937));
     await settle(() => expect(lastScene()?.primitives.some((p) => p.objectId === HISTORY_OBJECT)).toBe(true));
     expect(tick()).toBe("1024937");
-    expect(field<HTMLInputElement>("[name=room-view-room]").value).toBe("W13S28");
+    expect(field(".room-view").dataset.room).toBe("W13S28");
     expect(roomSubscriptions).toBe(0);
   });
 
@@ -226,7 +225,6 @@ describe("Room View 的 Replay", () => {
 
   it("token 失效时 Replay 照常可用（Live Tick 未知时向服务器要当前时间）", async () => {
     mount(unauthorizedSource);
-    expect(field("[data-testid=room-view-state]").textContent).toBe("认证失败");
     watch("shardSeason", "W13S28");
     click("replay-enter");
     // 录制的服务器时间之前就有历史；跳到有历史的 Tick 能画出来
