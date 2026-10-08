@@ -32,6 +32,7 @@ import {
   type PvpShard,
   type RoomMapOptions,
   type RoomMapUpdate,
+  type RoomSnapshot,
   type RoomTick,
   type ServerConfig,
   type ServerVersion,
@@ -54,6 +55,7 @@ import {
   pvpFromWire,
   roomTickFromWire,
   shardsFromWire,
+  roomSnapshotFromWire,
   terrainFromWire,
   versionFromWire,
 } from "./wire.ts";
@@ -316,6 +318,10 @@ export class LiveSource implements Source {
 
   async getRoomDecorations(shard: string, room: string): Promise<RoomDecorations> {
     return roomDecorationsFromWire(await this.api<unknown>("/game/room-decorations", { room, ...this.shardQuery(shard) }));
+  }
+
+  async getRoomSnapshot(shard: string, room: string): Promise<RoomSnapshot> {
+    return roomSnapshotFromWire(await this.api<unknown>("/game/room-objects", { room, ...this.shardQuery(shard) }));
   }
 
   mapTiles(shard: string, version: ServerVersion | undefined): MapTiles {

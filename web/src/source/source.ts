@@ -79,6 +79,15 @@ export interface RoomTick {
   readonly visual?: string;
 }
 
+/**
+ * 房间快照（Room Snapshot，`game/room-objects`，匿名即可，#63）：某一刻房间里的全部对象（形状同房间流的全量首帧），
+ * 没有 gameTime。换房间时先画它，实时订阅的第一帧到了整体替换。对象会变，不持久化。
+ */
+export interface RoomSnapshot {
+  readonly objects: Readonly<Record<string, RoomObjectPatch>>;
+  readonly users: Readonly<Record<string, RoomUser>>;
+}
+
 export interface HistoryTick extends RoomTick {
   readonly gameTime: number;
 }
@@ -324,6 +333,8 @@ export interface Source {
   getTerrain(shard: string, room: string): Promise<Terrain>;
   /** 房间的装饰（`game/room-decorations`，匿名即可，#61）；没有装饰时 objects 为空、无 wall / floor */
   getRoomDecorations(shard: string, room: string): Promise<RoomDecorations>;
+  /** 房间快照（`game/room-objects`，匿名即可，#63）；缓存层只在内存里留约 10 秒（snapshot-cache.ts） */
+  getRoomSnapshot(shard: string, room: string): Promise<RoomSnapshot>;
   /**
    * 某个 Shard 的地图瓦片地址（map-tiles.ts）。必须给版本信息：赛季服的本赛季瓦片根地址在里面；
    * 版本信息取不到时传 undefined，用 Server 的默认根地址。

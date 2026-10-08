@@ -180,6 +180,20 @@ describe("FixtureSource 一次性数据", () => {
     await expect(source.getTerrain(SHARD, "E0N0")).rejects.toThrow();
   });
 
+  it("房间快照（#63）：该房间录到的最早一帧的全部对象与用户，没有 gameTime", async () => {
+    const source = new FixtureSource(bundle);
+    const first = bundle.files.find((f): f is RoomFixture => f.meta.kind === "room" && f.meta.room === OWN_ROOM)!.frames[0]!.data;
+    const snapshot = await source.getRoomSnapshot(SHARD, OWN_ROOM);
+    expect(Object.keys(snapshot.objects)).toHaveLength(238);
+    expect(snapshot.objects).toEqual(first.objects);
+    expect(snapshot.users).toEqual(first.users);
+    expect(snapshot).not.toHaveProperty("gameTime");
+  });
+
+  it("没录到房间流的房间，快照会拒绝", async () => {
+    await expect(new FixtureSource(bundle).getRoomSnapshot(SHARD, "W1N1")).rejects.toThrow();
+  });
+
   it("用户信息：id、用户名与各 Shard 的房间", async () => {
     expect(await source.getMe()).toEqual({
       id: USER_ID,

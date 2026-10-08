@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FixtureSource, fixtureBundle } from "./fixture-source.ts";
-import type { FixtureFile, WireVersion } from "./fixture-format.ts";
+import type { FixtureFile, RoomFixture, WireVersion } from "./fixture-format.ts";
 import { LiveSource } from "./live-source.ts";
 import { SERVER_PRESETS } from "./servers.ts";
 import { SourceError, type ServerConfig } from "./source.ts";
@@ -83,6 +83,13 @@ const seasonRoutes: Record<string, Reply> = {
     body: { ok: 1, user: { _id: USER_ID, username: "Xerxes_2", badge: {}, gcl: 1 } },
   },
   "/season/api/user/find?id=nobody": { body: { error: "user not found" } },
+  // 真实响应：对象是数组（各带 _id），没有 gameTime
+  "/season/api/game/room-objects?room=W13S28&shard=shardSeason": {
+    body: (() => {
+      const first = (bundle.files.find((f) => f.meta.kind === "room" && f.meta.room === OWN_ROOM) as RoomFixture).frames[0]!.data;
+      return { ok: 1, objects: Object.values(first.objects ?? {}), users: first.users };
+    })(),
+  },
   "/season/api/game/world-size?shard=shardSeason": { body: { ok: 1, ...(recorded("worldSize") as object) } },
   // 真实响应还带 decorations 与完整的用户徽章
   "/season/api/game/map-stats": { body: { ok: 1, decorations: {}, ...(recorded("mapStats") as object) } },
@@ -156,6 +163,10 @@ describe("LiveSource HTTP：与同样 wire 数据的 FixtureSource 结果一致"
     expect(plain.block("W16S28")).toBe("/map-tiles/shardSeason/zoom2/W16S28.png");
     expect(plain.sector("W19S20")).toBe("/map-tiles/shardSeason/zoom1/W19S20.png");
     expect(source.mapTiles(SHARD, undefined).room(OWN_ROOM)).toBe("/map-tiles/shardSeason/W13S28.png");
+  });
+
+  it("房间快照（game/room-objects，#63）：对象数组按 _id 索引", async () => {
+    expect(await source.getRoomSnapshot(SHARD, OWN_ROOM)).toEqual(await fixture.getRoomSnapshot(SHARD, OWN_ROOM));
   });
 
   it("世界尺寸", async () => {

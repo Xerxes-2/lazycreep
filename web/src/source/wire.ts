@@ -19,6 +19,8 @@ import type {
 import { parseBadge } from "../badge/badge.ts";
 import type {
   ConsoleEvent,
+  RoomObjectPatch,
+  RoomSnapshot,
   HistoryChunk,
   MapStats,
   Nuke,
@@ -124,6 +126,24 @@ export function mapStatsFromWire(shard: string, wire: WireMapStats, rooms: reado
     out[room] = entry;
   }
   return { shard, gameTime: wire.gameTime, rooms: out, users };
+}
+
+/**
+ * 房间快照（`game/room-objects`，#63）：`{ objects: [{ _id, ... }], users: { id: {...} } }` → 按 _id 索引的对象。
+ * 没有字符串 _id 的条目跳过；没有 gameTime。
+ */
+export function roomSnapshotFromWire(wire: unknown): RoomSnapshot {
+  const body = (typeof wire === "object" && wire !== null ? wire : {}) as { objects?: unknown; users?: unknown };
+  const objects: Record<string, RoomObjectPatch> = {};
+  if (Array.isArray(body.objects)) {
+    for (const obj of body.objects as unknown[]) {
+      if (typeof obj !== "object" || obj === null) continue;
+      const id = (obj as { _id?: unknown })._id;
+      if (typeof id === "string") objects[id] = obj as RoomObjectPatch;
+    }
+  }
+  const users = typeof body.users === "object" && body.users !== null ? (body.users as Readonly<Record<string, RoomUser>>) : {};
+  return { objects, users };
 }
 
 export function roomTickFromWire(payload: WireRoomPayload): RoomTick {

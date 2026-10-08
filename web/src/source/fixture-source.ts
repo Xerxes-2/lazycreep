@@ -38,6 +38,8 @@ import {
   type PvpShard,
   type RoomMapOptions,
   type RoomMapUpdate,
+  type RoomObjectPatch,
+  type RoomSnapshot,
   type RoomTick,
   type ServerConfig,
   type ServerVersion,
@@ -282,6 +284,17 @@ export class FixtureSource implements Source {
     const match = (f: RoomDecorationsFixture) => f.meta.shard === shard && f.meta.room === room;
     if (!this.find<RoomDecorationsFixture>("roomDecorations", match)) return NO_DECORATIONS;
     return roomDecorationsFromWire(await this.body<RoomDecorationsFixture>("roomDecorations", `${shard}/${room} 的装饰`, match));
+  }
+
+  /** 房间快照（#63）：录到的该房间房间流的最早一帧（全量）的对象与用户；没录到房间流时拒绝 */
+  async getRoomSnapshot(shard: string, room: string): Promise<RoomSnapshot> {
+    const fixture = this.find<RoomFixture>("room", (f) => f.meta.shard === shard && f.meta.room === room);
+    const first = fixture?.frames[0];
+    if (!first) throw new Error(`没有录到 ${shard}/${room} 的房间流`);
+    const { objects, users } = roomTickFromWire(first.data);
+    const present: Record<string, RoomObjectPatch> = {};
+    for (const [id, obj] of Object.entries(objects)) if (obj) present[id] = obj;
+    return { objects: present, users: users ?? {} };
   }
 
   mapTiles(shard: string, version: ServerVersion | undefined): MapTiles {
