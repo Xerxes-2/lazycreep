@@ -32,6 +32,8 @@ import type { ShortcutCommands } from "../customize/keybindings.ts";
 import { registerRoomShortcuts } from "../customize/room-shortcuts.ts";
 import type { RoomDisplay } from "./display-options.ts";
 import { RoomToolbar } from "./RoomToolbar.tsx";
+import { animationTickMs } from "./tick-interval.ts";
+import { replayMsPerTick } from "../replay/replay-engine.ts";
 import { replayAt, replayTick, type RoomRequest, type RoomTarget } from "../shell/shell-state.ts";
 import { seasonArtFor } from "../art/season-art.ts";
 import type { DataSource } from "./data-source.ts";
@@ -86,6 +88,8 @@ export interface RoomViewProps {
   readonly shortcuts?: ShortcutCommands | undefined;
   /** 显示选项（#26）；默认全开 */
   readonly display?: RoomDisplay | undefined;
+  /** Live 下的 Tick 速度（Top Bar 实测，毫秒 / Tick）：动画时长按它算（#55）；测出来之前按 1000 ms */
+  readonly msPerTick?: Accessor<number | undefined> | undefined;
   /** 画面上的房间状态变化时回报（#26：房间信息区块） */
   readonly onShownState?: ((state: RoomState | undefined) => void) | undefined;
   /** 给了就由它进入 Replay（外壳经 navigate 打开 `#/replay?…`，#26）；不给时 Room View 自己打开 */
@@ -248,6 +252,20 @@ export function RoomView(props: RoomViewProps) {
   /** 画面上的房间状态：Replay 期间是重放出来的状态，否则是 Live 状态 */
   const shownState = () => (replay.active() ? replay.snapshot()?.roomState : roomState());
 
+  /** 画面上的房间状态与它之前的那个（动画的起点，#55）；换房间时清空 */
+  const shownHistory = createMemo<{ readonly current: RoomState | undefined; readonly previous: RoomState | undefined }>((last) => {
+    const current = shownState();
+    if (!current) return { current, previous: undefined };
+    if (last && current === last.current) return last;
+    return { current, previous: last?.current };
+  });
+
+  /** 动画的 Tick 间隔（#55）：Replay 按回放速度，Live 按 Top Bar 实测 */
+  const tickMs = () => {
+    const snapshot = replay.active() ? replay.snapshot() : undefined;
+    return animationTickMs(snapshot ? replayMsPerTick(snapshot.speed) : props.msPerTick?.());
+  };
+
   // 页面不可见时不构建新 Scene，沿用上一个（#14）
   /** 这个 Source 当前可用的赛季贴图（#47）；没有 Source 时不取版本信息、不预检 */
   const currentSeasonArt = () => {
@@ -255,16 +273,30 @@ export function RoomView(props: RoomViewProps) {
     return src ? seasonArtFor(src)() : undefined;
   };
 
+  // 隐藏期间错过的动画不补播（ADR 0008）：回到屏幕时画面上的那个 Tick 不带动画，从下一个 Tick 开始
+  let hidden = false;
+  let quietTick: number | undefined;
+  // 每个画面状态只取一次 Tick 间隔：之后实测值变了也不改这个 Tick 的动画描述（否则同一 Tick 内重建 Scene 会重播）
+  let timing: { readonly state: RoomState; readonly ms: number } | undefined;
   const scene = createMemo<Scene | undefined>((previous) => {
-    if (!visible()) return previous;
+    if (!visible()) {
+      hidden = true;
+      return previous;
+    }
     if (!target()) return undefined;
     const theme = props.theme ?? DEFAULT_THEME;
-    const state = shownState();
+    const { current: state, previous: before } = shownHistory();
     if (!state) {
       return { width: ROOM_SIZE, height: ROOM_SIZE, background: theme.background, primitives: [] };
     }
+    if (hidden) {
+      hidden = false;
+      quietTick = state.gameTime;
+    }
+    const animate = state.gameTime !== quietTick;
+    if (timing?.state !== state) timing = { state, ms: untrack(tickMs) };
     return buildRoomScene(
-      { state, terrain: terrain() },
+      { state, terrain: terrain(), previous: animate ? before : undefined },
       {
         theme,
         zoom: controls.zoom(),
@@ -274,6 +306,7 @@ export function RoomView(props: RoomViewProps) {
         display: props.display,
         // 在响应式上下文里读：赛季贴图预检完成时 Scene 重建一次
         seasonArt: currentSeasonArt(),
+        tickMs: timing.ms,
       },
     );
   });
@@ -342,6 +375,10 @@ export function RoomView(props: RoomViewProps) {
     const v = view();
     const s = scene();
     if (v && s) v.show(s);
+  });
+  // 不在屏幕上时进行中的动画跳到终态，不再请求帧（#14、ADR 0008）
+  createEffect(() => {
+    if (!visible()) view()?.settle();
   });
 
   /** 画面上的 Tick：Replay 期间是重放到的 Tick，否则是 Live 的 Tick */

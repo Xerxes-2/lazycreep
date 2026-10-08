@@ -86,6 +86,8 @@ function Shell(props: ShellOwnProps) {
   const router = createUrlRouter(shell, settings);
   // Room View 的数据来源（#51）：只有开发构建能切到录制数据，开关在 Menu 的原始读数项里
   const dataSource = import.meta.env.DEV ? createDataSourceChoice() : undefined;
+  // Top Bar 实测的 Tick 速度，Room View 在 Live 下按它算动画时长（#55）
+  const [liveMsPerTick, setLiveMsPerTick] = createSignal<number>();
   // 导入设置后界面重建：回到导入那一项，显示导入结果
   if (props.lastImport) shell.openMenu("transfer");
 
@@ -141,6 +143,7 @@ function Shell(props: ShellOwnProps) {
           settings={settings}
           sourceFor={sourceFor}
           {...(props.tickPollMs === undefined ? {} : { tickPollMs: props.tickPollMs })}
+          onMsPerTick={setLiveMsPerTick}
         />
       </TopBar>
       <MapAndRoom
@@ -150,7 +153,7 @@ function Shell(props: ShellOwnProps) {
         allies={allies.set()}
         alerts={alerts}
         theme={colors.theme()}
-        roomView={{ shortcuts, dataSource: dataSource?.source }}
+        roomView={{ shortcuts, dataSource: dataSource?.source, msPerTick: liveMsPerTick }}
         createView={boot.wrapView(props.createView ?? createSceneView)}
         narrow={narrow}
         bottom={

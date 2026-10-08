@@ -3,6 +3,9 @@ import { render } from "solid-js/web";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { App } from "../App";
+import { I18nProvider } from "../i18n";
+import { createSettings } from "../settings/settings.ts";
+import { TopBarStatus } from "./TopBarStatus.tsx";
 import { FixtureSource, fixtureBundle } from "../source/fixture-source.ts";
 import { TIME_REUSE_MS } from "../source/shared-time.ts";
 import type { ConnectionState, CpuUpdate, StreamErrorListener, Unsubscribe } from "../source/source.ts";
@@ -126,6 +129,26 @@ describe("Top Bar 状态（#25）", () => {
     await settle(() => expect(Number(/\d{7}/.exec(status("tick")!.textContent!)![0])).toBeGreaterThan(first));
     await settle(() => expect(status("tick")!.textContent).toMatch(/\d+ ms\/Tick/));
     expect(created[0]!.timeRequests.every((shard) => shard === "shardSeason")).toBe(true);
+  });
+
+  it("实测的 Tick 速度交给外壳共享（#55：Room View 按它算动画时长）", async () => {
+    localStorage.setItem("msc.settings", JSON.stringify({ serverId: "season", customServers: [], token: "", shards: {} }));
+    const reported: (number | undefined)[] = [];
+    dispose = render(
+      () => (
+        <I18nProvider>
+          <TopBarStatus
+            settings={createSettings(localStorage)}
+            sourceFor={() => new ProbeSource(bundle, { speed: Infinity })}
+            tickPollMs={10}
+            onMsPerTick={(ms) => reported.push(ms)}
+          />
+        </I18nProvider>
+      ),
+      container,
+    );
+    expect(reported[0]).toBeUndefined();
+    await settle(() => expect(reported.some((ms) => typeof ms === "number" && ms > 0)).toBe(true));
   });
 
   it("game/time 去重（#38）不吞掉 Top Bar 的采样：轮询间隔短于复用窗口时，每次轮询仍是一次新请求", async () => {

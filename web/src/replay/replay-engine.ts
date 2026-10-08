@@ -69,6 +69,11 @@ export interface ReplayEngine {
 export const DEFAULT_CHUNK_SIZE = 100;
 /** 1x 每秒一 Tick */
 const MS_PER_TICK = 1000;
+
+/** 按回放速度播放时每 Tick 的毫秒数（Room View 的动画时长按它算） */
+export function replayMsPerTick(speed: ReplaySpeed): number {
+  return MS_PER_TICK / speed;
+}
 /** 内存里留几个 chunk（当前与相邻的，外加一点余量） */
 const MEMORY_CHUNKS = 6;
 /** latest 模式下最多往前退几个 chunk */
@@ -130,7 +135,7 @@ export function createReplay(options: ReplayOptions): ReplayEngine {
     stopTimer();
     timer = setInterval(() => {
       if (snap.status === "ready") step(1);
-    }, MS_PER_TICK / snap.speed);
+    }, replayMsPerTick(snap.speed));
   };
 
   /** 取 chunk：进行中或已取到的复用；null 与失败不留，下次重新请求。 */

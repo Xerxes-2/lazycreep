@@ -28,6 +28,8 @@ export interface TopBarStatusProps {
   readonly sourceFor: SourceFactory;
   readonly visibility?: VisibilitySignal;
   readonly tickPollMs?: number;
+  /** 实测的 Tick 速度（毫秒 / Tick；测出来之前与换 Shard 后为 undefined）：外壳转给 Room View 算动画时长（#55） */
+  readonly onMsPerTick?: (ms: number | undefined) => void;
 }
 
 const CONNECTION_LABEL: Record<ConnectionState, MessageKey> = {
@@ -75,6 +77,7 @@ export function TopBarStatus(props: TopBarStatusProps) {
 
   const [tick, setTick] = createSignal<number>();
   const [msPerTick, setMsPerTick] = createSignal<number>();
+  createEffect(() => props.onMsPerTick?.(msPerTick()));
   createEffect(() => {
     const src = source();
     const current = shard();
