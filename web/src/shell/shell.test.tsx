@@ -175,6 +175,6 @@ describe("固定外壳（#24）", () => {
     expect(rule(".shell")).toMatch(/height:\s*100dvh/);
     expect(rule(".shell")).toMatch(/overflow:\s*hidden/);
     expect(rule(".main-view")).toMatch(/overflow:\s*hidden/);
-    for (const scrolls of [".menu__body", ".sidebar", ".console-dock"]) expect(rule(scrolls), scrolls).toMatch(/overflow(-y)?:\s*auto/);
+    for (const scrolls of [".menu__body", ".sidebar", ".console-panel"]) expect(rule(scrolls), scrolls).toMatch(/overflow(-y)?:\s*auto/);
   });
 });

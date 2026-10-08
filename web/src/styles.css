@@ -279,7 +279,7 @@ body {
 }
 
 /* Console Panel（#24）：Main View 底部，高度来自外壳状态 */
-.console-dock {
+.console-panel {
   flex: none;
   max-height: 60%;
   overflow: auto;
@@ -287,12 +287,12 @@ body {
   border-top: 1px solid color-mix(in srgb, var(--muted) 40%, transparent);
 }
 
-.console-dock[hidden] {
+.console-panel[hidden] {
   display: none;
 }
 
 /* 上边缘的拖动手柄（#30）：贴在滚动区顶端，不随内容滚走 */
-.console-dock__resize {
+.console-panel__resize {
   position: sticky;
   top: -6px;
   z-index: 1;
@@ -302,8 +302,8 @@ body {
   touch-action: none;
 }
 
-.console-dock__resize:hover,
-.console-dock__resize:focus-visible {
+.console-panel__resize:hover,
+.console-panel__resize:focus-visible {
   background: color-mix(in srgb, var(--accent) 40%, transparent);
   outline: none;
 }
@@ -1007,7 +1007,7 @@ body {
 }
 
 /* Console 面板（#6） */
-.console-panel {
+.console-view {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -1015,29 +1015,29 @@ body {
   min-height: 0;
 }
 
-.console-panel__bar {
+.console-view__bar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
 
-.console-panel__bar label {
+.console-view__bar label {
   display: inline-flex;
   align-items: center;
   gap: 4px;
 }
 
-.console-panel__bar input[type="number"] {
+.console-view__bar input[type="number"] {
   width: 6em;
 }
 
-.console-panel__hint {
+.console-view__hint {
   margin: 0;
   font-size: 0.85em;
 }
 
-.console-panel__output {
+.console-view__output {
   flex: 1;
   min-height: 8em;
   overflow: auto;
@@ -1048,38 +1048,38 @@ body {
   font-size: 0.85rem;
 }
 
-.console-panel__entry {
+.console-view__entry {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
-.console-panel__entry[data-kind="result"] {
+.console-view__entry[data-kind="result"] {
   color: var(--accent);
 }
 
-.console-panel__entry[data-kind="error"],
-.console-panel__status[data-state="error"] {
+.console-view__entry[data-kind="error"],
+.console-view__status[data-state="error"] {
   color: #d64545;
 }
 
-.console-panel__send {
+.console-view__send {
   display: flex;
   gap: 6px;
 }
 
-.console-panel__send input {
+.console-view__send input {
   flex: 1;
   min-width: 0;
   font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 }
 
-.console-panel__send input,
-.console-panel__send button {
+.console-view__send input,
+.console-view__send button {
   min-height: 36px;
   font-size: 1rem;
 }
 
-.console-panel__status {
+.console-view__status {
   margin: 0;
   min-height: 1.2em;
   font-size: 0.85em;
@@ -1144,8 +1144,8 @@ body {
 }
 
 /* 窄屏：16px 字号避免手机输入时自动放大 */
-.shell__body[data-layout="narrow"] .console-panel__send input,
-.shell__body[data-layout="narrow"] .console-panel__send button {
+.shell__body[data-layout="narrow"] .console-view__send input,
+.shell__body[data-layout="narrow"] .console-view__send button {
   min-height: 44px;
   font-size: 16px;
 }

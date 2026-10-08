@@ -50,7 +50,7 @@ function ResizeHandle(props: { shell: ShellState; panel: () => HTMLElement }) {
 
   return (
     <div
-      class="console-dock__resize"
+      class="console-panel__resize"
       data-action="resize-console"
       role="separator"
       tabindex="0"
@@ -68,7 +68,7 @@ function ResizeHandle(props: { shell: ShellState; panel: () => HTMLElement }) {
   );
 }
 
-export function ConsoleDock(props: { shell: ShellState; children: () => JSX.Element }) {
+export function ConsolePanel(props: { shell: ShellState; children: () => JSX.Element }) {
   const { t } = useI18n();
   const shell = props.shell;
   const [opened, setOpened] = createSignal(shell.consoleOpen());
@@ -79,7 +79,7 @@ export function ConsoleDock(props: { shell: ShellState; children: () => JSX.Elem
   return (
     <section
       ref={panel}
-      class="console-dock"
+      class="console-panel"
       data-console-panel
       hidden={!shell.consoleOpen()}
       aria-label={t("console.title")}

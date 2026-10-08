@@ -4,7 +4,7 @@ import { I18nProvider } from "../i18n";
 import { createSettings, type Settings } from "../settings/settings.ts";
 import { FixtureSource, fixtureBundle } from "../source/fixture-source.ts";
 import { SourceError, type ConsoleEvent, type ShardInfo, type Unsubscribe } from "../source/source.ts";
-import { ConsolePanel } from "./ConsolePanel.tsx";
+import { ConsoleView } from "./ConsoleView.tsx";
 
 const mmo = fixtureBundle(
   Object.values(import.meta.glob<unknown>("../../../fixtures/mmo/*.json", { eager: true, import: "default" })),
@@ -51,7 +51,7 @@ function mount(options: { token?: string; shard?: string } = {}) {
   dispose = render(
     () => (
       <I18nProvider>
-        <ConsolePanel settings={settings} sourceFor={() => source} storage={localStorage} />
+        <ConsoleView settings={settings} sourceFor={() => source} storage={localStorage} />
       </I18nProvider>
     ),
     container,

@@ -3,7 +3,7 @@ import { createAllyList } from "./allies/ally-list.ts";
 import { AlertSettingsPanel } from "./alert/AlertSettingsPanel.tsx";
 import { createAlertSettings } from "./alert/alert-settings.ts";
 import { AllyListSettings } from "./allies/AllyListSettings.tsx";
-import { ConsolePanel } from "./console/ConsolePanel.tsx";
+import { ConsoleView } from "./console/ConsoleView.tsx";
 import { createBootProgress, type CreateView } from "./boot/boot-progress.ts";
 import { BootScreen } from "./boot/BootScreen.tsx";
 import { AppearanceSettings } from "./customize/AppearanceSettings.tsx";
@@ -23,7 +23,7 @@ import { RawReadings } from "./readings/RawReadings.tsx";
 import { SettingsPage, type SourceFactory } from "./settings/SettingsPage.tsx";
 import { createSettings } from "./settings/settings.ts";
 import { mediaQuery, NARROW_QUERY } from "./shell/breakpoint.ts";
-import { ConsoleDock } from "./shell/ConsoleDock.tsx";
+import { ConsolePanel } from "./shell/ConsolePanel.tsx";
 import { Menu, type MenuItemDef } from "./shell/Menu.tsx";
 import { RouteNotice } from "./shell/RouteNotice.tsx";
 import { createShellState } from "./shell/shell-state.ts";
@@ -124,7 +124,7 @@ function Shell(props: ShellOwnProps) {
   const consoleItem: MenuItemDef = {
     id: "console",
     title: "console.title",
-    render: () => <ConsolePanel settings={settings} sourceFor={sourceFor} />,
+    render: () => <ConsoleView settings={settings} sourceFor={sourceFor} />,
   };
 
   return (
@@ -148,7 +148,7 @@ function Shell(props: ShellOwnProps) {
         narrow={narrow}
         bottom={
           <Show when={!narrow()}>
-            <ConsoleDock shell={shell}>{() => <ConsolePanel settings={settings} sourceFor={sourceFor} />}</ConsoleDock>
+            <ConsolePanel shell={shell}>{() => <ConsoleView settings={settings} sourceFor={sourceFor} />}</ConsolePanel>
           </Show>
         }
       />

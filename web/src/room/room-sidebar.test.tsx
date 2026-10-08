@@ -241,6 +241,6 @@ describe("Room View 的 Sidebar 区块与左侧按钮列（#26）", () => {
     expect(rule(".room-view__replay")).toMatch(/bottom:/);
     expect(rule(".room-view__stage")).toMatch(/position:\s*relative/);
     // Console Panel 与 Main View 在同一列里各占高度，不浮在 Main View 上
-    expect(rule(".console-dock")).not.toMatch(/position:\s*(absolute|fixed)/);
+    expect(rule(".console-panel")).not.toMatch(/position:\s*(absolute|fixed)/);
   });
 });
