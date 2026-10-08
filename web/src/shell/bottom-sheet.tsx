@@ -1,8 +1,8 @@
 /**
  * 窄屏的底部面板（#29，ADR 0005）：Sidebar 在窄屏上从底部升起占半屏，区块表里当前模式的每个
  * Sidebar Section 变为面板顶部的一个标签，一次显示一个。标签只由区块表（sidebar-sections.tsx）
- * 驱动，新增区块自动出现。面板开合沿用 Sidebar 的开合（shell.sidebarOpen）：点关闭或在顶部下滑收起，
- * Top Bar 的 Sidebar 按钮重新打开。
+ * 驱动，新增区块自动出现。面板开合经 shell.sidebarOpen 读写，但与宽屏 Sidebar 各记一份（窄屏默认收起）：
+ * 点关闭或在顶部下滑收起，Top Bar 的 Sidebar 按钮重新打开。
  *
  * 当前标签不持久化；每个模式各记一个，默认是该模式的第一个区块。
  */

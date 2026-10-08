@@ -78,6 +78,7 @@ afterEach(() => {
 describe("窄屏结构（#29）", () => {
   it("Sidebar 渲染为底部面板，区块表里的每个区块是一个标签，一次显示一个", () => {
     mountApp(() => true);
+    q<HTMLButtonElement>("[data-action=toggle-sidebar]")!.click();
     const sheet = q(".sidebar")!;
     expect(sheet.dataset["sheet"]).toBe("bottom");
     expect(tabs()).toEqual(SIDEBAR_SECTIONS.map.map((s) => s.id));
@@ -99,12 +100,14 @@ describe("窄屏结构（#29）", () => {
   it("窄屏下折叠状态不藏标签内容；区块标题按钮让位给标签", () => {
     localStorage.setItem("msc.shell", JSON.stringify({ collapsed: { "map.search": true } }));
     mountApp(() => true);
+    q<HTMLButtonElement>("[data-action=toggle-sidebar]")!.click();
     expect(shownSections()).toEqual(["map.search"]);
     expect(q('[data-section="map.search"] .sidebar-section__title')!.hidden).toBe(true);
   });
 
   it("点关闭或下滑收起底部面板；Top Bar 的 Sidebar 按钮重新打开", () => {
     mountApp(() => true);
+    q<HTMLButtonElement>("[data-action=toggle-sidebar]")!.click();
     q<HTMLButtonElement>("[data-action=close-sheet]")!.click();
     expect(q(".sidebar")!.hidden).toBe(true);
     q<HTMLButtonElement>("[data-action=toggle-sidebar]")!.click();
@@ -115,6 +118,58 @@ describe("窄屏结构（#29）", () => {
     expect(q(".sidebar")!.hidden).toBe(false);
     swipe(handle, 100, 200);
     expect(q(".sidebar")!.hidden).toBe(true);
+  });
+
+  it("窄屏首次进入时底部面板默认收起，宽屏 Sidebar 默认打开", () => {
+    mountApp(() => true);
+    expect(q(".sidebar")!.hidden).toBe(true);
+    mountApp(() => false);
+    expect(q(".sidebar")!.hidden).toBe(false);
+  });
+
+  it("窄屏与宽屏各自记住开合：竖屏收起面板不连带收起横屏 Sidebar，反之亦然", () => {
+    const [narrow, setNarrow] = createSignal(false);
+    mountApp(narrow);
+    expect(q(".sidebar")!.hidden).toBe(false);
+
+    setNarrow(true);
+    expect(q(".sidebar")!.hidden).toBe(true);
+    q<HTMLButtonElement>("[data-action=toggle-sidebar]")!.click();
+    expect(q(".sidebar")!.hidden).toBe(false);
+    q<HTMLButtonElement>("[data-action=close-sheet]")!.click();
+    expect(q(".sidebar")!.hidden).toBe(true);
+
+    setNarrow(false);
+    expect(q(".sidebar")!.hidden).toBe(false);
+    q<HTMLButtonElement>("[data-action=toggle-sidebar]")!.click();
+    expect(q(".sidebar")!.hidden).toBe(true);
+
+    setNarrow(true);
+    q<HTMLButtonElement>("[data-action=toggle-sidebar]")!.click();
+    expect(q(".sidebar")!.hidden).toBe(false);
+    setNarrow(false);
+    expect(q(".sidebar")!.hidden).toBe(true);
+
+    // 重新挂载后两种状态都保持
+    mountApp(narrow);
+    expect(q(".sidebar")!.hidden).toBe(true);
+    setNarrow(true);
+    expect(q(".sidebar")!.hidden).toBe(false);
+  });
+
+  it("旧版只存了一个开合值：迁移为宽屏状态，窄屏仍默认收起", () => {
+    localStorage.setItem("msc.shell", JSON.stringify({ sidebarOpen: false }));
+    const [narrow, setNarrow] = createSignal(false);
+    mountApp(narrow);
+    expect(q(".sidebar")!.hidden).toBe(true);
+    setNarrow(true);
+    expect(q(".sidebar")!.hidden).toBe(true);
+
+    localStorage.setItem("msc.shell", JSON.stringify({ sidebarOpen: true }));
+    mountApp(narrow);
+    expect(q(".sidebar")!.hidden).toBe(true);
+    setNarrow(false);
+    expect(q(".sidebar")!.hidden).toBe(false);
   });
 
   it("Console Panel 不显示，Top Bar 没有 Console 按钮；Menu 里多出 Console 项并能打开 Console", () => {
@@ -211,29 +266,31 @@ describe("窄屏：点选对象切到选中对象标签（#29）", () => {
     return { clientX: body.x * vp.scale + vp.x, clientY: body.y * vp.scale + vp.y };
   }
 
-  it("面板在别的标签或已收起时，点选对象打开面板并切到选中对象标签，详情画在其中", async () => {
+  it("面板在别的标签或已收起时，点选对象打开面板并切到选中对象标签，详情画在其中；宽屏 Sidebar 的开合不受影响", async () => {
     scenes = new Map();
     viewports = new Map();
     let shell!: ShellState;
     const settings = createSettings(localStorage);
+    const [narrow, setNarrow] = createSignal(false);
     dispose = render(
       () => (
         <I18nProvider>
           <MapAndRoom
             settings={settings}
-            shell={(shell = createShellState(localStorage, settings))}
+            shell={(shell = createShellState(localStorage, settings, narrow))}
             sourceFor={() => new FixtureSource(bundle, { speed: Infinity })}
             createView={fakeView}
             roomView={{ historyCache: async () => undefined }}
-            narrow={() => true}
+            narrow={narrow}
           />
         </I18nProvider>
       ),
       container,
     );
+    shell.setSidebarOpen(false);
+    setNarrow(true);
     shell.navigate({ shard: "shardSeason", room: "W13S28" });
     q<HTMLButtonElement>('.sidebar [role=tab][data-tab="test.fake"]')!.click();
-    shell.setSidebarOpen(false);
 
     let point: ReturnType<typeof creepPoint>;
     await settle(() => expect((point = creepPoint())).toBeDefined());
@@ -244,5 +301,8 @@ describe("窄屏：点选对象切到选中对象标签（#29）", () => {
     expect(q(".sidebar")!.hidden).toBe(false);
     expect(selectedTab()).toBe("room.selected");
     expect(q(".room-view [data-testid=room-details]")).toBeNull();
+
+    setNarrow(false);
+    expect(q(".sidebar")!.hidden).toBe(true);
   });
 });

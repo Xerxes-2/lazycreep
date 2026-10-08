@@ -2,8 +2,8 @@
  * 外壳状态（#24，ADR 0005）：整页唯一的一份，Top Bar、Main View、Sidebar、Menu、Console Panel 都读写它。
  *
  * - Main View 模式（World Map / Room View）：运行状态，存 `msc.mainView`，不进设置导出。
- * - Sidebar 是否收起、各 Sidebar Section 的折叠（按区块 id）、Console Panel 开合与高度：用户设置，
- *   存 `msc.shell`，进设置导出。
+ * - Sidebar 是否收起（宽屏与窄屏底部面板各一份）、各 Sidebar Section 的折叠（按区块 id）、
+ *   Console Panel 开合与高度：用户设置，存 `msc.shell`，进设置导出。
  * - Menu 当前打开项、Room View 的房间：不持久化。
  *
  * **位置（Main View 模式 + Shard + 房间 + Replay Tick）只经一个入口读写**：读 `location()`，
@@ -70,14 +70,17 @@ export const MAIN_VIEW_STORAGE: StoredKey = { key: "msc.mainView", kind: "json-s
 export const CONSOLE_HEIGHT = { min: 120, max: 800, initial: 260 } as const;
 
 interface ShellPrefs {
+  /** 宽屏 Sidebar 是否打开（旧版唯一的开合值沿用这个字段，即迁移为宽屏状态） */
   readonly sidebarOpen: boolean;
+  /** 窄屏底部面板是否打开（#29）；默认收起，与宽屏互不影响 */
+  readonly sheetOpen: boolean;
   /** 折叠了的区块 id → true（没出现即展开） */
   readonly collapsed: Readonly<Record<string, true>>;
   readonly consoleOpen: boolean;
   readonly consoleHeight: number;
 }
 
-const DEFAULT_PREFS: ShellPrefs = { sidebarOpen: true, collapsed: {}, consoleOpen: false, consoleHeight: CONSOLE_HEIGHT.initial };
+const DEFAULT_PREFS: ShellPrefs = { sidebarOpen: true, sheetOpen: false, collapsed: {}, consoleOpen: false, consoleHeight: CONSOLE_HEIGHT.initial };
 
 const clampHeight = (px: number) => Math.round(Math.min(CONSOLE_HEIGHT.max, Math.max(CONSOLE_HEIGHT.min, px)));
 
@@ -90,6 +93,7 @@ function decodePrefs(value: unknown): ShellPrefs | undefined {
   const height = value["consoleHeight"];
   return {
     sidebarOpen: typeof value["sidebarOpen"] === "boolean" ? value["sidebarOpen"] : DEFAULT_PREFS.sidebarOpen,
+    sheetOpen: typeof value["sheetOpen"] === "boolean" ? value["sheetOpen"] : DEFAULT_PREFS.sheetOpen,
     collapsed,
     consoleOpen: typeof value["consoleOpen"] === "boolean" ? value["consoleOpen"] : DEFAULT_PREFS.consoleOpen,
     consoleHeight: typeof height === "number" && Number.isFinite(height) ? clampHeight(height) : DEFAULT_PREFS.consoleHeight,
@@ -121,7 +125,7 @@ export interface ShellState {
   /** Room View 回报它此刻显示的房间与 Replay 起始 Tick（只给 Room View 用） */
   reportRoom(target: RoomTarget | undefined, replayTick?: number, latest?: boolean): void;
 
-  // ---- Sidebar ----
+  // ---- Sidebar（宽屏与窄屏各自一份开合，以下都作用于当前布局的那份） ----
   readonly sidebarOpen: Accessor<boolean>;
   setSidebarOpen(open: boolean): void;
   toggleSidebar(): void;
@@ -145,10 +149,11 @@ export interface ShellState {
   closeMenu(): void;
 }
 
-/** storage 一般是 browserStorage()。 */
+/** storage 一般是 browserStorage()；narrow 是此刻是否窄屏（决定 Sidebar 开合读写哪一份），默认宽屏。 */
 export function createShellState(
   storage: (KeyValueStorage & Partial<Pick<Storage, "removeItem">>) | undefined,
   settings: ShardSettings,
+  narrow: Accessor<boolean> = () => false,
 ): ShellState {
   clearLegacyLayout(storage);
 
@@ -192,6 +197,9 @@ export function createShellState(
   const [menuOpen, setMenuOpen] = createSignal(false);
   const [menuItem, setMenuItem] = createSignal<string>();
 
+  const sidebarOpen = () => (narrow() ? prefs().sheetOpen : prefs().sidebarOpen);
+  const setSidebarOpen = (open: boolean) => change(narrow() ? { sheetOpen: open } : { sidebarOpen: open });
+
   const sectionCollapsed = (id: string) => prefs().collapsed[id] === true;
   const setSectionCollapsed = (id: string, collapsed: boolean) => {
     if (sectionCollapsed(id) === collapsed) return;
@@ -217,9 +225,9 @@ export function createShellState(
       });
     },
 
-    sidebarOpen: () => prefs().sidebarOpen,
-    setSidebarOpen: (open) => change({ sidebarOpen: open }),
-    toggleSidebar: () => change({ sidebarOpen: !prefs().sidebarOpen }),
+    sidebarOpen,
+    setSidebarOpen,
+    toggleSidebar: () => setSidebarOpen(!sidebarOpen()),
     sectionCollapsed,
     setSectionCollapsed,
     toggleSection: (id) => setSectionCollapsed(id, !sectionCollapsed(id)),

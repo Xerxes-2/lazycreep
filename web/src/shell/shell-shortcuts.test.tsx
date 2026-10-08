@@ -103,6 +103,8 @@ describe("快捷键目录（#30）", () => {
 
   it("窄屏下 Esc 在没有 Menu 时收起底部的 Sidebar 面板", () => {
     mount(true);
+    expect(sidebarShown()).toBe(false);
+    press("h");
     expect(sidebarShown()).toBe(true);
     q<HTMLButtonElement>("[data-action=open-menu]")!.click();
     press("Escape");
@@ -126,11 +128,11 @@ describe("快捷键目录（#30）", () => {
     press("Escape");
     expect(menuShown()).toBe(false);
 
-    expect(sidebarShown()).toBe(true);
-    press("h");
     expect(sidebarShown()).toBe(false);
     press("h");
     expect(sidebarShown()).toBe(true);
+    press("h");
+    expect(sidebarShown()).toBe(false);
   });
 
   it("R 进出 Replay；空格播放暂停，逗号句号单步", async () => {
@@ -248,7 +250,7 @@ describe("设置导出涵盖外壳状态（#30）", () => {
     container.remove();
   });
 
-  it("导出 → 清空 → 导入后，Sidebar 收起、区块折叠、Console Panel 开合与高度全部还原；导出中无 token", () => {
+  it("导出 → 清空 → 导入后，Sidebar 收起（宽屏与窄屏各一份）、区块折叠、Console Panel 开合与高度全部还原；导出中无 token", () => {
     localStorage.setItem("msc.settings", JSON.stringify({ serverId: "season", customServers: [], token: "secret-token", shards: {} }));
     mount();
     q<HTMLButtonElement>("[data-section='map.pvp'] [data-action=toggle-section]")!.click();
@@ -259,6 +261,10 @@ describe("设置导出涵盖外壳状态（#30）", () => {
     expect(sidebarShown()).toBe(false);
     expect(consoleShown()).toBe(true);
     expect(consoleHeight()).toBe("460px");
+    // 窄屏底部面板的开合单独一份，同样导出
+    mount(true);
+    press("h");
+    expect(sidebarShown()).toBe(true);
 
     unmount();
     const file = JSON.stringify(exportSettings(localStorage));
@@ -278,5 +284,7 @@ describe("设置导出涵盖外壳状态（#30）", () => {
     expect(consoleHeight()).toBe("460px");
     press("h");
     expect(sectionCollapsed("map.pvp")).toBe(true);
+    mount(true);
+    expect(sidebarShown()).toBe(true);
   });
 });

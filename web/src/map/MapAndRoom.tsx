@@ -60,8 +60,8 @@ export interface MapAndRoomProps {
 
 export function MapAndRoom(props: MapAndRoomProps) {
   const page = props.visibility ?? pageVisibility();
-  const shell = props.shell ?? createShellState(browserStorage(), props.settings);
   const narrow = props.narrow ?? mediaQuery(NARROW_QUERY);
+  const shell = props.shell ?? createShellState(browserStorage(), props.settings, narrow);
 
   // PvP 列表与所有权补查用的 Source（全页共享的同一个）
   const source = createMemo(() => {

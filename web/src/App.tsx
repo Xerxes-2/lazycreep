@@ -72,10 +72,10 @@ function Shell(props: ShellOwnProps) {
   // 启动画面（#33）观察共享 Source 之下的真实事件；URL 指向 Replay 时认证不是必需的
   const boot = createBootProgress({ authOptional: () => replayRoute() });
   const sourceFor = sharedSources(boot.wrapSources(props.sourceFor));
-  const shell = createShellState(browserStorage(), settings);
-  const replayRoute = () => shell.location().replay !== undefined || isReplayAddress(location.hash);
-  // 窄屏（#29）：Console Panel 不显示，Console 改从 Menu 打开
+  // 窄屏（#29）：Console Panel 不显示，Console 改从 Menu 打开；Sidebar 开合按布局各记一份
   const narrow = props.narrow ?? mediaQuery(NARROW_QUERY);
+  const shell = createShellState(browserStorage(), settings, narrow);
+  const replayRoute = () => shell.location().replay !== undefined || isReplayAddress(location.hash);
   registerShellShortcuts(shortcuts, shell, narrow);
   // URL 导航（#32）：地址 ↔ Main View 位置
   const router = createUrlRouter(shell, settings);

@@ -150,6 +150,8 @@ describe("固定外壳（#24）", () => {
     mount(true);
     expect(q(".shell__body")!.dataset["layout"]).toBe("narrow");
     expect(shownView()).toEqual(["map"]);
+    expect(shownSections()).toEqual([]);
+    q<HTMLButtonElement>("[data-action=toggle-sidebar]")!.click();
     expect(shownSections()).toEqual(["map.search"]);
     press("m");
     expect(shownView()).toEqual(["room"]);
