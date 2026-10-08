@@ -1,5 +1,6 @@
 /**
- * #42：Art Style 接到整页——Menu“外观”里切换，Room View 的 Scene 随之换画法；刷新后保持；随设置导出导入。
+ * #54（ADR 0007）：Room View 只有官方画风——设置里没有画风选项；本地残留的旧画风值启动时清除；
+ * 导入含画风字段的旧设置文件时静默忽略它。
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render } from "solid-js/web";
@@ -60,9 +61,8 @@ function openAppearance() {
   container.querySelector<HTMLButtonElement>("[data-action=open-menu]")!.click();
   container.querySelector<HTMLButtonElement>(`[data-menu-item="appearance"]`)!.click();
 }
-const styleRadio = (style: string) => container.querySelector<HTMLInputElement>(`input[name=art-style][value=${style}]`)!;
 
-describe("Art Style 接到整页（#42）", () => {
+describe("只有官方画风（#54）", () => {
   beforeEach(() => {
     localStorage.clear();
     history.replaceState(null, "", "/#!/season/room/shardSeason/W13S28");
@@ -76,40 +76,34 @@ describe("Art Style 接到整页（#42）", () => {
     history.replaceState(null, "", "/");
   });
 
-  it("默认官方画风；在外观里切到几何后 Room View 换画法，刷新后保持", async () => {
+  it("Room View 用官方贴图；外观设置里没有画风选项", async () => {
     mount();
     await settle(() => expect(officialImages()).toBeGreaterThan(0));
-
     openAppearance();
-    expect(styleRadio("official").checked).toBe(true);
-    styleRadio("geometric").click();
-    await settle(() => {
-      expect(roomScene()?.primitives.length).toBeGreaterThan(0);
-      expect(officialImages()).toBe(0);
-    });
-
-    mount();
-    await settle(() => expect(roomScene()?.primitives.length).toBeGreaterThan(0));
-    expect(officialImages()).toBe(0);
-    openAppearance();
-    expect(styleRadio("geometric").checked).toBe(true);
-    styleRadio("official").click();
-    await settle(() => expect(officialImages()).toBeGreaterThan(0));
+    expect(container.querySelector("[data-testid=appearance-settings]")).not.toBeNull();
+    expect(container.querySelector("input[name=art-style]")).toBeNull();
+    expect(container.querySelector("[data-testid=art-style-settings]")).toBeNull();
   });
 
-  it("导出包含 Art Style，导入后按文件里的 Art Style 画", async () => {
+  it("本地残留的旧画风值（几何）启动时清除，Room View 仍是官方画风，导出里没有它", async () => {
+    localStorage.setItem("msc.artStyle", JSON.stringify("geometric"));
     mount();
-    openAppearance();
-    styleRadio("geometric").click();
-    const file = exportSettings(localStorage);
-    expect(file.settings["msc.artStyle"]).toBe("geometric");
+    expect(localStorage.getItem("msc.artStyle")).toBeNull();
+    await settle(() => expect(officialImages()).toBeGreaterThan(0));
+    expect(Object.keys(exportSettings(localStorage).settings)).not.toContain("msc.artStyle");
+  });
 
-    localStorage.clear();
+  it("导入含画风字段的旧设置文件：不报错、不算无法识别的项、不写入，其余设置照常导入", async () => {
+    mount();
+    const report = importSettings(localStorage, {
+      format: "my-screeps-client/settings",
+      version: 1,
+      settings: { "msc.artStyle": "geometric", "msc.allies": ["Friend"] },
+    });
+    expect(report.ignored).toEqual([]);
+    expect(report.applied).toEqual(["msc.allies"]);
+    expect(localStorage.getItem("msc.artStyle")).toBeNull();
     mount();
     await settle(() => expect(officialImages()).toBeGreaterThan(0));
-    importSettings(localStorage, file);
-    mount();
-    await settle(() => expect(roomScene()?.primitives.length).toBeGreaterThan(0));
-    expect(officialImages()).toBe(0);
   });
 });

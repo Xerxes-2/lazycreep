@@ -8,9 +8,8 @@ import { createBootProgress, type CreateView } from "./boot/boot-progress.ts";
 import { BootScreen } from "./boot/BootScreen.tsx";
 import { AppearanceSettings } from "./customize/AppearanceSettings.tsx";
 import { createColorScheme } from "./customize/color-scheme.ts";
-import { createArtStyle } from "./art/art-style.ts";
 import { attachShortcuts, createKeybindings, createShortcutCommands } from "./customize/keybindings.ts";
-import type { ImportReport } from "./customize/settings-transfer.ts";
+import { clearRetiredSettings, type ImportReport } from "./customize/settings-transfer.ts";
 import { SettingsTransfer } from "./customize/SettingsTransfer.tsx";
 import { ShortcutSettings } from "./customize/ShortcutSettings.tsx";
 import { browserDarkQuery, createUiTheme } from "./customize/ui-theme.ts";
@@ -62,13 +61,14 @@ interface ShellOwnProps extends ShellProps {
  */
 function Shell(props: ShellOwnProps) {
   const { t } = useI18n();
+  // 已删除的设置（如 #54 的画风）：本机残留的值启动时清除
+  clearRetiredSettings(browserStorage());
   const settings = createSettings(browserStorage());
   const allies = createAllyList(browserStorage());
   const alerts = createAlertSettings(browserStorage());
   // 外观与快捷键（#5）
   const uiTheme = createUiTheme({ storage: browserStorage(), darkQuery: browserDarkQuery() });
   const colors = createColorScheme(browserStorage());
-  const artStyle = createArtStyle(browserStorage());
   const keybindings = createKeybindings(browserStorage());
   const shortcuts = createShortcutCommands();
   attachShortcuts(document, keybindings, shortcuts);
@@ -107,7 +107,7 @@ function Shell(props: ShellOwnProps) {
         </section>
       ),
     },
-    { id: "appearance", title: "customize.appearance.title", render: () => <AppearanceSettings uiTheme={uiTheme} colors={colors} artStyle={artStyle} /> },
+    { id: "appearance", title: "customize.appearance.title", render: () => <AppearanceSettings uiTheme={uiTheme} colors={colors} /> },
     { id: "shortcuts", title: "shortcuts.title", render: () => <ShortcutSettings bindings={keybindings} /> },
     {
       id: "transfer",
@@ -150,7 +150,6 @@ function Shell(props: ShellOwnProps) {
         allies={allies.set()}
         alerts={alerts}
         theme={colors.theme()}
-        artStyle={artStyle.style()}
         roomView={{ shortcuts, dataSource: dataSource?.source }}
         createView={boot.wrapView(props.createView ?? createSceneView)}
         narrow={narrow}

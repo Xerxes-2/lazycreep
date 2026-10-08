@@ -1,6 +1,6 @@
 /**
- * Room View 的显示选项（#26）：say 气泡、RoomVisual、血条、玩家名四个开关，存 `msc.roomDisplay`（可导出）；
- * #49 加了光照（官方画风的发光图元）。
+ * Room View 的显示选项（#26）：say 气泡、RoomVisual、玩家名、光照（#49，发光图元）四个开关，
+ * 存 `msc.roomDisplay`（可导出）。#54 删除了只对几何画风有效的血条开关；存储里旧的 `bars` 值读取时忽略。
  *
  * 各开关经 `RoomSceneView.display` 作用于 buildRoomScene；
  * say 开关由 `showSayBubbles` 读出，气泡画法在 say-bubbles.ts（#22）。
@@ -15,24 +15,22 @@ export interface RoomDisplay {
   readonly say: boolean;
   /** 脚本画的 RoomVisual */
   readonly visual: boolean;
-  /** 血条 */
-  readonly bars: boolean;
   /** creep 上方的玩家名 */
   readonly names: boolean;
-  /** 官方画风的光照（#49） */
+  /** 光照（#49） */
   readonly lighting: boolean;
 }
 
 export type RoomDisplayKey = keyof RoomDisplay;
 
-export const ROOM_DISPLAY_KEYS: readonly RoomDisplayKey[] = ["say", "visual", "bars", "names", "lighting"];
+export const ROOM_DISPLAY_KEYS: readonly RoomDisplayKey[] = ["say", "visual", "names", "lighting"];
 
-export const DEFAULT_ROOM_DISPLAY: RoomDisplay = { say: true, visual: true, bars: true, names: true, lighting: true };
+export const DEFAULT_ROOM_DISPLAY: RoomDisplay = { say: true, visual: true, names: true, lighting: true };
 
 function decode(value: unknown): RoomDisplay | undefined {
   if (!isRecord(value)) return undefined;
   const pick = (key: RoomDisplayKey) => (typeof value[key] === "boolean" ? (value[key] as boolean) : DEFAULT_ROOM_DISPLAY[key]);
-  return { say: pick("say"), visual: pick("visual"), bars: pick("bars"), names: pick("names"), lighting: pick("lighting") };
+  return { say: pick("say"), visual: pick("visual"), names: pick("names"), lighting: pick("lighting") };
 }
 
 export interface RoomDisplayOptions {

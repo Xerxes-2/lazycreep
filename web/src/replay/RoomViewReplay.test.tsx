@@ -72,7 +72,7 @@ function mount(
     setOpen = set;
     return (
       <I18nProvider>
-        <RoomView artStyle="geometric"
+        <RoomView
           settings={createSettings(localStorage)}
           sourceFor={sourceFor}
           createView={fakeView}

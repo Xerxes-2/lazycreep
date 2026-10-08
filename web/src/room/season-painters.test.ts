@@ -1,3 +1,7 @@
+/**
+ * 赛季对象的兜底画法（#13；#54 起只在赛季贴图不可用时用）：这里不给赛季贴图，所以 reactor、钍矿、
+ * 掉落的钍都走兜底画法。有贴图时的画法见 season-official-painters.test.ts。
+ */
 import { describe, expect, it } from "vitest";
 import type { Primitive, Scene } from "../scene/scene.ts";
 import { DEFAULT_THEME } from "../scene/theme.ts";
@@ -21,7 +25,7 @@ const HYDROGEN_MINERAL = { _id: "6a8cae989a27bdd9986d34dc", type: "mineral", den
 
 function scene(objects: Record<string, Record<string, unknown>>): Scene {
   const state = roomStateFrom({ objects, users: { [REACTOR.user]: { _id: REACTOR.user, username: "volotsyouga" } } });
-  return buildRoomScene({ state }, { artStyle: "geometric", theme: DEFAULT_THEME, me: REACTOR.user });
+  return buildRoomScene({ state }, { theme: DEFAULT_THEME, me: REACTOR.user });
 }
 
 const of = (s: Scene, id: string) => s.primitives.filter((p) => p.objectId === id);
@@ -30,7 +34,7 @@ const fills = (prims: Primitive[]) => prims.flatMap((p) => ("fill" in p && p.fil
 
 function covers(p: Primitive, x: number, y: number): boolean {
   if (p.kind === "circle") return Math.hypot(p.x - x, p.y - y) <= p.radius;
-  if (p.kind === "rect" || p.kind === "bar") return p.x <= x && x <= p.x + p.width && p.y <= y && y <= p.y + p.height;
+  if (p.kind === "rect") return p.x <= x && x <= p.x + p.width && p.y <= y && y <= p.y + p.height;
   if (p.kind === "polygon") {
     const xs = p.points.filter((_, i) => i % 2 === 0);
     const ys = p.points.filter((_, i) => i % 2 === 1);

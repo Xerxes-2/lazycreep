@@ -7,8 +7,6 @@ import type { Color } from "./scene.ts";
 
 export interface Theme {
   readonly background: Color;
-  readonly terrainWall: Color;
-  readonly terrainSwamp: Color;
 
   /** 我方对象 */
   readonly owned: Color;
@@ -21,16 +19,11 @@ export interface Theme {
 
   readonly structure: Color;
   readonly structureOutline: Color;
-  readonly road: Color;
   readonly wall: Color;
   readonly energy: Color;
   readonly power: Color;
   readonly mineral: Color;
-  readonly controller: Color;
-  readonly decay: Color;
 
-  readonly hitsBar: Color;
-  readonly barBackground: Color;
   readonly label: Color;
   readonly labelOutline: Color;
   readonly placeholder: Color;
@@ -45,11 +38,9 @@ export interface Theme {
 
 export type StrangerColoring = "perPlayer" | "faction";
 
-/** 深色简约几何画风 */
+/** 默认调色板（深色）：World Map、Minimap 与 Room View 中非贴图的部分（选中框、玩家名、占位、赛季兜底画法） */
 export const DEFAULT_THEME: Theme = {
   background: 0x2b2b2b,
-  terrainWall: 0x111111,
-  terrainSwamp: 0x2c3a1e,
 
   owned: 0x5d9cec,
   ally: 0x6ccf8e,
@@ -58,16 +49,11 @@ export const DEFAULT_THEME: Theme = {
 
   structure: 0x3c3c3c,
   structureOutline: 0x8a8a8a,
-  road: 0x4a4a4a,
   wall: 0x1c1c1c,
   energy: 0xffe56d,
   power: 0xf41f33,
   mineral: 0xb4b4f0,
-  controller: 0x6c6c6c,
-  decay: 0x6b5a4a,
 
-  hitsBar: 0x6ccf5e,
-  barBackground: 0x101010,
   label: 0xffffff,
   labelOutline: 0x000000,
   placeholder: 0xff4fd8,

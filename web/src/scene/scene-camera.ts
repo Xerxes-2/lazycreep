@@ -57,7 +57,6 @@ export function clampCamera(camera: Camera, scene: Pick<Scene, "width" | "height
 function covers(p: Primitive, x: number, y: number): boolean {
   switch (p.kind) {
     case "rect":
-    case "bar":
     case "image":
       return p.x <= x && x <= p.x + p.width && p.y <= y && y <= p.y + p.height;
     case "circle":

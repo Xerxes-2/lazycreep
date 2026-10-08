@@ -1,18 +1,16 @@
 /**
- * #45：其余对象在官方画风（Art Style = 官方）下的 Scene 输出：贴图、资源量、controller 等级样式。
+ * #45：其余对象的官方画法在 Scene 里的输出：贴图、资源量、controller 等级样式。
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { officialArtUrl, type OfficialSvgName } from "../art/official-art.ts";
 import type { ImagePrimitive, Primitive, Scene } from "../scene/scene.ts";
 import { DEFAULT_THEME } from "../scene/theme.ts";
-import { FixtureSource, fixtureBundle } from "../source/fixture-source.ts";
 import { buildRoomScene, type RoomSceneView } from "./room-scene.ts";
-import { reduceLiveTick, roomStateFrom, type RoomState } from "./room-state.ts";
+import { roomStateFrom } from "./room-state.ts";
 
 const theme = DEFAULT_THEME;
 const users = { me1: { _id: "me1", username: "Me" }, foe1: { _id: "foe1", username: "Foe" } };
-const official: RoomSceneView = { theme, me: "me1", artStyle: "official" };
-const geometric: RoomSceneView = { ...official, artStyle: "geometric" };
+const official: RoomSceneView = { theme, me: "me1" };
 
 type Objects = Record<string, Record<string, unknown>>;
 function scene(objects: Objects, view: RoomSceneView = official, gameTime?: number): Scene {
@@ -170,50 +168,5 @@ describe("官方画风：controller 按等级的样式", () => {
     expect(half).toMatchObject({ kind: "polygon", fill: 0xffffff });
     expect(size(half)).toBeGreaterThan(size(quarter));
     expect(part(at(8, 1000), "c", "progress")).toBeUndefined();
-  });
-});
-
-const bundle = fixtureBundle(
-  Object.values(import.meta.glob<unknown>("../../../fixtures/season/*.json", { eager: true, import: "default" })),
-);
-
-async function finalState(room: string): Promise<RoomState> {
-  const source = new FixtureSource(bundle, { speed: Infinity });
-  let state: RoomState | undefined;
-  source.subscribeRoom("shardSeason", room, (tick) => (state = reduceLiveTick(state, tick)));
-  await vi.runAllTimersAsync();
-  return state!;
-}
-
-/** 由别的票接手的类型：creep（#48）、赛季对象（#47）；道路 / rampart / 墙已由 #46 接手 */
-const OTHER_TICKETS = new Set(["creep", "powerCreep", "reactor"]);
-
-describe("官方画风：录制房间里的对象都不再落到几何画法", () => {
-  beforeEach(() => vi.useFakeTimers());
-  afterEach(() => vi.useRealTimers());
-
-  it.each(["W13S28", "E13N21"])("%s", async (room) => {
-    const state = await finalState(room);
-    vi.useRealTimers();
-    const view = { theme, zoom: 40 };
-    const a = buildRoomScene({ state }, { ...view, artStyle: "official" });
-    const b = buildRoomScene({ state }, { ...view, artStyle: "geometric" });
-    const byObject = (s: Scene) => {
-      const map = new Map<string, Primitive[]>();
-      for (const p of s.primitives) if (p.objectId) map.set(p.objectId, [...(map.get(p.objectId) ?? []), p]);
-      return map;
-    };
-    const officialObjects = byObject(a);
-    const geometricObjects = byObject(b);
-    const checked = new Set<string>();
-    for (const [id, obj] of Object.entries(state.objects)) {
-      const type = String(obj["type"]);
-      if (OTHER_TICKETS.has(type) || obj["x"] === undefined) continue;
-      // 钍矿与掉落的钍（#47）：没有赛季贴图时有意退回几何画法的钍色
-      if (obj["mineralType"] === "T" || obj["resourceType"] === "T") continue;
-      checked.add(type);
-      expect({ id, type, same: JSON.stringify(officialObjects.get(id)) === JSON.stringify(geometricObjects.get(id)) }).toEqual({ id, type, same: false });
-    }
-    expect(checked.size).toBeGreaterThan(3);
   });
 });

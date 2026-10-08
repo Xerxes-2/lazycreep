@@ -259,7 +259,7 @@ describe("窄屏：点选对象切到选中对象标签（#29）", () => {
   function creepPoint(): { clientX: number; clientY: number } | undefined {
     roomCanvas = q<HTMLCanvasElement>(".room-view canvas") ?? undefined;
     if (!roomCanvas) return undefined;
-    const body = scenes.get(roomCanvas)?.primitives.find((p) => p.key === `${CREEP}/body`);
+    const body = scenes.get(roomCanvas)?.primitives.find((p) => p.key === `${CREEP}/base`);
     const vp = viewports.get(roomCanvas);
     if (!body || body.kind !== "circle" || !vp) return undefined;
     return { clientX: body.x * vp.scale + vp.x, clientY: body.y * vp.scale + vp.y };
@@ -274,7 +274,7 @@ describe("窄屏：点选对象切到选中对象标签（#29）", () => {
     dispose = render(
       () => (
         <I18nProvider>
-          <MapAndRoom artStyle="geometric"
+          <MapAndRoom
             settings={settings}
             shell={(shell = createShellState(localStorage, settings, narrow))}
             sourceFor={() => new FixtureSource(bundle, { speed: Infinity })}

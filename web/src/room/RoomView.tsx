@@ -31,10 +31,9 @@ import { sharedHistoryCache } from "../replay/replay-settings.ts";
 import type { ShortcutCommands } from "../customize/keybindings.ts";
 import { registerRoomShortcuts } from "../customize/room-shortcuts.ts";
 import type { RoomDisplay } from "./display-options.ts";
-import type { ArtStyle } from "../art/art-style.ts";
 import { RoomToolbar } from "./RoomToolbar.tsx";
 import { replayAt, replayTick, type RoomRequest, type RoomTarget } from "../shell/shell-state.ts";
-import { seasonArtOf } from "./room-art.ts";
+import { seasonArtFor } from "../art/season-art.ts";
 import type { DataSource } from "./data-source.ts";
 
 type Target = RoomTarget;
@@ -87,8 +86,6 @@ export interface RoomViewProps {
   readonly shortcuts?: ShortcutCommands | undefined;
   /** 显示选项（#26）；默认全开 */
   readonly display?: RoomDisplay | undefined;
-  /** Art Style（必须给出；默认值只在设置里，DEFAULT_ART_STYLE） */
-  readonly artStyle: ArtStyle;
   /** 画面上的房间状态变化时回报（#26：房间信息区块） */
   readonly onShownState?: ((state: RoomState | undefined) => void) | undefined;
   /** 给了就由它进入 Replay（外壳经 navigate 打开 `#/replay?…`，#26）；不给时 Room View 自己打开 */
@@ -252,6 +249,12 @@ export function RoomView(props: RoomViewProps) {
   const shownState = () => (replay.active() ? replay.snapshot()?.roomState : roomState());
 
   // 页面不可见时不构建新 Scene，沿用上一个（#14）
+  /** 这个 Source 当前可用的赛季贴图（#47）；没有 Source 时不取版本信息、不预检 */
+  const currentSeasonArt = () => {
+    const src = source();
+    return src ? seasonArtFor(src)() : undefined;
+  };
+
   const scene = createMemo<Scene | undefined>((previous) => {
     if (!visible()) return previous;
     if (!target()) return undefined;
@@ -269,8 +272,8 @@ export function RoomView(props: RoomViewProps) {
         me: me(),
         allies: props.allies,
         display: props.display,
-        artStyle: props.artStyle,
-        seasonArt: seasonArtOf(source(), props.artStyle),
+        // 在响应式上下文里读：赛季贴图预检完成时 Scene 重建一次
+        seasonArt: currentSeasonArt(),
       },
     );
   });

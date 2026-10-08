@@ -1,5 +1,5 @@
 /**
- * creep 的 say 气泡（#22）：照官方 `processors/say.js` 的几何（100 = 1 格），两种画风共用。
+ * creep 的 say 气泡（#22）：照官方 `processors/say.js` 的几何（100 = 1 格）。
  * 数据是对象的 `actionLog.say = {message, isPublic}`；服务器在下一 Tick 把它置 null，
  * 所以气泡只在说话的那个 Tick 出现，不另做停留或淡出。
  *

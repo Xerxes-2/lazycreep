@@ -13,7 +13,7 @@ const bundle = fixtureBundle(
 function visuals(...commands: unknown[]): Primitive[] {
   const visual = commands.map((c) => (typeof c === "string" ? c : JSON.stringify(c))).join("\n") + "\n";
   const state = { ...roomStateFrom({ objects: {} }), visual };
-  return buildRoomScene({ state }, { artStyle: "geometric", theme: DEFAULT_THEME }).primitives.filter((p) => p.layer === LAYER.visual);
+  return buildRoomScene({ state }, { theme: DEFAULT_THEME }).primitives.filter((p) => p.layer === LAYER.visual);
 }
 
 describe("RoomVisual → Scene", () => {
@@ -205,7 +205,7 @@ describe("RoomVisual → Scene", () => {
         .map((c) => JSON.stringify(c))
         .join("\n"),
     };
-    const scene = buildRoomScene({ state }, { artStyle: "geometric", theme: DEFAULT_THEME });
+    const scene = buildRoomScene({ state }, { theme: DEFAULT_THEME });
     const last = scene.primitives.at(-1);
     expect(last).toMatchObject({ kind: "text", layer: LAYER.visual });
     const vis = scene.primitives.filter((p) => p.layer === LAYER.visual);
@@ -227,7 +227,7 @@ describe("RoomVisual：录制的房间", () => {
     let state: RoomState | undefined;
     source.subscribeRoom("shardSeason", "W13S28", (tick) => {
       state = reduceLiveTick(state, tick);
-      const scene = buildRoomScene({ state }, { artStyle: "geometric", theme: DEFAULT_THEME });
+      const scene = buildRoomScene({ state }, { theme: DEFAULT_THEME });
       for (const p of scene.primitives) {
         if (p.layer !== LAYER.visual || p.kind !== "text") continue;
         expect(p.x).toBeGreaterThanOrEqual(0);

@@ -9,7 +9,7 @@ import { LAYER, buildRoomScene, type RoomSceneView } from "./room-scene.ts";
 import { roomStateFrom } from "./room-state.ts";
 
 const users = { me1: { _id: "me1", username: "Me" } };
-const official: RoomSceneView = { theme: DEFAULT_THEME, me: "me1", artStyle: "official" };
+const official: RoomSceneView = { theme: DEFAULT_THEME, me: "me1" };
 const lit = { ...DEFAULT_ROOM_DISPLAY, lighting: true };
 const unlit = { ...DEFAULT_ROOM_DISPLAY, lighting: false };
 
@@ -53,7 +53,7 @@ describe("官方画风的光照（#49）", () => {
     for (const p of glows(on)) expect(p.objectId).toBeUndefined();
   });
 
-  it("层级在对象（含 creep、rampart）之上、施工中的工地与血条、名字、RoomVisual 之下", () => {
+  it("层级在对象（含 creep、rampart）之上、施工中的工地与名字、RoomVisual 之下", () => {
     const on = scene(
       { ...BASE, ra: { type: "rampart", x: 15, y: 15, user: "me1", isPublic: true }, cs: { type: "constructionSite", x: 30, y: 30, user: "me1", progress: 1, progressTotal: 2 } },
       { ...official, display: lit, zoom: 40 },
@@ -62,16 +62,16 @@ describe("官方画风的光照（#49）", () => {
     expect(layers.size).toBe(1);
     const [layer] = [...layers] as [number];
     expect(layer).toBeGreaterThanOrEqual(LAYER.rampart);
-    expect(layer).toBeLessThan(LAYER.bar);
+    expect(layer).toBeLessThan(LAYER.label);
     for (const p of on.primitives) {
       if (p.objectId === "cs") expect(p.layer).toBeGreaterThan(layer);
-      else if (p.objectId && p.kind !== "bar" && p.kind !== "text") expect(p.layer).toBeLessThan(layer);
+      else if (p.objectId && p.kind !== "text") expect(p.layer).toBeLessThan(layer);
     }
   });
 
-  it("默认（不给显示选项）开启；几何画风下没有光照", () => {
+  it("默认（不给显示选项）开启；显示选项关掉后没有光照", () => {
     expect(glows(scene(BASE))).not.toEqual([]);
-    expect(glows(scene(BASE, { ...official, artStyle: "geometric", display: lit }))).toEqual([]);
+    expect(glows(scene(BASE, { ...official, display: unlit }))).toEqual([]);
   });
 
   it("按官方的条件点亮：link 有能量、lab 有矿物、矿物按种类染色、孵化中的 creep 不亮", () => {

@@ -5,7 +5,7 @@
  * lighting 图层（glow）、补间与常驻动画都不做，动画部件取一个静态画面。并入 official-painters.ts 的映射表。
  */
 import type { Color } from "../scene/scene.ts";
-import { LAYER, center, hitsBar, num, type ObjectPainter, type ObjectPainters, type PrimitiveDraft } from "./room-paint.ts";
+import { LAYER, center, num, type ObjectPainter, type ObjectPainters, type PrimitiveDraft } from "./room-paint.ts";
 import type { RoomObject } from "./room-state.ts";
 import { ENERGY, circle, clamp01, officialSprite, ownerTint, progressArc, progressPie, storeAmounts, storeTotal, u, zLayer } from "./official-sprite.ts";
 
@@ -107,14 +107,14 @@ const portal: ObjectPainter = (obj) => {
 // ---- powerBank（powerBank.metadata.js：贴图 + 面积与 power 成正比的红圆） ----
 /** 官方 constants.POWER_BANK_CAPACITY_MAX */
 const POWER_BANK_CAPACITY_MAX = 5000;
-const powerBank: ObjectPainter = (obj, ctx) => {
+const powerBank: ObjectPainter = (obj) => {
   const layer = zLayer(11);
   const power = storeAmounts(obj)["power"] ?? num(obj, "power") ?? 0;
   const radius = Math.sqrt((clamp01(power / POWER_BANK_CAPACITY_MAX) * 3000) / Math.PI);
   const { x, y } = center(obj);
   const prims: PrimitiveDraft[] = [officialSprite(obj, "body", "powerBank", { width: 200, layer })];
   if (radius > 0) prims.push({ part: "power", kind: "circle", layer, x, y, radius: u(radius), fill: 0xf41f33, stroke: { color: 0x8d000d, width: u(10) } });
-  return [...prims, ...hitsBar(obj, ctx)];
+  return prims;
 };
 
 // ---- invaderCore（invaderCore.metadata.js：贴图 + 剩余寿命扇形 + 孵化进度弧） ----
@@ -137,7 +137,7 @@ const invaderCore: ObjectPainter = (obj, ctx) => {
       if (arc) prims.push(arc);
     }
   }
-  return [...prims, ...hitsBar(obj, ctx)];
+  return prims;
 };
 
 // ---- nuke（nuke.metadata.js：落地前在 effects 图层画半透明的核弹标记与红晕；落地闪光不做） ----

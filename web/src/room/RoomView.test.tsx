@@ -46,7 +46,7 @@ function mount() {
     setDataSource = setSource;
     return (
       <I18nProvider>
-        <RoomView artStyle="geometric"
+        <RoomView
           settings={createSettings(localStorage)}
           sourceFor={() => {
             const source = new FixtureSource(bundle, { speed: Infinity });

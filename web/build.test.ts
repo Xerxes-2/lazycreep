@@ -124,6 +124,17 @@ describe("赛季贴图不进构建产物（#47）", () => {
   });
 });
 
+describe("只有官方画风（#54，ADR 0007）", () => {
+  it("产物里没有几何地形、画风设置、血条开关与已删除的配色项", () => {
+    // 几何地形的图元 key 是 `terrain/<行>/<列>`；官方地形是 `official-terrain`
+    const markers = ["terrain/", "art-style", "art.style.", "display.bars", "palette.hitsBar", "palette.barBackground", "palette.terrainWall"];
+    for (const file of files.filter((f) => f.endsWith(".js") || f.endsWith(".html"))) {
+      const text = readFileSync(join(outDir, file), "latin1");
+      for (const marker of markers) expect(text.includes(marker), `${file}: ${marker}`).toBe(false);
+    }
+  });
+});
+
 describe("官方美术随构建产物发布（#42）", () => {
   const artDir = join(here, "public/official-art");
   const svgs = readdirSync(artDir).filter((f) => f.endsWith(".svg"));

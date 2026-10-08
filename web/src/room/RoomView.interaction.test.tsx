@@ -6,11 +6,12 @@ import { createSignal } from "solid-js";
 import { render } from "solid-js/web";
 import { I18nProvider } from "../i18n";
 import type { Scene } from "../scene/scene.ts";
+import { DEFAULT_THEME } from "../scene/theme.ts";
 import type { SceneView, SceneViewOptions, Viewport } from "../scene/pixi-scene-view.ts";
 import { createSettings } from "../settings/settings.ts";
 import { FixtureSource, fixtureBundle } from "../source/fixture-source.ts";
 import type { Source } from "../source/source.ts";
-import { BAR_MIN_ZOOM } from "./room-detail-rules.ts";
+import { LABEL_MIN_ZOOM } from "./room-detail-rules.ts";
 import { RoomView, type RoomViewProps } from "./RoomView.tsx";
 
 const bundle = fixtureBundle(
@@ -72,7 +73,7 @@ function mount(detailsMount?: HTMLElement, initial?: RoomViewProps["open"]) {
     setOpen = set;
     return (
       <I18nProvider>
-        <RoomView artStyle="geometric"
+        <RoomView
           settings={createSettings(localStorage)}
           sourceFor={trackingSource}
           createView={fakeView}
@@ -111,10 +112,11 @@ function tap(sx: number, sy: number, pointerType: string) {
 
 /** 对象所在格子中心的屏幕坐标 */
 function screenOf(id: string): [number, number] {
-  const body = lastScene().primitives.find((p) => p.key === `${id}/body`);
-  if (!body || body.kind !== "circle") throw new Error(`找不到 ${id}`);
+  // 官方 creep 的底盘是以格子中心为圆心的圆
+  const base = lastScene().primitives.find((p) => p.key === `${id}/base`);
+  if (!base || base.kind !== "circle") throw new Error(`找不到 ${id}`);
   const vp = lastViewport();
-  return [body.x * vp.scale + vp.x, body.y * vp.scale + vp.y];
+  return [base.x * vp.scale + vp.x, base.y * vp.scale + vp.y];
 }
 
 function wheel(deltaY: number, x = 300, y = 300) {
@@ -190,9 +192,10 @@ describe("Room View 交互", () => {
   it("我方对象按“我方”颜色画（当前用户来自 Source.getMe）", async () => {
     mount();
     await openRoom("W13S28");
+    // 我方建筑的贴图按“我方”颜色染色（没有当前用户时都按陌生人着色，不会出现这个颜色）
     await settle(() => {
-      const body = lastScene().primitives.find((p) => p.key === `${CREEP}/body`);
-      expect(body?.kind === "circle" && body.fill).toBe(0x5d9cec);
+      const owned = lastScene().primitives.filter((p) => p.kind === "image" && p.tint === DEFAULT_THEME.owned);
+      expect(owned.length).toBeGreaterThan(0);
     });
   });
 
@@ -204,16 +207,17 @@ describe("Room View 交互", () => {
     await settle(() => expect(container.querySelector("[data-testid=room-details]")).toBeNull());
   });
 
-  it("滚轮放大越过阈值后出现血条，拖拽平移", async () => {
+  it("滚轮放大越过阈值后出现玩家名，拖拽平移", async () => {
+    const names = () => lastScene().primitives.some((p) => p.key.endsWith("/owner-name"));
     mount();
     await openRoom("W13S28");
     const fitted = lastViewport();
-    expect(fitted.scale).toBeLessThan(BAR_MIN_ZOOM);
-    expect(lastScene().primitives.some((p) => p.kind === "bar")).toBe(false);
+    expect(fitted.scale).toBeLessThan(LABEL_MIN_ZOOM);
+    expect(names()).toBe(false);
 
     for (let i = 0; i < 5; i++) wheel(-100);
     await settle(() => expect(lastViewport().scale).toBeGreaterThan(fitted.scale * 1.5));
-    await settle(() => expect(lastScene().primitives.some((p) => p.kind === "bar")).toBe(true));
+    await settle(() => expect(names()).toBe(true));
 
     const before = lastViewport();
     for (const [type, x] of [["pointerdown", 100], ["pointermove", 150], ["pointerup", 150]] as const) {

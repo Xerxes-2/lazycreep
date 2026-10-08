@@ -59,7 +59,6 @@ const scene: Scene = {
     { key: "l", kind: "line", layer: 100, points: [1, 1, 5, 5, 9, 1], stroke: { color: 0xff0000, width: 0.1, alpha: 0.5 } },
     { key: "p", kind: "polygon", layer: 20, points: [20, 20, 21, 20, 20.5, 21], fill: 0x00ff00 },
     { key: "x", kind: "text", layer: 60, x: 25, y: 25, text: "8", size: 0.5, color: 0xffffff, stroke: { color: 0, width: 0.04 } },
-    { key: "b", kind: "bar", layer: 50, objectId: "creep1", x: 10.1, y: 10.8, width: 0.8, height: 0.12, value: 0.25, fill: 0x00ff00, background: 0 },
   ],
 };
 

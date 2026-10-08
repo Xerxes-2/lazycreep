@@ -70,7 +70,7 @@ function mount() {
   dispose = render(
     () => (
       <I18nProvider>
-        <MapAndRoom artStyle="geometric"
+        <MapAndRoom
           settings={settings}
           shell={(shell = createShellState(localStorage, settings))}
           sourceFor={() => new FixtureSource(bundle, { speed: Infinity })}
@@ -99,7 +99,7 @@ async function openW13S28() {
 }
 
 function tapObject(id: string) {
-  const body = lastScene().primitives.find((p) => p.key === `${id}/body`);
+  const body = lastScene().primitives.find((p) => p.key === `${id}/base`);
   if (!body || body.kind !== "circle") throw new Error(`找不到 ${id}`);
   const vp = roomCanvas().viewport!;
   const point = { clientX: body.x * vp.scale + vp.x, clientY: body.y * vp.scale + vp.y };
@@ -151,7 +151,7 @@ describe("Room View 的 Sidebar 区块与左侧按钮列（#26）", () => {
     shell.setSectionCollapsed("room.selected", true);
     expect(sectionBody("room.selected").hidden).toBe(true);
 
-    await settle(() => expect(lastScene().primitives.some((p) => p.key === `${CREEP}/body`)).toBe(true));
+    await settle(() => expect(lastScene().primitives.some((p) => p.key === `${CREEP}/base`)).toBe(true));
     tapObject(CREEP);
     await settle(() => expect(sectionBody("room.selected").hidden).toBe(false));
     expect(q("[data-section='room.selected'] [data-testid=room-details]")).not.toBeNull();
@@ -167,7 +167,9 @@ describe("Room View 的 Sidebar 区块与左侧按钮列（#26）", () => {
     mount();
     await openW13S28();
     const box = (name: string) => q<HTMLInputElement>(`[data-section="room.display"] input[name="display-${name}"]`)!;
-    for (const name of ["say", "visual", "bars", "names"]) expect(box(name).checked).toBe(true);
+    for (const name of ["say", "visual", "names", "lighting"]) expect(box(name).checked).toBe(true);
+    // #54：血条开关已删除
+    expect(q(`[data-section="room.display"] input[name="display-bars"]`)).toBeNull();
 
     box("names").click();
     box("say").click();

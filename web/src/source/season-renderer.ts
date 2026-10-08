@@ -4,7 +4,7 @@
  *
  * 资源在官方静态资源主机上，不给 CORS 头，不能直接作 WebGL 纹理；这里把它们换成同源的
  * Gateway 只读路径 `/season-static/<…>`（Gateway 转发到静态资源主机的 `/seasons/<…>`）。
- * 认不出的地址直接丢掉，用到它的对象退回几何画法。
+ * 认不出的地址直接丢掉，用到它的对象退回兜底画法。
  */
 import { isRecord } from "../storage/local-store.ts";
 

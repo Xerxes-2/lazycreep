@@ -45,7 +45,7 @@ function mount() {
   dispose = render(
     () => (
       <I18nProvider>
-        <MapAndRoom artStyle="geometric"
+        <MapAndRoom
           settings={settings}
           shell={createShellState(localStorage, settings)}
           sourceFor={() => new FixtureSource(bundle, { speed: Infinity })}

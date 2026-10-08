@@ -4,7 +4,7 @@
  *
  * 适配层加载贴图失败时什么都不画，所以 Scene 构建必须事先知道贴图能不能用：
  * {@link seasonArtFor} 先把下发的贴图逐张预检（取到并能解码），只有预检通过的贴图才会出现在
- * {@link SeasonArt} 里；没有配置、还在预检或预检失败的，画法退回几何。每张贴图预检完会更新一次，
+ * {@link SeasonArt} 里；没有配置、还在预检或预检失败的，画法退回兜底画法（room/season-painters.ts）。每张贴图预检完会更新一次，
  * 让 Room View 重建一次 Scene（不是常驻动画）。
  *
  * 贴图不打包进构建产物，运行时经 Gateway 的只读路径 `/season-static/` 取；没有 ISC 之类的许可声明，
@@ -34,7 +34,7 @@ export interface SeasonMainSprite extends SeasonSprite {
 export interface SeasonArt {
   /**
    * 对象类型 metadata 里用 `texture` 的 sprite（objects 图层）：贴图可用、metadata 里有它时给出 URL 与尺寸，
-   * 否则 undefined（画法退回几何）。
+   * 否则 undefined（画法退回兜底画法）。
    */
   sprite(objectType: string, texture: string): SeasonSprite | undefined;
   /** 对象类型的主贴图（通用画法用）；metadata 里没有这个类型或贴图都不可用时 undefined */

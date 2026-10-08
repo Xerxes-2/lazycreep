@@ -9,12 +9,12 @@
  * - 导入是“还原”：登记范围内、文件里没有的本机键会被删掉；未知键与类型不对的值忽略并报告。
  *   每个功能读存储时自己再做一遍字段级校验，所以这里只校验到值的类型。
  * - 导入只写存储；让页面生效由调用方负责（App 重建整个界面，见 App.tsx）。
+ * - 已删除的设置（RETIRED_SETTING_KEYS）导入时静默忽略，不算“无法识别”；启动时从本机清除。
  */
 
 import { ALERT_MEMORY_STORAGE } from "../alert/alert-memory.ts";
 import { ALERT_SETTINGS_STORAGE } from "../alert/alert-settings.ts";
 import { ALLY_LIST_STORAGE } from "../allies/ally-list.ts";
-import { ART_STYLE_STORAGE } from "../art/art-style.ts";
 import { CONSOLE_SETTINGS_STORAGE } from "../console/console-settings.ts";
 import { LOCALE_STORAGE } from "../i18n/locale.ts";
 import { MAP_LAYERS_STORAGE } from "../map/map-layer-toggles.ts";
@@ -23,7 +23,7 @@ import { ROOM_CAMERA_STORAGE } from "../room/room-camera-store.ts";
 import { ROOM_DISPLAY_STORAGE } from "../room/display-options.ts";
 import { CONNECTION_STORAGE } from "../settings/settings.ts";
 import { MAIN_VIEW_STORAGE, SHELL_STORAGE } from "../shell/shell-state.ts";
-import type { StoredKey, StoredKind } from "../storage/local-store.ts";
+import { removeKey, type KeyValueStorage, type StoredKey, type StoredKind } from "../storage/local-store.ts";
 import { STATIC_CACHE_STORAGE } from "../source/static-cache.ts";
 import { COLOR_SCHEME_STORAGE } from "./color-scheme.ts";
 import { KEYBINDINGS_STORAGE } from "./keybindings.ts";
@@ -47,12 +47,22 @@ export const STORED_KEYS: readonly StoredKey[] = [
   ROOM_CAMERA_STORAGE,
   MAP_LAYERS_STORAGE,
   ROOM_DISPLAY_STORAGE,
-  ART_STYLE_STORAGE,
   /** 不导出的运行状态 */
   ALERT_MEMORY_STORAGE,
   MAIN_VIEW_STORAGE,
   STATIC_CACHE_STORAGE,
 ];
+
+/**
+ * 已删除的设置：不再是本应用存储的键，不登记进 STORED_KEYS。旧备份里出现时静默忽略，
+ * 本机残留的值由 {@link clearRetiredSettings} 在启动时清除。
+ * - `msc.artStyle`：画风（#42）；#54 起只有官方画风（ADR 0007）。
+ */
+export const RETIRED_SETTING_KEYS: readonly string[] = ["msc.artStyle"];
+
+export function clearRetiredSettings(storage: (KeyValueStorage & Partial<Pick<Storage, "removeItem">>) | undefined): void {
+  for (const key of RETIRED_SETTING_KEYS) removeKey(storage, key);
+}
 
 const EXPORTED = STORED_KEYS.filter((s) => s.role === "settings");
 
@@ -160,6 +170,7 @@ export function importSettings(storage: TransferStorage, file: unknown): ImportR
   const accepted = new Map<string, string>();
   const ignored: string[] = [];
   for (const [key, value] of Object.entries(file["settings"])) {
+    if (RETIRED_SETTING_KEYS.includes(key)) continue;
     const kind = kindOf(key);
     if (kind === undefined || !fits(kind, value)) {
       ignored.push(key);

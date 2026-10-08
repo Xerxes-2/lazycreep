@@ -1,11 +1,11 @@
 /**
- * #42：官方画风（Art Style = 官方）下 buildRoomScene 的输出。
+ * #42：官方画风下 buildRoomScene 的输出（#54 起 Room View 只有官方画风）。
  */
 import { describe, expect, it } from "vitest";
 import { officialArtUrl } from "../art/official-art.ts";
 import type { ImagePrimitive, Primitive, Scene } from "../scene/scene.ts";
 import { DEFAULT_THEME } from "../scene/theme.ts";
-import { BAR_MIN_ZOOM } from "./room-detail-rules.ts";
+import { LABEL_MIN_ZOOM } from "./room-detail-rules.ts";
 import { buildRoomScene, type RoomSceneView } from "./room-scene.ts";
 import { roomStateFrom } from "./room-state.ts";
 
@@ -15,7 +15,7 @@ const users = {
   ally1: { _id: "ally1", username: "Friend" },
   foe1: { _id: "foe1", username: "Foe" },
 };
-const official: RoomSceneView = { theme, me: "me1", allies: new Set(["friend"]), artStyle: "official" };
+const official: RoomSceneView = { theme, me: "me1", allies: new Set(["friend"]) };
 
 function scene(objects: Record<string, Record<string, unknown>>, view: RoomSceneView = official): Scene {
   return buildRoomScene({ state: roomStateFrom({ objects, users }) }, view);
@@ -95,7 +95,7 @@ describe("官方画风：贴图", () => {
 });
 
 describe("官方画风：染色按我方 / 盟友 / 陌生人", () => {
-  it("三种主人的边框颜色与几何画风的主人色一致", () => {
+  it("三种主人的边框颜色是我方、盟友、陌生人的主人色", () => {
     const objects = {
       mine: { type: "extension", x: 1, y: 1, user: "me1" },
       ally: { type: "extension", x: 2, y: 1, user: "ally1" },
@@ -106,41 +106,26 @@ describe("官方画风：染色按我方 / 盟友 / 陌生人", () => {
     const tint = (id: string) => images(s, id)[0]!.tint;
     expect(tint("mine")).toBe(theme.owned);
     expect(tint("ally")).toBe(theme.ally);
-    // 陌生人与几何画风 creep 的主人色相同
-    const creepFill = of(scene(objects, { ...official, artStyle: "geometric" }), "creep").find((p) => p.kind === "circle");
-    expect(tint("foe")).toBe(creepFill && "fill" in creepFill ? creepFill.fill : undefined);
+    expect(theme.strangers).toContain(tint("foe"));
+    // 与同一主人的 creep 中心（低缩放时的主人色圆）一致
+    const badge = of(s, "creep").find((p) => p.key === "creep/badge");
+    expect(tint("foe")).toBe(badge?.kind === "circle" ? badge.fill : undefined);
     expect(new Set([tint("mine"), tint("ally"), tint("foe")]).size).toBe(3);
   });
 });
 
-describe("官方画风：没有映射的类型退回几何画法", () => {
-  it("未知类型与几何画风输出相同", () => {
-    const objects = {
-      odd: { type: "scoreCollector", x: 3, y: 3 },
-    };
-    const view = { ...official, zoom: BAR_MIN_ZOOM + 1 };
-    const a = scene(objects, view);
-    const b = scene(objects, { ...view, artStyle: "geometric" });
-    for (const id of Object.keys(objects)) expect(of(a, id)).toEqual(of(b, id));
-  });
-
-  it("官方画风不叠加通用血条与资源条；选中高亮照常", () => {
-    const view = { ...official, zoom: BAR_MIN_ZOOM + 1, selectedId: "t" };
+describe("官方画风：没有通用进度条", () => {
+  it("不叠加通用血条与资源条；选中高亮照常", () => {
+    const view = { ...official, zoom: LABEL_MIN_ZOOM + 1, selectedId: "t" };
     const objects = {
       t: { type: "tower", x: 20, y: 20, user: "foe1", hits: 1000, hitsMax: 3000 },
       r: { type: "reactor", x: 25, y: 25, user: "foe1", store: { T: 500 }, storeCapacityResource: { T: 1000 } },
     };
     const s = scene(objects, view);
-    expect(s.primitives.filter((p) => p.kind === "bar")).toEqual([]);
+    const parts = s.primitives.map((p) => p.key.split("/")[1]);
+    expect(parts).not.toContain("hits");
+    expect(parts).not.toContain("store");
     expect(of(s, "t").map((p) => p.key.split("/")[1])).toContain("selected");
-  });
-
-  it("几何画风仍然叠加血条与资源条", () => {
-    const s = scene(
-      { t: { type: "tower", x: 20, y: 20, user: "foe1", hits: 1000, hitsMax: 3000 } },
-      { ...official, artStyle: "geometric", zoom: BAR_MIN_ZOOM + 1 },
-    );
-    expect(of(s, "t").map((p) => p.key.split("/")[1])).toContain("hits");
   });
 });
 

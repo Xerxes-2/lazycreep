@@ -1,6 +1,6 @@
 /**
- * #47：官方画风下，赛季对象（reactor、钍矿、掉落的钍）用赛季服下发的贴图；
- * 没有配置、贴图还没加载好或加载失败时，这几类对象的输出与几何画法完全相同。
+ * #47：赛季对象（reactor、钍矿、掉落的钍）用赛季服下发的贴图；
+ * 没有配置、贴图还没加载好或加载失败时，这几类对象用兜底画法（season-painters.ts，#54 起只剩这里还是简单图形）。
  */
 import { describe, expect, it } from "vitest";
 import { seasonArt, type SeasonArt } from "../art/season-art.ts";
@@ -31,7 +31,7 @@ const OBJECTS = {
 };
 
 function scene(view: Partial<RoomSceneView>): Scene {
-  return buildRoomScene({ state: roomStateFrom({ objects: OBJECTS, users }) }, { artStyle: "geometric", theme, me: "me1", ...view });
+  return buildRoomScene({ state: roomStateFrom({ objects: OBJECTS, users }) }, { theme, me: "me1", ...view });
 }
 
 const images = (s: Scene, id: string) =>
@@ -40,7 +40,7 @@ const of = (s: Scene, id: string) => s.primitives.filter((p) => p.objectId === i
 
 describe("赛季对象的官方贴图", () => {
   it("有配置且贴图可用时：reactor 是 1.5 格的炉芯 + 外圈，按下发的同源地址引用", () => {
-    const s = scene({ artStyle: "official", seasonArt: seasonArt(renderer, ALL) });
+    const s = scene({ seasonArt: seasonArt(renderer, ALL) });
     expect(images(s, "r")).toEqual([
       expect.objectContaining({ url: "/season-static/season11/renderer/reactor-core.png", x: 24.75, y: 24.75, width: 1.5, height: 1.5 }),
       expect.objectContaining({ url: "/season-static/season11/renderer/reactor-edge.png", x: 24.75, y: 24.75, width: 1.5, height: 1.5 }),
@@ -52,8 +52,8 @@ describe("赛季对象的官方贴图", () => {
   });
 
   it("钍矿用 1.28 格的钍贴图，掉落的钍按数量缩放；别的矿物与能量不受影响", () => {
-    const s = scene({ artStyle: "official", seasonArt: seasonArt(renderer, ALL) });
-    const geo = scene({ artStyle: "official" });
+    const s = scene({ seasonArt: seasonArt(renderer, ALL) });
+    const geo = scene({});
     expect(images(s, "m")).toEqual([
       expect.objectContaining({ url: "/season-static/season11/renderer/T.png", x: 4.86, y: 4.86, width: 1.28, height: 1.28 }),
     ]);
@@ -66,27 +66,31 @@ describe("赛季对象的官方贴图", () => {
     expect(of(s, "e")).toEqual(of(geo, "e"));
   });
 
-  it("没有配置、贴图还没可用或加载失败时，赛季对象与几何画法完全相同", () => {
-    const geometric = scene({});
+  it("没有配置、贴图还没可用或加载失败时，赛季对象用兜底画法，别的对象不受影响", () => {
+    const official = scene({});
+    const parts = (s: Scene, id: string) => of(s, id).map((p) => `${p.kind}:${p.key.split("/")[1]}`);
     const cases: (SeasonArt | undefined)[] = [
       undefined,
       seasonArt(renderer, new Set()),
       seasonArt({ resources: {}, metadata: {} }, ALL),
       seasonArt({ resources: renderer.resources, metadata: {} }, ALL),
     ];
-    const official = scene({ artStyle: "official" });
     for (const art of cases) {
-      const s = scene({ artStyle: "official", ...(art ? { seasonArt: art } : {}) });
-      // 赛季对象退回几何画法（#13），别的对象照官方画法
-      for (const id of ["r", "idle", "m", "d"]) expect(of(s, id), id).toEqual(of(geometric, id));
+      const s = scene({ ...(art ? { seasonArt: art } : {}) });
+      // 赛季对象用兜底画法（没有贴图），别的对象照官方画法
+      for (const id of ["r", "idle", "m", "d"]) expect(images(s, id), id).toEqual([]);
+      expect(parts(s, "r")).toEqual(["circle:body", "polygon:frame", "circle:thorium"]);
+      expect(parts(s, "idle")).toEqual(["circle:body", "polygon:frame"]);
+      expect(parts(s, "m")).toEqual(["circle:body", "text:kind"]);
+      expect(parts(s, "d")).toEqual(["circle:body"]);
       for (const id of ["h", "e"]) expect(of(s, id), id).toEqual(of(official, id));
       // 钍矿与掉落的钍是钍色，不是官方表里的灰色
       for (const id of ["m", "d"]) expect(of(s, id).find((p) => p.key === `${id}/body`), id).toMatchObject({ fill: THORIUM });
     }
   });
 
-  it("只有炉芯可用、外圈失败时 reactor 整个退回几何，不画半个", () => {
-    const s = scene({ artStyle: "official", seasonArt: seasonArt(renderer, new Set(["reactor-core", "T"])) });
+  it("只有炉芯可用、外圈失败时 reactor 整个退回兜底画法，不画半个", () => {
+    const s = scene({ seasonArt: seasonArt(renderer, new Set(["reactor-core", "T"])) });
     expect(of(s, "r")).toEqual(of(scene({}), "r"));
     expect(images(s, "m")).toHaveLength(1);
   });
@@ -104,10 +108,10 @@ describe("赛季对象的官方贴图", () => {
         },
       },
     };
-    const fooScene = (art: SeasonArt | undefined, artStyle: "official" | "geometric" = "official") =>
+    const fooScene = (art: SeasonArt | undefined) =>
       buildRoomScene(
         { state: roomStateFrom({ objects: { f: { type: "foo", x: 10, y: 10, user: "me1" } }, users }) },
-        { theme, me: "me1", artStyle, ...(art ? { seasonArt: art } : {}) },
+        { theme, me: "me1", ...(art ? { seasonArt: art } : {}) },
       );
 
     it("官方表与本地赛季画法都没有的类型，按 metadata 的尺寸画它的主贴图，按需主人色染色", () => {
@@ -117,18 +121,11 @@ describe("赛季对象的官方贴图", () => {
       ]);
     });
 
-    it("预检失败、没有配置或几何画风时退回几何占位", () => {
+    it("预检失败或没有配置时画占位", () => {
       const placeholder = (s: Scene) => of(s, "f").map((p) => p.key);
       const expected = ["f/placeholder", "f/placeholder-label"];
       expect(placeholder(fooScene(seasonArt(foo, new Set())))).toEqual(expected);
       expect(placeholder(fooScene(undefined))).toEqual(expected);
-      expect(placeholder(fooScene(seasonArt(foo, new Set(["foo"])), "geometric"))).toEqual(expected);
     });
-  });
-
-  it("几何画风不用赛季贴图", () => {
-    const s = scene({ seasonArt: seasonArt(renderer, ALL) });
-    expect(of(s, "r")).toEqual(of(scene({}), "r"));
-    expect(images(s, "m")).toEqual([]);
   });
 });

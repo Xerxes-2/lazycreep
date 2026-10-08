@@ -292,7 +292,7 @@ export function roadLinks(grid: CellGrid): LinePrimitive[] {
 /** 全页共用的一份（buildRoomScene 用） */
 const shared = createOfficialLayers();
 
-/** 官方画风的房间级图层（buildRoomScene 在官方画风下用它替代几何地形） */
+/** 官方画风的房间级图层：地形、道路连线、合并的 rampart（buildRoomScene 用） */
 export function officialRoomLayers(state: RoomState, terrain: Terrain | undefined, ctx: PaintContext): Primitive[] {
   return shared.layers(state, terrain, ctx);
 }

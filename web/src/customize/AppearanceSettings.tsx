@@ -6,14 +6,10 @@ import { useI18n, type MessageKey } from "../i18n";
 import type { StrangerColoring } from "../scene/theme.ts";
 import { colorToHex, hexToColor, PALETTE_KEYS, type ColorScheme } from "./color-scheme.ts";
 import { UI_THEME_PREFERENCES, type UiThemeStore } from "./ui-theme.ts";
-import type { ArtStyleStore } from "../art/art-style.ts";
-import { ArtStyleSettings } from "../art/ArtStyleSettings.tsx";
 
 export interface AppearanceSettingsProps {
   readonly uiTheme: UiThemeStore;
   readonly colors: ColorScheme;
-  /** Art Style（#42） */
-  readonly artStyle?: ArtStyleStore;
 }
 
 export function AppearanceSettings(props: AppearanceSettingsProps) {
@@ -51,8 +47,6 @@ export function AppearanceSettings(props: AppearanceSettingsProps) {
           )}
         </For>
       </fieldset>
-
-      <Show when={props.artStyle}>{(store) => <ArtStyleSettings store={store()} />}</Show>
 
       <fieldset class="settings__group">
         <legend>{t("customize.rules.title")}</legend>

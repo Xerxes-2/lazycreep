@@ -147,7 +147,7 @@ describe("PvP 卡片参战者名字旁显示徽章（#43）", () => {
     dispose = render(
       () => (
         <I18nProvider>
-          <MapAndRoom artStyle="geometric"
+          <MapAndRoom
             settings={settings}
             sourceFor={() => new FixtureSource(season, { speed: Infinity })}
             createView={fakeView}

@@ -119,7 +119,6 @@ export function RoomInfoSection(props: RoomInfoSectionProps) {
 const DISPLAY_LABELS: Readonly<Record<(typeof ROOM_DISPLAY_KEYS)[number], MessageKey>> = {
   say: "roomSidebar.display.say",
   visual: "roomSidebar.display.visual",
-  bars: "roomSidebar.display.bars",
   names: "roomSidebar.display.names",
   lighting: "roomSidebar.display.lighting",
 };

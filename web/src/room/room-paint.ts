@@ -1,5 +1,5 @@
 /**
- * Room View 画法的公共部分：层级、画法签名与小工具。具体画法在 room-painters.ts 的映射表里。
+ * Room View 画法的公共部分：层级、画法签名与小工具。具体画法在 official-painters.ts 的映射表里。
  */
 import type { SeasonArt } from "../art/season-art.ts";
 import type { Color, Primitive } from "../scene/scene.ts";
@@ -19,7 +19,6 @@ export const LAYER = {
   creep: 30,
   /** 半透明盖在 creep 上 */
   rampart: 40,
-  bar: 50,
   label: 60,
   /** RoomVisual（脚本画的东西）在一切之上 */
   visual: 100,
@@ -28,14 +27,14 @@ export const LAYER = {
 type Draft<P> = P extends Primitive ? Omit<P, "key" | "objectId"> & { readonly part: string } : never;
 
 /**
- * 画法产出的图元草稿：`part` 在同一个对象内唯一（如 "body"、"hits"），
+ * 画法产出的图元草稿：`part` 在同一个对象内唯一（如 "body"、"energy"），
  * buildRoomScene 把它变成 Scene 里的 key（`<对象 id>/<part>`）并填上 objectId。
  */
 export type PrimitiveDraft = Draft<Primitive>;
 
 export interface PaintContext {
   readonly theme: Theme;
-  /** 画布上 1 格对应的像素数；血条显隐等按缩放的规则用它 */
+  /** 画布上 1 格对应的像素数；玩家名、徽章等按缩放显隐的规则用它 */
   readonly zoom: number;
   /** 当前选中的对象 id */
   readonly selectedId: string | undefined;
@@ -44,7 +43,7 @@ export interface PaintContext {
   readonly gameTime?: number | undefined;
   /** 对象主人的颜色；按玩家 / 阵营着色的规则替换这里 */
   ownerColor(user: unknown): Color;
-  /** 已确认可用的赛季贴图（#47）；没有时赛季对象用几何画法 */
+  /** 已确认可用的赛季贴图（#47）；没有时赛季对象用兜底画法（season-painters.ts） */
   readonly seasonArt?: SeasonArt;
 }
 
@@ -78,36 +77,6 @@ export function storeFraction(obj: RoomObject): number | undefined {
   const capacity = num(obj, "storeCapacity") || sumValues(obj["storeCapacityResource"]);
   if (used === undefined || !capacity) return undefined;
   return Math.min(1, used / capacity);
-}
-
-export function hitsFraction(obj: RoomObject): number | undefined {
-  const hits = num(obj, "hits");
-  const max = num(obj, "hitsMax");
-  if (hits === undefined || !max) return undefined;
-  return Math.max(0, Math.min(1, hits / max));
-}
-
-/** 格子下沿的一条进度条 */
-export function tileBar(obj: RoomObject, part: string, value: number, fill: Color, ctx: PaintContext): PrimitiveDraft {
-  const { x, y } = center(obj);
-  return {
-    part,
-    kind: "bar",
-    layer: LAYER.bar,
-    x: x - 0.4,
-    y: y + 0.32,
-    width: 0.8,
-    height: 0.12,
-    value,
-    fill,
-    background: ctx.theme.barBackground,
-  };
-}
-
-/** 有血量时画血条 */
-export function hitsBar(obj: RoomObject, ctx: PaintContext): PrimitiveDraft[] {
-  const value = hitsFraction(obj);
-  return value === undefined ? [] : [tileBar(obj, "hits", value, ctx.theme.hitsBar, ctx)];
 }
 
 /** 以格子中心为圆心、半径 r 的正多边形顶点（首个顶点朝上）。 */

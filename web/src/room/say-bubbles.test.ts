@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import type { Primitive, Scene } from "../scene/scene.ts";
 import { DEFAULT_THEME } from "../scene/theme.ts";
 import { DEFAULT_ROOM_DISPLAY } from "./display-options.ts";
-import { BAR_MIN_ZOOM } from "./room-detail-rules.ts";
+import { LABEL_MIN_ZOOM } from "./room-detail-rules.ts";
 import { LAYER } from "./room-paint.ts";
 import { buildRoomScene, type RoomSceneView } from "./room-scene.ts";
 import { roomStateFrom, type RoomState } from "./room-state.ts";
@@ -20,7 +20,7 @@ function stateWith(objects: Record<string, Record<string, unknown>>): RoomState 
 const saying = (message: unknown, isPublic = false, extra: Record<string, unknown> = {}) =>
   stateWith({ c: { _id: "c", type: "creep", x: 10, y: 20, user: "u1", actionLog: { say: { message, isPublic } }, ...extra } });
 
-const view: RoomSceneView = { artStyle: "geometric", theme: DEFAULT_THEME, zoom: 40 };
+const view: RoomSceneView = { theme: DEFAULT_THEME, zoom: 40 };
 
 const part = (scene: Scene, name: string): Primitive | undefined => scene.primitives.find((p) => p.key === `c/${name}`);
 
@@ -95,14 +95,14 @@ describe("say 气泡", () => {
   });
 
   it("缩放低于进度条阈值时隐藏，选中的 creep 除外", () => {
-    const far = { ...view, zoom: BAR_MIN_ZOOM - 1 };
+    const far = { ...view, zoom: LABEL_MIN_ZOOM - 1 };
     expect(bubble(buildRoomScene({ state: saying("x") }, far)).shape).toBeUndefined();
     expect(bubble(buildRoomScene({ state: saying("x") }, { ...far, selectedId: "c" })).shape).toBeDefined();
-    expect(bubble(buildRoomScene({ state: saying("x") }, { ...view, zoom: BAR_MIN_ZOOM })).shape).toBeDefined();
+    expect(bubble(buildRoomScene({ state: saying("x") }, { ...view, zoom: LABEL_MIN_ZOOM })).shape).toBeDefined();
   });
 
-  it("官方画风同样画", () => {
-    const { shape, text } = bubble(buildRoomScene({ state: saying("x", true) }, { ...view, artStyle: "official" }));
+  it("公开的 say 用红色气泡", () => {
+    const { shape, text } = bubble(buildRoomScene({ state: saying("x", true) }, view));
     expect(shape?.fill).toBe(0xdd8888);
     expect(text?.text).toBe("x");
   });

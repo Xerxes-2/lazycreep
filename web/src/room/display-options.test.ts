@@ -1,5 +1,6 @@
 /**
- * #26：显示选项（say 气泡、RoomVisual、血条、玩家名）作用于 Room View 的 Scene 构建，并在重新挂载后恢复。
+ * #26：显示选项（say 气泡、RoomVisual、玩家名、光照）作用于 Room View 的 Scene 构建，并在重新挂载后恢复。
+ * #54：血条开关已删除，存储里旧的 `bars` 值被忽略。
  */
 import { describe, expect, it } from "vitest";
 import type { Scene } from "../scene/scene.ts";
@@ -25,55 +26,51 @@ const state = {
   visual: JSON.stringify({ t: "c", x: 5, y: 5 }) + "\n",
 };
 
-/** 足够大，血条与玩家名都按缩放显示 */
-const near: RoomSceneView = { artStyle: "geometric", theme: DEFAULT_THEME, zoom: 40 };
+/** 足够大，玩家名按缩放显示 */
+const near: RoomSceneView = { theme: DEFAULT_THEME, zoom: 40 };
 
 const build = (view: RoomSceneView): Scene => buildRoomScene({ state }, view);
 const visuals = (scene: Scene) => scene.primitives.filter((p) => p.layer === LAYER.visual);
-const hitsBars = (scene: Scene) => scene.primitives.filter((p) => p.kind === "bar" && p.key.endsWith("/hits"));
+/** 两个对象自身的图元（不含玩家名），用来确认开关只影响自己那类图元 */
+const bodies = (scene: Scene) => scene.primitives.filter((p) => p.objectId !== undefined && p.kind !== "text");
 const nameLabels = (scene: Scene) =>
   scene.primitives.filter((p) => p.kind === "text" && p.text === "Xerxes_2");
 
 describe("显示选项 → Room View 的 Scene", () => {
-  it("默认全开：RoomVisual、血条、creep 下方的玩家名都画出来", () => {
+  it("默认全开：RoomVisual、creep 下方的玩家名都画出来", () => {
     const display = createRoomDisplayOptions(memoryStorage()).display();
-    expect(display).toEqual({ say: true, visual: true, bars: true, names: true, lighting: true });
+    expect(display).toEqual({ say: true, visual: true, names: true, lighting: true });
     const scene = build({ ...near, display });
     expect(visuals(scene)).toHaveLength(1);
-    expect(hitsBars(scene).map((p) => p.objectId).sort()).toEqual(["c1", "s1"]);
+    expect(new Set(bodies(scene).map((p) => p.objectId))).toEqual(new Set(["c1", "s1"]));
     const [label, ...more] = nameLabels(scene);
     expect(more).toEqual([]);
     expect(label).toMatchObject({ objectId: "c1", kind: "text" });
     expect(label!.kind === "text" && label!.y).toBeGreaterThan(10.5);
   });
 
-  it("玩家名与血条一样，缩小到看不清时只给选中对象画", () => {
-    const far = { artStyle: "geometric", theme: DEFAULT_THEME, zoom: 4 } as const;
+  it("玩家名缩小到看不清时只给选中对象画", () => {
+    const far = { theme: DEFAULT_THEME, zoom: 4 } as const;
     expect(nameLabels(build(far))).toEqual([]);
     expect(nameLabels(build({ ...far, selectedId: "c1" }))).toHaveLength(1);
   });
 
-  it("关闭 RoomVisual / 血条 / 玩家名后对应图元不出现，其余图元不受影响", () => {
+  it("关闭 RoomVisual / 玩家名后对应图元不出现，其余图元不受影响", () => {
     const options = createRoomDisplayOptions(memoryStorage());
     const before = build({ ...near, display: options.display() });
 
     options.set("visual", false);
     const noVisual = build({ ...near, display: options.display() });
     expect(visuals(noVisual)).toEqual([]);
-    expect(hitsBars(noVisual)).toHaveLength(2);
+    expect(bodies(noVisual)).toEqual(bodies(before));
     expect(nameLabels(noVisual)).toHaveLength(1);
 
     options.set("visual", true);
-    options.set("bars", false);
-    const noBars = build({ ...near, display: options.display() });
-    expect(hitsBars(noBars)).toEqual([]);
-    expect(visuals(noBars)).toHaveLength(1);
-
-    options.set("bars", true);
     options.set("names", false);
     const noNames = build({ ...near, display: options.display() });
     expect(nameLabels(noNames)).toEqual([]);
-    expect(noNames.primitives.find((p) => p.key === "c1/body")).toEqual(before.primitives.find((p) => p.key === "c1/body"));
+    expect(visuals(noNames)).toHaveLength(1);
+    expect(bodies(noNames)).toEqual(bodies(before));
   });
 
   it("开关在重新挂载（按同一存储重建）后恢复；say 开关只存储，经读取函数给出", () => {
@@ -84,20 +81,28 @@ describe("显示选项 → Room View 的 Scene", () => {
     first.set("say", false);
 
     const again = createRoomDisplayOptions(storage).display();
-    expect(again).toEqual({ say: false, visual: false, bars: true, names: false, lighting: true });
+    expect(again).toEqual({ say: false, visual: false, names: false, lighting: true });
     const scene = build({ ...near, display: again });
     expect(visuals(scene)).toEqual([]);
     expect(nameLabels(scene)).toEqual([]);
-    expect(hitsBars(scene)).toHaveLength(2);
     expect(showSayBubbles(again)).toBe(false);
     expect(showSayBubbles(undefined)).toBe(true);
   });
 
   it("存储内容损坏时退回默认", () => {
     const storage = memoryStorage();
-    storage.setItem("msc.roomDisplay", '{"visual": "nope", "bars": false');
-    expect(createRoomDisplayOptions(storage).display()).toEqual({ say: true, visual: true, bars: true, names: true, lighting: true });
-    storage.setItem("msc.roomDisplay", '{"visual": "nope", "bars": false}');
-    expect(createRoomDisplayOptions(storage).display()).toEqual({ say: true, visual: true, bars: false, names: true, lighting: true });
+    storage.setItem("msc.roomDisplay", '{"visual": "nope", "names": false');
+    expect(createRoomDisplayOptions(storage).display()).toEqual({ say: true, visual: true, names: true, lighting: true });
+    storage.setItem("msc.roomDisplay", '{"visual": "nope", "names": false}');
+    expect(createRoomDisplayOptions(storage).display()).toEqual({ say: true, visual: true, names: false, lighting: true });
+  });
+
+  it("#54：存储里旧的血条开关被忽略，其余开关照读；之后写回时不再带它", () => {
+    const storage = memoryStorage();
+    storage.setItem("msc.roomDisplay", '{"say": true, "visual": false, "bars": false, "names": true, "lighting": false}');
+    const options = createRoomDisplayOptions(storage);
+    expect(options.display()).toEqual({ say: true, visual: false, names: true, lighting: false });
+    options.set("names", false);
+    expect(JSON.parse(storage.getItem("msc.roomDisplay")!)).toEqual({ say: true, visual: false, names: false, lighting: false });
   });
 });

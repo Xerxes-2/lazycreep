@@ -1,6 +1,6 @@
 /**
  * Scene：渲染前的纯数据（spec #1 接缝 2）。Room View 与 World Map 都先产出 Scene，
- * 图元有 rect / circle / line / polygon / text / bar / image 七种。
+ * 图元有 rect / circle / line / polygon / text / image 六种。
  * 再交给与来源无关的 Pixi 适配层画出来。Scene 里只有可 JSON 序列化的值，没有函数与类实例。
  *
  * 坐标是“世界单位”：Room View 里 1 单位 = 1 格，格 (x, y) 占 [x, x+1) × [y, y+1)；
@@ -77,19 +77,6 @@ export interface TextPrimitive extends PrimitiveBase {
   readonly stroke?: Stroke;
 }
 
-/** 进度条（血条、能量条）：从左往右填充 value 比例。 */
-export interface BarPrimitive extends PrimitiveBase {
-  readonly kind: "bar";
-  readonly x: number;
-  readonly y: number;
-  readonly width: number;
-  readonly height: number;
-  /** 0–1，越界会被截断 */
-  readonly value: number;
-  readonly fill: Color;
-  readonly background: Color;
-}
-
 /**
  * 图片（World Map 的地形瓦片、官方画风的贴图等）：把 url 指向的图拉伸进矩形。只存 URL 与矩形，
  * 加载由适配层负责；加载完成前与加载失败时什么都不画。
@@ -126,7 +113,6 @@ export type Primitive =
   | LinePrimitive
   | PolygonPrimitive
   | TextPrimitive
-  | BarPrimitive
   | ImagePrimitive;
 
 export type PrimitiveKind = Primitive["kind"];

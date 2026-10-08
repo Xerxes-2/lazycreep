@@ -254,12 +254,6 @@ function drawGraphics(g: Graphics, p: Exclude<Primitive, { kind: "text" | "image
       g.stroke(strokeStyle(p.stroke));
       break;
     }
-    case "bar": {
-      const value = Math.max(0, Math.min(1, p.value));
-      g.rect(p.x, p.y, p.width, p.height).fill({ color: p.background });
-      if (value > 0) g.rect(p.x, p.y, p.width * value, p.height).fill({ color: p.fill });
-      break;
-    }
   }
   g.alpha = p.alpha ?? 1;
 }

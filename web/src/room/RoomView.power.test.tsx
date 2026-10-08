@@ -28,6 +28,8 @@ function manualRoomSource() {
       return () => (push = undefined);
     },
     getTerrain: async (shard: string, room: string) => ({ shard, room, encoded: "0".repeat(2500) }),
+    // 没有赛季渲染器配置：Room View 不预检赛季贴图
+    getVersion: async () => ({ package: 1, protocol: 14, historyChunkSize: 100, mapTileRoot: null }),
     close() {},
   } as unknown as Source;
   return {
@@ -68,7 +70,7 @@ function mount() {
     open = setRequest;
     return (
       <I18nProvider>
-        <RoomView artStyle="geometric"
+        <RoomView
           settings={createSettings(localStorage)}
           sourceFor={() => room.source}
           visibility={visibility}

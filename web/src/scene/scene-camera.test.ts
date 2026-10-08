@@ -48,7 +48,6 @@ describe("点选", () => {
       { key: "t", kind: "rect", layer: 0, x: 0, y: 0, width: 50, height: 1, fill: 1 },
       { key: "r/body", objectId: "r", kind: "circle", layer: 10, x: 3.5, y: 0.5, radius: 0.2, fill: 1 },
       { key: "c/body", objectId: "c", kind: "circle", layer: 30, x: 3.5, y: 0.5, radius: 0.38, fill: 1 },
-      { key: "c/hits", objectId: "c", kind: "bar", layer: 50, x: 3.1, y: 0.82, width: 0.8, height: 0.12, value: 1, fill: 1, background: 0 },
       { key: "w/body", objectId: "w", kind: "rect", layer: 40, x: 3, y: 0, width: 1, height: 1, fill: 1 },
       { key: "s/body", objectId: "s", kind: "rect", layer: 20, x: 9, y: 9, width: 1, height: 1, fill: 1 },
     ],

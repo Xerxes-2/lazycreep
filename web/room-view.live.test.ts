@@ -35,7 +35,7 @@ describe.skipIf(!LIVE)("Room View 联调（赛季服）", () => {
         const times: number[] = [];
         source.subscribeRoom(shard, room, (tick) => {
           state = reduceLiveTick(state, tick);
-          scenes.push(buildRoomScene({ state, terrain }, { artStyle: "geometric", theme: DEFAULT_THEME }));
+          scenes.push(buildRoomScene({ state, terrain }, { theme: DEFAULT_THEME }));
           if (state.gameTime !== undefined) times.push(state.gameTime);
         });
 
@@ -62,7 +62,7 @@ describe.skipIf(!LIVE)("Room View 联调（赛季服）", () => {
         const replayed = roomStateAt(chunk!.ticks, target);
         expect(replayed.gameTime).toBe(target);
         expect(Object.keys(replayed.objects).length).toBeGreaterThan(0);
-        const replayScene = buildRoomScene({ state: replayed, terrain }, { artStyle: "geometric", theme: DEFAULT_THEME });
+        const replayScene = buildRoomScene({ state: replayed, terrain }, { theme: DEFAULT_THEME });
         expect(replayScene.primitives.length).toBeGreaterThan(0);
       } finally {
         source.close();

@@ -94,7 +94,7 @@ const RULES: Readonly<Record<string, GlowRule>> = {
   reactor: () => [{ size: 800, alpha: 0.8, tint: 0x67a700 }],
 };
 
-/** 房间里所有对象的发光图元（buildRoomScene 在官方画风且光照开启时用）；不带 objectId，不参与点选 */
+/** 房间里所有对象的发光图元（buildRoomScene 在光照开启时用）；不带 objectId，不参与点选 */
 export function officialLighting(state: RoomState): Primitive[] {
   const url = officialTextureUrl("glow");
   const out: Primitive[] = [];

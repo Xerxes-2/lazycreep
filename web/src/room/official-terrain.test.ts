@@ -16,7 +16,7 @@ import { reduceLiveTick, roomStateFrom, type RoomState } from "./room-state.ts";
 
 const theme = DEFAULT_THEME;
 const users = { me1: { _id: "me1", username: "Me" }, foe1: { _id: "foe1", username: "Foe" } };
-const official: RoomSceneView = { theme, me: "me1", artStyle: "official" };
+const official: RoomSceneView = { theme, me: "me1" };
 
 /** 50×50 的地形：cells 里的格子按给定代码（1 墙、2 沼泽） */
 function terrainOf(cells: Record<string, number> = {}, room = "W1N1"): Terrain {

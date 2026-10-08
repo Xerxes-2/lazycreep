@@ -1,10 +1,10 @@
 /**
- * 玩家名放在 creep 下方：上方留给 say 气泡（#22），不与格子下沿内的血条 / 资源条重叠。
+ * 玩家名放在 creep 下方：上方留给 say 气泡（#22）。
  */
 import { describe, expect, it } from "vitest";
 import type { Primitive, Scene } from "../scene/scene.ts";
 import { DEFAULT_THEME } from "../scene/theme.ts";
-import { BAR_MIN_ZOOM } from "./room-detail-rules.ts";
+import { LABEL_MIN_ZOOM } from "./room-detail-rules.ts";
 import { buildRoomScene } from "./room-scene.ts";
 import { roomStateFrom } from "./room-state.ts";
 
@@ -23,13 +23,13 @@ const creep = {
   actionLog: { say: { message: "⛏", isPublic: false } },
 };
 
-function scene(artStyle: "official" | "geometric"): Scene {
-  return buildRoomScene({ state: roomStateFrom({ objects: { c: creep }, users }) }, { theme: DEFAULT_THEME, me: "me1", zoom: BAR_MIN_ZOOM + 20, artStyle });
+function scene(): Scene {
+  return buildRoomScene({ state: roomStateFrom({ objects: { c: creep }, users }) }, { theme: DEFAULT_THEME, me: "me1", zoom: LABEL_MIN_ZOOM + 20 });
 }
 const part = (s: Scene, name: string): Primitive | undefined => s.primitives.find((p) => p.key === `c/${name}`);
 
-describe.each(["official", "geometric"] as const)("玩家名（%s 画风）", (artStyle) => {
-  const s = scene(artStyle);
+describe("玩家名", () => {
+  const s = scene();
   const label = part(s, "owner-name");
   const cy = 10.5;
 
@@ -46,13 +46,5 @@ describe.each(["official", "geometric"] as const)("玩家名（%s 画风）", (a
     expect(bubbleYs.length).toBeGreaterThan(0);
     if (label?.kind !== "text") return;
     expect(Math.max(...bubbleYs)).toBeLessThan(label.y - label.size / 2);
-  });
-
-  it("不与进度条重叠", () => {
-    if (label?.kind !== "text") return;
-    for (const p of s.primitives.filter((q) => q.objectId === "c" && q.kind === "bar")) {
-      if (p.kind !== "bar") continue;
-      expect(p.y + p.height).toBeLessThanOrEqual(label.y - label.size / 2);
-    }
   });
 });

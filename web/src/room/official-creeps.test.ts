@@ -7,7 +7,7 @@ import { badgeSvgUrl } from "../badge/badge-image.ts";
 import { parseBadge } from "../badge/badge.ts";
 import type { ImagePrimitive, PolygonPrimitive, Scene } from "../scene/scene.ts";
 import { DEFAULT_THEME } from "../scene/theme.ts";
-import { BAR_MIN_ZOOM } from "./room-detail-rules.ts";
+import { LABEL_MIN_ZOOM } from "./room-detail-rules.ts";
 import { BADGE_MIN_ZOOM } from "./owner-badge.ts";
 import { buildRoomScene, type RoomSceneView } from "./room-scene.ts";
 import { roomStateFrom } from "./room-state.ts";
@@ -22,7 +22,7 @@ const users = {
   foe1: { _id: "foe1", username: "Foe", badge: FOE_BADGE },
   plain: { _id: "plain", username: "NoBadge" },
 };
-const near: RoomSceneView = { theme, me: "me1", artStyle: "official", zoom: 40 };
+const near: RoomSceneView = { theme, me: "me1", zoom: 40 };
 
 function scene(objects: Record<string, Record<string, unknown>>, view: RoomSceneView = near): Scene {
   return buildRoomScene({ state: roomStateFrom({ objects, users }) }, view);
@@ -157,10 +157,10 @@ describe("官方 creep：中心徽章", () => {
   it("官方画风不叠加通用血条与资源条（血量看部件环、装载看资源圆），选中高亮照常", () => {
     const s = scene(
       { c: { type: "creep", x: 5, y: 5, user: "me1", body: [{ type: "carry", hits: 100 }], hits: 50, hitsMax: 100, store: { energy: 25 }, storeCapacity: 50 } },
-      { ...near, zoom: BAR_MIN_ZOOM + 10, selectedId: "c" },
+      { ...near, zoom: LABEL_MIN_ZOOM + 10, selectedId: "c" },
     );
     const part = (name: string) => of(s, "c").find((p) => p.key === `c/${name}`);
-    expect(of(s, "c").filter((p) => p.kind === "bar")).toEqual([]);
+    expect(of(s, "c").map((p) => p.key.split("/")[1])).not.toContain("hits");
     expect(part("selected")).toBeDefined();
     expect(part("store-energy")).toMatchObject({ kind: "circle", radius: 0.1, fill: 0xffe56d });
   });

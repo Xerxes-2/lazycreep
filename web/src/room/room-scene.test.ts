@@ -10,7 +10,7 @@ const bundle = fixtureBundle(
   Object.values(import.meta.glob<unknown>("../../../fixtures/season/*.json", { eager: true, import: "default" })),
 );
 
-const view = { artStyle: "geometric", theme: DEFAULT_THEME } as const;
+const view = { theme: DEFAULT_THEME } as const;
 
 function stateWith(objects: Record<string, Record<string, unknown>>): RoomState {
   return roomStateFrom({ objects, users: { me: { _id: "me", username: "me" } } });
@@ -20,7 +20,6 @@ function stateWith(objects: Record<string, Record<string, unknown>>): RoomState 
 function bounds(p: Primitive): { x0: number; y0: number; x1: number; y1: number } {
   switch (p.kind) {
     case "rect":
-    case "bar":
     case "image":
       return { x0: p.x, y0: p.y, x1: p.x + p.width, y1: p.y + p.height };
     case "circle":
@@ -44,32 +43,7 @@ function covers(p: Primitive, x: number, y: number): boolean {
 const ofObject = (scene: Scene, id: string) => scene.primitives.filter((p) => p.objectId === id);
 
 describe("buildRoomScene：地形", () => {
-  // 第 0 行：x=0..2 墙、x=3 沼泽，其余平原；第 1 行 x=10 墙
-  const encoded = ("1112" + "0".repeat(46) + "0".repeat(10) + "1" + "0".repeat(39)).padEnd(2500, "0");
-  const terrain: Terrain = { shard: "s", room: "W1N1", encoded };
-
-  it("墙与沼泽画成矩形，平原不画；地形在对象之下", () => {
-    const scene = buildRoomScene({ state: stateWith({}), terrain }, view);
-    expect(scene.width).toBe(50);
-    expect(scene.height).toBe(50);
-    const terrainPrims = scene.primitives.filter((p) => p.objectId === undefined);
-    const at = (x: number, y: number) => terrainPrims.filter((p) => covers(p, x + 0.5, y + 0.5));
-    expect(at(0, 0)).toHaveLength(1);
-    expect(at(2, 0)).toHaveLength(1);
-    expect(at(10, 1)).toHaveLength(1);
-    expect(at(3, 0)).toHaveLength(1);
-    const fillAt = (x: number, y: number) => {
-      const [p] = at(x, y);
-      return p?.kind === "rect" ? p.fill : undefined;
-    };
-    expect(fillAt(0, 0)).toBeDefined();
-    expect(fillAt(3, 0)).toBeDefined();
-    expect(fillAt(3, 0)).not.toBe(fillAt(0, 0));
-    expect(at(5, 0)).toHaveLength(0);
-    expect(at(25, 25)).toHaveLength(0);
-    expect(terrainPrims.every((p) => p.layer === LAYER.terrain)).toBe(true);
-  });
-
+  // 官方地形的画法见 official-terrain.test.ts
   it("没有地形时只画对象", () => {
     const scene = buildRoomScene({ state: stateWith({}) }, view);
     expect(scene.primitives).toHaveLength(0);
@@ -103,7 +77,7 @@ describe("buildRoomScene：对象", () => {
 
   it.each(common)("%s 有专用画法：带对象 id，画在它的格子上，不是占位图元", (type) => {
     const scene = buildRoomScene(
-      { state: stateWith({ o1: { _id: "o1", type, x: 20, y: 30, user: "me", hits: 50, hitsMax: 100 } }) },
+      { state: stateWith({ o1: { _id: "o1", type, x: 20, y: 30, user: "me", hits: 50, hitsMax: 100, energy: 500, amount: 500 } }) },
       view,
     );
     const prims = ofObject(scene, "o1");
@@ -122,15 +96,6 @@ describe("buildRoomScene：对象", () => {
   it("缺坐标的对象跳过而不是抛错", () => {
     const scene = buildRoomScene({ state: stateWith({ bad: { _id: "bad", type: "creep" } }) }, view);
     expect(ofObject(scene, "bad")).toHaveLength(0);
-  });
-
-  it("creep 带血条，按 hits / hitsMax 填充", () => {
-    const scene = buildRoomScene(
-      { state: stateWith({ c: { _id: "c", type: "creep", x: 1, y: 1, user: "me", hits: 30, hitsMax: 120 } }) },
-      { ...view, zoom: 100 },
-    );
-    const bar = ofObject(scene, "c").find((p) => p.kind === "bar");
-    expect(bar).toMatchObject({ kind: "bar", value: 0.25 });
   });
 
   it("层级：道路在建筑下，creep 在建筑上，rampart 盖住 creep", () => {
