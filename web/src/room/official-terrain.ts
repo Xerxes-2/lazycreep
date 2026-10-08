@@ -13,6 +13,8 @@
  * - 外观参数（墙底色、纹理强度、环境光）比官方调亮，见 TERRAIN_LOOK。
  * - lighting 图层：官方整个画面乘以 0x808080 的环境光，建筑另有光晕提亮（光晕见 official-lighting.ts，#49）；
  *   我们只把环境光（含墙的模糊阴影）乘进地形与道路的颜色，建筑保持原色。
+ * - 装饰（#61，Decoration）：墙与地面的颜色、亮度、前景图案，沼泽与道路的颜色，照 terrain.js、decorations.js 与
+ *   road.js 的装饰分支；有装饰的部分用官方原参数（OFFICIAL_LOOK），不用 TERRAIN_LOOK 的调亮。装饰进地形的缓存键。
  * - 沼泽噪声不流动（官方 swampTexture: 'animated' 的平移动画），出口标记（exit-*.svg）不画。
  * - 道路：官方每条路画一个圆 + 连向左上、上、右上、左四个邻居的矩形条（宽 0.3 格），合起来就是八邻域连线。
  *   我们把同一方向上连成一串的道路合成一条 line 图元，圆仍由每个道路对象画（点选、选中高亮照旧）。
@@ -27,7 +29,9 @@ import { officialArtUrl } from "../art/official-art.ts";
 import { officialTextureUrl } from "../art/official-textures.ts";
 import { compositeSvgUrl } from "../scene/image-sources.ts";
 import type { Color, ImagePrimitive, LinePrimitive, Primitive } from "../scene/scene.ts";
+import type { FloorLandscape, WallLandscape } from "../source/room-decorations.ts";
 import type { Terrain } from "../source/source.ts";
+import { colorBrightness, grayHex, tintFilter, toHex } from "./decoration-look.ts";
 import { LAYER, center, num, type ObjectPainter, type ObjectPainters, type PaintContext } from "./room-paint.ts";
 import type { RoomState } from "./room-state.ts";
 import { PATH_ROOM_SIZE as N, cellGrid, renderPath, type CellGrid } from "./render-path.ts";
@@ -36,6 +40,11 @@ import { PATH_ROOM_SIZE as N, cellGrid, renderPath, type CellGrid } from "./rend
 const AMBIENT = 0x80 / 0xff;
 /** 官方道路色 0xaaaaaa 乘以环境光 */
 export const OFFICIAL_ROAD_COLOR = scaleColor(0xaaaaaa, AMBIENT);
+
+/** 道路颜色：有地面装饰时按装饰的颜色与亮度（road.js），同样乘以环境光 */
+export function roadColor(floor: FloorLandscape | undefined): Color {
+  return floor ? scaleColor(colorBrightness(floor.roadsColor, floor.roadsBrightness), AMBIENT) : OFFICIAL_ROAD_COLOR;
+}
 /** 官方道路：圆半径 0.15 格，连接条宽 0.3 格 */
 const ROAD_RADIUS = 0.15;
 
@@ -46,7 +55,7 @@ function scaleColor(color: Color, k: number): Color {
 
 const hex = (color: Color) => `#${color.toString(16).padStart(6, "0")}`;
 
-// ---- 地形 SVG（terrain.js：lighting 'normal'、swampTexture 静止、没有 decoration） ----
+// ---- 地形 SVG（terrain.js：lighting 'normal'、swampTexture 静止；装饰见 #61） ----
 
 /**
  * 官方噪声纹理用加色混合（Pixi 的 ADD）叠进墙与沼泽。SVG 里对应 `mix-blend-mode: plus-lighter`，
@@ -89,52 +98,107 @@ const TERRAIN_LOOK = {
   ambient: "#8c8c8c",
 } as const;
 
-function terrainSvg(walls: string, swamps: string, blend: AdditiveBlend): string {
+/** 装饰的前景贴图（官方静态资源上的 PNG）按 1024 像素算：Scene 是纯数据，合成时才取图，量不到原始尺寸 */
+export const DECORATION_TEXTURE_PX = 1024;
+
+/** 有装饰时照官方原参数（terrain.js，lighting 'normal'）；没有装饰的部分仍用 TERRAIN_LOOK */
+const OFFICIAL_LOOK = { wallNoise: 0.2, swamp: 0.4, swampNoise: 0.075, ambient: "#808080" } as const;
+
+/** 装饰的地形（#61）：墙与地面各自可有可无 */
+export interface TerrainDecorations {
+  readonly wall?: WallLandscape | undefined;
+  readonly floor?: FloorLandscape | undefined;
+}
+
+function terrainSvg(walls: string, swamps: string, blend: AdditiveBlend, decorations: TerrainDecorations = {}): string {
+  const { wall, floor } = decorations;
   const full = `x="0" y="0" width="5000" height="5000"`;
   const tile = (id: string, name: Parameters<typeof officialTextureUrl>[0], size: number, filter = "") =>
     `<pattern id="${id}" patternUnits="userSpaceOnUse" width="${size}" height="${size}">` +
     `<image href="${officialTextureUrl(name)}" width="${size}" height="${size}" preserveAspectRatio="none"${filter}/></pattern>`;
   const add = `style="mix-blend-mode:${blend}"`;
+  const decorated = wall !== undefined || floor !== undefined;
+  const ambient = decorated ? OFFICIAL_LOOK.ambient : TERRAIN_LOOK.ambient;
   const parts = [
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 5000 5000">`,
     `<defs>`,
     // noise2 的 tint 0x66FF00
     `<filter id="green" color-interpolation-filters="sRGB"><feColorMatrix values="0.4 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 1 0"/></filter>`,
     `<filter id="shadow" x="-5%" y="-5%" width="110%" height="110%"><feGaussianBlur stdDeviation="20"/></filter>`,
-    // 官方 tileScale：ground 3、ground-mask 7、noise2 10 与 14、墙的 noise1 8
-    tile("ground", "ground", 512 * 3),
-    tile("groundMask", "ground-mask", 512 * 7),
+  ];
+  // 官方 tileScale：ground 3、ground-mask 7、noise2 10 与 14、墙的 noise1 8
+  if (!floor) parts.push(tile("ground", "ground", 512 * 3), tile("groundMask", "ground-mask", 512 * 7));
+  parts.push(
     tile("swampNoiseA", "noise2", 256 * 10, ` filter="url(#green)"`),
     tile("swampNoiseB", "noise2", 256 * 14, ` filter="url(#green)"`),
     tile("wallNoise", "noise1", 512 * 8),
+  );
+  if (wall) parts.push(tintFilter("wallTint", colorBrightness(wall.foregroundColor, wall.foregroundBrightness)));
+  if (floor) {
+    parts.push(tintFilter("floorTint", colorBrightness(floor.floorForegroundColor, floor.floorForegroundBrightness)));
+    if (floor.tileScale !== undefined) {
+      // 官方 TilingSprite 的 tileScale：一块 = 贴图像素 × tileScale 个官方单位（100 = 1 格）
+      const size = DECORATION_TEXTURE_PX * floor.tileScale;
+      parts.push(
+        `<pattern id="floorTile" patternUnits="userSpaceOnUse" width="${size}" height="${size}">` +
+          `<image href="${floor.floorForegroundUrl}" width="${size}" height="${size}" preserveAspectRatio="none" filter="url(#floorTint)"/></pattern>`,
+      );
+    }
+  }
+  parts.push(
     `<path id="walls" d="${walls}"/><path id="swamps" d="${swamps}"/>`,
     `<clipPath id="wallClip"><use href="#walls"/></clipPath><clipPath id="swampClip"><use href="#swamps"/></clipPath>`,
     `</defs>`,
-    // 地面
-    `<rect ${full} fill="#555555"/>`,
-    `<rect ${full} fill="url(#ground)" opacity="${TERRAIN_LOOK.ground}"/>`,
-    `<rect ${full} fill="url(#groundMask)" opacity="${TERRAIN_LOOK.groundMask}" style="mix-blend-mode:multiply"/>`,
-  ];
+  );
+  // 地面
+  if (floor) {
+    const alpha = floor.floorForegroundAlpha;
+    parts.push(
+      `<rect ${full} fill="${toHex(colorBrightness(floor.floorBackgroundColor, floor.floorBackgroundBrightness))}"/>`,
+      floor.tileScale !== undefined
+        ? `<rect ${full} fill="url(#floorTile)" opacity="${alpha}"/>`
+        : `<image href="${floor.floorForegroundUrl}" ${full} preserveAspectRatio="none" filter="url(#floorTint)" opacity="${alpha}"/>`,
+    );
+  } else {
+    parts.push(
+      `<rect ${full} fill="#555555"/>`,
+      `<rect ${full} fill="url(#ground)" opacity="${TERRAIN_LOOK.ground}"/>`,
+      `<rect ${full} fill="url(#groundMask)" opacity="${TERRAIN_LOOK.groundMask}" style="mix-blend-mode:multiply"/>`,
+    );
+  }
   if (swamps) {
+    const look = floor ? OFFICIAL_LOOK : TERRAIN_LOOK;
+    const fill = floor ? `fill="${floor.swampColor}" stroke="${floor.swampStrokeColor}" stroke-width="${floor.swampStrokeWidth}"` : `fill="#4a501e" stroke="#4a501e" stroke-width="50"`;
     parts.push(
-      `<use href="#swamps" fill="#4a501e" stroke="#4a501e" stroke-width="50" paint-order="stroke" opacity="${TERRAIN_LOOK.swamp}"/>`,
-      // 官方噪声 alpha 0.3，遮罩精灵自身 alpha 0.25（Pixi 的精灵遮罩把它乘进去），合起来 0.075；这里按 TERRAIN_LOOK 加强
-      `<rect ${full} fill="url(#swampNoiseA)" opacity="${TERRAIN_LOOK.swampNoise}" clip-path="url(#swampClip)" ${add}/>`,
-      `<rect ${full} fill="url(#swampNoiseB)" opacity="${TERRAIN_LOOK.swampNoise}" clip-path="url(#swampClip)" ${add}/>`,
+      `<use href="#swamps" ${fill} paint-order="stroke" opacity="${look.swamp}"/>`,
+      // 官方噪声 alpha 0.3，遮罩精灵自身 alpha 0.25（Pixi 的精灵遮罩把它乘进去），合起来 0.075；没有装饰时按 TERRAIN_LOOK 加强
+      `<rect ${full} fill="url(#swampNoiseA)" opacity="${look.swampNoise}" clip-path="url(#swampClip)" ${add}/>`,
+      `<rect ${full} fill="url(#swampNoiseB)" opacity="${look.swampNoise}" clip-path="url(#swampClip)" ${add}/>`,
     );
   }
+  const wallStroke = wall ? `stroke-width="${wall.strokeWidth}"` : `stroke-width="10"`;
   if (walls) {
+    const fill = wall
+      ? `fill="${toHex(colorBrightness(wall.backgroundColor, wall.backgroundBrightness))}" stroke="${toHex(colorBrightness(wall.strokeColor, wall.strokeBrightness))}"`
+      : `fill="${TERRAIN_LOOK.wall}" stroke="#000000"`;
     parts.push(
-      `<use href="#walls" fill="${TERRAIN_LOOK.wall}" stroke="#000000" stroke-width="10" paint-order="stroke"/>`,
-      `<rect ${full} fill="url(#wallNoise)" opacity="${TERRAIN_LOOK.wallNoise}" clip-path="url(#wallClip)" ${add}/>`,
+      `<use href="#walls" ${fill} ${wallStroke} paint-order="stroke"/>`,
+      `<rect ${full} fill="url(#wallNoise)" opacity="${wall ? OFFICIAL_LOOK.wallNoise : TERRAIN_LOOK.wallNoise}" clip-path="url(#wallClip)" ${add}/>`,
     );
+    // 装饰的前景（decorations.js）：拉伸铺满整个房间，用墙的遮罩（只有填充、不含描边）
+    if (wall) {
+      parts.push(
+        `<image href="${wall.foregroundUrl}" ${full} preserveAspectRatio="none" filter="url(#wallTint)" opacity="${wall.foregroundAlpha}" clip-path="url(#wallClip)"/>`,
+      );
+    }
   }
-  // lighting 图层里与地形有关的部分：环境光、墙的模糊阴影、墙本身的 0x808080
-  parts.push(`<g style="mix-blend-mode:multiply"><rect ${full} fill="${TERRAIN_LOOK.ambient}"/>`);
+  // lighting 图层里与地形有关的部分：环境光、墙的模糊阴影、墙本身的 0x808080（装饰时描边的亮度按 strokeLighting）
+  parts.push(`<g style="mix-blend-mode:multiply"><rect ${full} fill="${ambient}"/>`);
   if (walls) {
+    const lightStroke = wall ? grayHex(wall.strokeLighting) : "#000000";
     parts.push(
       `<use href="#walls" fill="#000000" filter="url(#shadow)" style="mix-blend-mode:multiply"/>`,
-      `<use href="#walls" fill="#808080" stroke="#000000" stroke-width="10" paint-order="stroke" style="mix-blend-mode:screen"/>`,
+      `<use href="#walls" fill="#808080" stroke="${lightStroke}" ${wallStroke} paint-order="stroke" style="mix-blend-mode:screen"/>`,
     );
   }
   parts.push(`</g></svg>`);
@@ -195,14 +259,15 @@ export interface OfficialLayerOptions {
 export function createOfficialLayers(options: OfficialLayerOptions = {}) {
   const blend = options.additiveBlend ?? detectAdditiveBlend();
   const counters: OfficialLayerCounters = { terrain: 0, roads: 0, ramparts: 0 };
-  const terrainCache = new WeakMap<Terrain, { key: string; primitive: ImagePrimitive }>();
+  const terrainCache = new WeakMap<Terrain, { key: string; wall: WallLandscape | undefined; floor: FloorLandscape | undefined; primitive: ImagePrimitive }>();
   const roadCache = new Recent<readonly LinePrimitive[]>(8);
   const rampartCache = new Recent<ImagePrimitive>(32);
 
-  const terrainLayer = (terrain: Terrain, constructedWalls: number[]): ImagePrimitive => {
+  const terrainLayer = (terrain: Terrain, constructedWalls: number[], { wall, floor }: TerrainDecorations): ImagePrimitive => {
     const key = cellsKey(constructedWalls);
     const hit = terrainCache.get(terrain);
-    if (hit && hit.key === key) return hit.primitive;
+    // 装饰来自缓存，同一房间内是同一个对象：按引用比较
+    if (hit && hit.key === key && hit.wall === wall && hit.floor === floor) return hit.primitive;
     counters.terrain++;
     const natural = cellGrid();
     const swamps = cellGrid();
@@ -211,7 +276,7 @@ export function createOfficialLayers(options: OfficialLayerOptions = {}) {
       if (code & 1) natural[i] = 1;
       else if (code & 2) swamps[i] = 1;
     }
-    const svg = terrainSvg(renderPath(gridOf(constructedWalls, natural)), renderPath(swamps), blend);
+    const svg = terrainSvg(renderPath(gridOf(constructedWalls, natural)), renderPath(swamps), blend, { wall, floor });
     const primitive: ImagePrimitive = {
       key: "official-terrain",
       kind: "image",
@@ -222,14 +287,14 @@ export function createOfficialLayers(options: OfficialLayerOptions = {}) {
       height: N,
       url: compositeSvgUrl(svg),
     };
-    terrainCache.set(terrain, { key, primitive });
+    terrainCache.set(terrain, { key, wall, floor, primitive });
     return primitive;
   };
 
-  const roadLayer = (roads: number[]) =>
-    roadCache.get(cellsKey(roads), () => {
+  const roadLayer = (roads: number[], color: Color) =>
+    roadCache.get(`${color}|${cellsKey(roads)}`, () => {
       counters.roads++;
-      return roadLinks(gridOf(roads));
+      return roadLinks(gridOf(roads), color);
     });
 
   const rampartLayer = (user: string, cells: number[], color: Color) =>
@@ -269,8 +334,9 @@ export function createOfficialLayers(options: OfficialLayerOptions = {}) {
       }
     }
     const out: Primitive[] = [];
-    if (terrain) out.push(terrainLayer(terrain, constructedWalls));
-    if (roads.length > 0) out.push(...roadLayer(roads));
+    const decorations = ctx.decorations;
+    if (terrain) out.push(terrainLayer(terrain, constructedWalls, { wall: decorations?.wall, floor: decorations?.floor }));
+    if (roads.length > 0) out.push(...roadLayer(roads, roadColor(decorations?.floor)));
     for (const user of [...ramparts.keys()].sort()) {
       out.push(rampartLayer(user, ramparts.get(user)!, ctx.ownerColor(user)));
     }
@@ -289,7 +355,7 @@ const DIRECTIONS = [
 ] as const;
 
 /** 道路连线（road.js 的连接条）：每串同方向相邻的道路一条 line，宽 0.3 格，从格子中心到格子中心 */
-export function roadLinks(grid: CellGrid): LinePrimitive[] {
+export function roadLinks(grid: CellGrid, color: Color = OFFICIAL_ROAD_COLOR): LinePrimitive[] {
   const has = (x: number, y: number) => x >= 0 && y >= 0 && x < N && y < N && grid[y * N + x] !== 0;
   const out: LinePrimitive[] = [];
   for (const [d, [dx, dy]] of DIRECTIONS.entries()) {
@@ -304,7 +370,7 @@ export function roadLinks(grid: CellGrid): LinePrimitive[] {
           kind: "line",
           layer: LAYER.road,
           points: [x + 0.5, y + 0.5, x + dx * length + 0.5, y + dy * length + 0.5],
-          stroke: { color: OFFICIAL_ROAD_COLOR, width: ROAD_RADIUS * 2 },
+          stroke: { color, width: ROAD_RADIUS * 2 },
         });
       }
     }
@@ -323,9 +389,9 @@ export function officialRoomLayers(state: RoomState, terrain: Terrain | undefine
 // ---- 对象画法：道路与 rampart ----
 
 /** 道路本身：官方 road.js 的圆；连线在房间级图层里 */
-const road: ObjectPainter = (obj) => {
+const road: ObjectPainter = (obj, ctx) => {
   const { x, y } = center(obj);
-  return [{ part: "body", kind: "circle", layer: LAYER.road, x, y, radius: ROAD_RADIUS, fill: OFFICIAL_ROAD_COLOR }];
+  return [{ part: "body", kind: "circle", layer: LAYER.road, x, y, radius: ROAD_RADIUS, fill: roadColor(ctx.decorations?.floor) }];
 };
 
 /**

@@ -45,7 +45,7 @@ describe("官方画风：录制房间的 Scene 输出不变", () => {
     const views: Record<string, RoomSceneView> = {
       default: { theme: DEFAULT_THEME },
       near: { theme: DEFAULT_THEME, zoom: 40, me: owner, selectedId: anyCreep, allies: new Set(["someone"]) },
-      plain: { theme: DEFAULT_THEME, zoom: 40, me: owner, display: { say: false, visual: false, names: false, lighting: false, animation: false } },
+      plain: { theme: DEFAULT_THEME, zoom: 40, me: owner, display: { say: false, visual: false, names: false, lighting: false, animation: false, decorations: false } },
     };
     const scenes = Object.fromEntries(Object.entries(views).map(([name, view]) => [name, buildRoomScene({ state, terrain }, view)]));
     // 一行一个图元，便于看出差异

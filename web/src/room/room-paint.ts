@@ -4,6 +4,7 @@
 import type { SeasonArt } from "../art/season-art.ts";
 import type { Color, Primitive } from "../scene/scene.ts";
 import type { Theme } from "../scene/theme.ts";
+import type { RoomDecorations } from "../source/room-decorations.ts";
 import type { RoomUser } from "../source/source.ts";
 import type { RoomObject, RoomState } from "./room-state.ts";
 
@@ -52,6 +53,8 @@ export interface PaintContext {
    * before 是上一个 Tick 记住的朝向，after 是本 Tick 的（静止画面按它画）；没有记录的对象朝上。
    */
   readonly facings?: { readonly before: ReadonlyMap<string, number>; readonly after: ReadonlyMap<string, number> };
+  /** 房间的装饰（#61）；“装饰”开关关掉或房间没有装饰时不给，画法用默认外观 */
+  readonly decorations?: RoomDecorations;
 }
 
 /** 画法播放动画需要的上下文（action-animation.ts 的构件都收它） */

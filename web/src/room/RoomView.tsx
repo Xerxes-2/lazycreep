@@ -18,6 +18,7 @@ import { DEFAULT_THEME, type Theme } from "../scene/theme.ts";
 import { errorMessage, type SourceFactory } from "../settings/SettingsPage.tsx";
 import type { Settings } from "../settings/settings.ts";
 import { FixtureSource, fixtureBundle } from "../source/fixture-source.ts";
+import type { RoomDecorations } from "../source/room-decorations.ts";
 import type { Source, StreamError, Terrain } from "../source/source.ts";
 import { browserStorage, type KeyValueStorage } from "../storage/local-store.ts";
 import { cameraKey } from "./room-camera-store.ts";
@@ -41,7 +42,7 @@ import { replayMsPerTick } from "../replay/replay-engine.ts";
 import { replayAt, replayTick, type RoomRequest, type RoomTarget } from "../shell/shell-state.ts";
 import { seasonArtFor } from "../art/season-art.ts";
 import type { DataSource } from "./data-source.ts";
-import { preloadNeighbors } from "./neighbor-preload.ts";
+import { preloadNeighbors, roomDecorations } from "./neighbor-preload.ts";
 
 type Target = RoomTarget;
 /** 从外部打开的房间；给了 replay 就以该 Tick 进入 Replay */
@@ -156,6 +157,8 @@ export function RoomView(props: RoomViewProps) {
   const [target, setTarget] = createSignal<Target>();
   const [roomState, setRoomState] = createSignal<RoomState>();
   const [terrain, setTerrain] = createSignal<Terrain>();
+  /** 房间的装饰（#61）：与地形一起取，换房间时清空；取不到时没有（默认外观） */
+  const [decorations, setDecorations] = createSignal<RoomDecorations>();
   const [streamError, setStreamError] = createSignal<StreamError>();
   const [terrainError, setTerrainError] = createSignal<string>();
 
@@ -185,6 +188,7 @@ export function RoomView(props: RoomViewProps) {
           // 与换房间同一批清掉旧房间的状态：Scene 不会先拿新房间配旧对象画一帧
           setRoomState(undefined);
           setTerrain(undefined);
+          setDecorations(undefined);
           setTarget({ shard: opened.shard, room: opened.room });
           if (opened.replay) {
             const { tick, latest } = opened.replay;
@@ -215,6 +219,7 @@ export function RoomView(props: RoomViewProps) {
     const current = target();
     setRoomState(undefined);
     setTerrain(undefined);
+    setDecorations(undefined);
     setStreamError(undefined);
     setTerrainError(undefined);
     if (!src || !current) return;
@@ -228,6 +233,8 @@ export function RoomView(props: RoomViewProps) {
           (tick) => setRoomState((state) => reduceLiveTick(state, tick)),
           setStreamError,
         );
+    // 装饰走 Source 的装饰缓存（decoration-cache.ts），从不拒绝
+    void roomDecorations(src, current.shard, current.room).then((loaded) => alive && setDecorations(loaded));
     src.getTerrain(current.shard, current.room).then(
       (loaded) => {
         if (!alive) return;
@@ -315,7 +322,7 @@ export function RoomView(props: RoomViewProps) {
     const animate = state.gameTime !== quietTick;
     if (timing?.state !== state) timing = { state, ms: untrack(tickMs) };
     return buildRoomScene(
-      { state, terrain: terrain(), previous: animate ? before : undefined, facing: previousFacing },
+      { state, terrain: terrain(), decorations: decorations(), previous: animate ? before : undefined, facing: previousFacing },
       {
         theme,
         zoom: controls.zoom(),

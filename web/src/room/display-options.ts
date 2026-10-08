@@ -1,5 +1,6 @@
 /**
- * Room View 的显示选项（#26）：say 气泡、RoomVisual、玩家名、光照（#49，发光图元）、动画（#55，ADR 0008）五个开关，
+ * Room View 的显示选项（#26）：say 气泡、RoomVisual、玩家名、光照（#49，发光图元）、动画（#55，ADR 0008）、
+ * 装饰（#61，房间的 Decoration：赛季地形与控制器）六个开关，
  * 存 `msc.roomDisplay`（可导出）。#54 删除了只对几何画风有效的血条开关；存储里旧的 `bars` 值读取时忽略。
  *
  * 存储里只有用户设置过的开关：没设置过的取默认值。动画的默认值随系统的“减少动态效果”
@@ -25,14 +26,23 @@ export interface RoomDisplay {
   readonly lighting: boolean;
   /** 有界动画（#55）：动作动画、受击闪光、塔转向、移动补间 */
   readonly animation: boolean;
+  /** 房间的装饰（#61）：关掉时地形、道路与对象用默认外观 */
+  readonly decorations: boolean;
 }
 
 export type RoomDisplayKey = keyof RoomDisplay;
 
-export const ROOM_DISPLAY_KEYS: readonly RoomDisplayKey[] = ["say", "visual", "names", "lighting", "animation"];
+export const ROOM_DISPLAY_KEYS: readonly RoomDisplayKey[] = ["say", "visual", "names", "lighting", "animation", "decorations"];
 
 /** 没有系统偏好时的默认值（全开） */
-export const DEFAULT_ROOM_DISPLAY: RoomDisplay = { say: true, visual: true, names: true, lighting: true, animation: true };
+export const DEFAULT_ROOM_DISPLAY: RoomDisplay = {
+  say: true,
+  visual: true,
+  names: true,
+  lighting: true,
+  animation: true,
+  decorations: true,
+};
 
 /** 系统要求减少动态效果 */
 export const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";

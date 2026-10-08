@@ -9,6 +9,7 @@
  */
 import type { Primitive, Scene } from "../scene/scene.ts";
 import type { Theme } from "../scene/theme.ts";
+import type { RoomDecorations } from "../source/room-decorations.ts";
 import type { Terrain } from "../source/source.ts";
 import { LAYER, center, num, type AnimationContext, type ObjectPainter, type ObjectPainters, type PaintContext, type PrimitiveDraft } from "./room-paint.ts";
 import { labelsVisible, ownerColorRule, selectionHighlight } from "./room-detail-rules.ts";
@@ -21,6 +22,7 @@ import type { SeasonArt } from "../art/season-art.ts";
 import { GLOW_GAIN, LIGHTING_LAYER, officialLighting } from "./official-lighting.ts";
 import { actionEffects, hitFlashes } from "./action-animation.ts";
 import { applyObjectMotions, nextFacings, objectMotions, type Facings } from "./movement-tween.ts";
+import { objectDecorationDrafts } from "./decoration-look.ts";
 import { OFFICIAL_PAINTERS } from "./official-painters.ts";
 import { officialRoomLayers } from "./official-terrain.ts";
 import { seasonMetadataPainter, withSeasonArt } from "./season-official-painters.ts";
@@ -40,6 +42,8 @@ export interface RoomSceneInput {
   readonly previous?: RoomState | undefined;
   /** 上一个 Tick 记住的 creep 朝向（movement-tween.ts 的 nextFacings 沿 Tick 传下来）；没有时都朝上 */
   readonly facing?: Facings | undefined;
+  /** 房间的装饰（#61，与地形一样换房间时清空）；没有或“装饰”开关关掉时用默认外观 */
+  readonly decorations?: RoomDecorations | undefined;
 }
 
 export interface RoomSceneView {
@@ -90,6 +94,11 @@ const placeholder: ObjectPainter = (obj, ctx) => {
 
 const NO_FACINGS: Facings = new Map();
 
+/** 有内容的装饰；空的当作没有（与不传完全一致） */
+function usable(decorations: RoomDecorations | undefined): RoomDecorations | undefined {
+  return decorations && (decorations.wall || decorations.floor || decorations.objects.length > 0) ? decorations : undefined;
+}
+
 export function buildRoomScene(
   room: RoomSceneInput,
   view: RoomSceneView,
@@ -104,6 +113,7 @@ export function buildRoomScene(
     display.animation && view.tickMs !== undefined && previous !== undefined && tick !== undefined
       ? { tick, tickMs: view.tickMs, previous }
       : undefined;
+  const decorations = display.decorations ? usable(room.decorations) : undefined;
   const ctx: PaintContext = {
     theme,
     zoom: view.zoom ?? 1,
@@ -113,6 +123,7 @@ export function buildRoomScene(
     ownerColor: ownerColorRule(theme, room.state.users, { me: view.me, allies: view.allies }),
     ...(view.seasonArt ? { seasonArt: view.seasonArt } : {}),
     ...(animation ? { animation } : {}),
+    ...(decorations ? { decorations } : {}),
     ...(display.animation ? { facings: { before: room.facing ?? NO_FACINGS, after: nextFacings(room.facing, previous, room.state) } } : {}),
   };
 
@@ -124,6 +135,8 @@ export function buildRoomScene(
       (typeof type === "string" && ((Object.hasOwn(table, type) && table[type]) || seasonMetadataPainter(type, view.seasonArt))) ||
       placeholder;
     const drafts = [...paint(obj, ctx)];
+    // 对象装饰（#61）垫在对象自身所有部件之下：同层排在前面，层级取对象最低的那层
+    if (decorations) drafts.unshift(...objectDecorationDrafts(obj, decorations, drafts.length ? Math.min(...drafts.map((d) => d.layer)) : LAYER.structure));
     if (id === ctx.selectedId) drafts.push(selectionHighlight(obj, ctx));
     const showLabels = labelsVisible(ctx, id);
     const label = display.names && showLabels ? nameLabel(obj, ctx) : undefined;

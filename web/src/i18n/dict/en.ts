@@ -352,6 +352,7 @@ export const en: Partial<Record<MessageKey, string>> = {
   // #49
   "roomSidebar.display.lighting": "Lighting",
   "roomSidebar.display.animation": "Animations",
+  "roomSidebar.display.decorations": "Decorations",
   "roomSidebar.tools": "Room tools",
   "roomSidebar.zoomIn": "Zoom in",
   "roomSidebar.zoomOut": "Zoom out",

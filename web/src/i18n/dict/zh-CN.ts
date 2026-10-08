@@ -350,6 +350,7 @@ export const zhCN = {
   // #49
   "roomSidebar.display.lighting": "光照",
   "roomSidebar.display.animation": "动画",
+  "roomSidebar.display.decorations": "装饰",
   "roomSidebar.tools": "房间工具",
   "roomSidebar.zoomIn": "放大",
   "roomSidebar.zoomOut": "缩小",

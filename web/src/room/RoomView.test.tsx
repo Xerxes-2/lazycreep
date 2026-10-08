@@ -99,6 +99,20 @@ describe("Room View 页面", () => {
     container.remove();
   });
 
+  it("#61：房间的装饰随地形一起取到并画出（赛季地形、控制器下面的赛季贴图）", async () => {
+    mount();
+    watch("shardSeason", "W13S28");
+    const decorated = (scene: Scene) => {
+      const terrain = scene.primitives.find((p) => p.key === "official-terrain");
+      return (
+        terrain?.kind === "image" &&
+        decodeURIComponent(terrain.url).includes("/season-static/season11/decorations/wall.png") &&
+        scene.primitives.some((p) => p.key.endsWith("/decoration/0/0") && p.kind === "image" && p.url.endsWith("/renderer/controller.svg"))
+      );
+    };
+    await settle(() => expect(shown.some(decorated)).toBe(true));
+  });
+
   it("选房间前没有 Tick，画布已就位", async () => {
     mount();
     expect(tick()).toBeUndefined();
