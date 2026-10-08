@@ -238,16 +238,15 @@ describe("FixtureSource 一次性数据", () => {
     expect(error).toMatchObject({ kind: "unauthorized", status: 401 });
   });
 
-  it("瓦片 URL 来自 Server 配置", () => {
-    expect(source.tileUrl(SHARD, OWN_ROOM)).toBe("/map-tiles/shardSeason/W13S28.png");
+  it("瓦片 URL：录制的版本信息里有本赛季的根地址", async () => {
+    const tiles = source.mapTiles(SHARD, await source.getVersion());
+    expect(tiles.room(OWN_ROOM)).toBe("/season-static/season11/map/shardSeason/W13S28.png");
+    expect(tiles.block("W16S28")).toBe("/season-static/season11/map/shardSeason/zoom2/W16S28.png");
+    expect(tiles.sector("W19S20")).toBe("/season-static/season11/map/shardSeason/zoom1/W19S20.png");
   });
 
-  it("zoom2 块瓦片 URL 按块角房间命名", () => {
-    expect(source.blockTileUrl(SHARD, "W16S28")).toBe("/map-tiles/shardSeason/zoom2/W16S28.png");
-  });
-
-  it("zoom1 扇区瓦片 URL 按扇区角房间命名", () => {
-    expect(source.sectorTileUrl(SHARD, "W19S20")).toBe("/map-tiles/shardSeason/zoom1/W19S20.png");
+  it("瓦片 URL：没有版本信息或没有覆盖时用 Server 配置的根地址", () => {
+    expect(source.mapTiles(SHARD, undefined).room(OWN_ROOM)).toBe("/map-tiles/shardSeason/W13S28.png");
   });
 
   it("世界尺寸以房间计", async () => {

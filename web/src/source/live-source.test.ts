@@ -57,8 +57,16 @@ function fakeGateway(routes: Record<string, Reply | (() => never)>) {
 
 const seasonRoutes: Record<string, Reply> = {
   "/season/api/version": {
-    // 真实响应的 serverData 还带着别的字段，转换时忽略
-    body: { ok: 1, ...(recorded("version") as WireVersion), serverData: { ...(recorded("version") as WireVersion).serverData, features: [] } },
+    // 真实响应的 serverData 还带着别的字段与别的 feature，转换时忽略
+    body: {
+      ok: 1,
+      ...(recorded("version") as WireVersion),
+      serverData: {
+        ...(recorded("version") as WireVersion).serverData,
+        customObjectTypes: {},
+        features: [{ name: "season-chronicle", version: 1 }, ...((recorded("version") as WireVersion).serverData.features as unknown[])],
+      },
+    },
   },
   "/season/api/game/time?shard=shardSeason": { body: { ok: 1, ...(recorded("time") as object) } },
   "/season/api/game/shards/info": { body: { ok: 1, ...(recorded("shards") as object) } },
@@ -140,10 +148,14 @@ describe("LiveSource HTTP：与同样 wire 数据的 FixtureSource 结果一致"
     );
   });
 
-  it("瓦片 URL 是同源 Gateway 路径", () => {
-    expect(source.tileUrl(SHARD, OWN_ROOM)).toBe("/map-tiles/shardSeason/W13S28.png");
-    expect(source.blockTileUrl(SHARD, "W16S28")).toBe("/map-tiles/shardSeason/zoom2/W16S28.png");
-    expect(source.sectorTileUrl(SHARD, "W19S20")).toBe("/map-tiles/shardSeason/zoom1/W19S20.png");
+  it("瓦片 URL 是同源 Gateway 路径：赛季服用版本信息给的根地址，否则用 Server 的默认根地址", async () => {
+    const version = await source.getVersion();
+    expect(source.mapTiles(SHARD, version).room(OWN_ROOM)).toBe("/season-static/season11/map/shardSeason/W13S28.png");
+    const plain = source.mapTiles(SHARD, { ...version, mapTileRoot: null });
+    expect(plain.room(OWN_ROOM)).toBe("/map-tiles/shardSeason/W13S28.png");
+    expect(plain.block("W16S28")).toBe("/map-tiles/shardSeason/zoom2/W16S28.png");
+    expect(plain.sector("W19S20")).toBe("/map-tiles/shardSeason/zoom1/W19S20.png");
+    expect(source.mapTiles(SHARD, undefined).room(OWN_ROOM)).toBe("/map-tiles/shardSeason/W13S28.png");
   });
 
   it("世界尺寸", async () => {

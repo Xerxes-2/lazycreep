@@ -135,18 +135,15 @@ export function MapView(props: MapViewProps) {
     setSizeError(undefined);
     if (current === undefined) return;
     let alive = true;
-    src.getWorldSize(current).then(
-      (size) => {
+    // 瓦片根地址在版本信息里（赛季服的本赛季瓦片）；版本信息取不到时用默认根地址
+    Promise.all([src.getWorldSize(current), src.getVersion().catch(() => undefined)]).then(
+      ([size, version]) => {
         if (!alive) return;
         setMapState(
           mapStateFrom({
             shard: current,
             size,
-            tiles: {
-              room: (room) => src.tileUrl(current, room),
-              block: (room) => src.blockTileUrl(current, room),
-              sector: (room) => src.sectorTileUrl(current, room),
-            },
+            tiles: src.mapTiles(current, version),
             me: untrack(me),
           }),
         );

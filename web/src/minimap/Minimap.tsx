@@ -21,6 +21,7 @@ import { screenToWorld } from "../scene/scene-camera.ts";
 import { DEFAULT_THEME } from "../scene/theme.ts";
 import type { SectionContext } from "../shell/sidebar-sections.tsx";
 import type { MapStats, RoomMapUpdate, WorldSize } from "../source/source.ts";
+import type { MapTiles } from "../source/map-tiles.ts";
 import { ROOM_MAP_PRIORITY, roomMapKey, useRoomMapLease, type RoomRef } from "../source/room-map-hub.ts";
 import { buildMinimapScene, minimapCells, minimapRoomAt } from "./minimap-scene.ts";
 
@@ -47,16 +48,22 @@ export function Minimap(props: { readonly ctx: SectionContext; readonly shown: A
   );
   const shard = createMemo(() => where()?.shard);
 
-  // 世界尺寸：按 Source + Shard 取一次
+  // 世界尺寸与瓦片地址：按 Source + Shard 取一次（瓦片根地址在版本信息里，取不到时用默认根地址）
   const [size, setSize] = createSignal<WorldSize>();
+  const [tiles, setTiles] = createSignal<MapTiles>();
   createEffect(() => {
     const src = ctx.source();
     const current = shard();
     setSize(undefined);
+    setTiles(undefined);
     if (current === undefined) return;
     let alive = true;
-    src.getWorldSize(current).then(
-      (got) => alive && setSize(got),
+    Promise.all([src.getWorldSize(current), src.getVersion().catch(() => undefined)]).then(
+      ([got, version]) => {
+        if (!alive) return;
+        setTiles(src.mapTiles(current, version));
+        setSize(got);
+      },
       () => undefined,
     );
     onCleanup(() => (alive = false));
@@ -135,15 +142,15 @@ export function Minimap(props: { readonly ctx: SectionContext; readonly shown: A
     if (!active()) return previous;
     const at = where();
     const world = size();
-    const src = ctx.source();
-    if (!at || !world) return undefined;
+    const urls = tiles();
+    if (!at || !world || !urls) return undefined;
     const theme = ctx.theme() ?? DEFAULT_THEME;
     const known = stats();
     const color = ownerColorRule(theme, known?.users ?? {}, { me: me(), allies: ctx.allies() });
     return buildMinimapScene({
       center: at.room,
       size: world,
-      tileUrl: (room) => src.tileUrl(at.shard, room),
+      tileUrl: (room) => urls.room(room),
       rooms: known?.rooms ?? {},
       positions: replaying() ? {} : positions(),
       ownerColor: color,

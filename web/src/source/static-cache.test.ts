@@ -186,6 +186,25 @@ describe("静态数据：持久化缓存", () => {
     expect(second.versions).toHaveLength(0);
   });
 
+  it("旧版缓存里的版本信息没有瓦片根地址：丢弃并重新取，不用旧赛季的瓦片", async () => {
+    const storage = memoryStorage();
+    const version = await new FixtureSource(bundle, { speed: Infinity }).getVersion();
+    expect(version.mapTileRoot).toBe("/season-static/season11/map");
+    const first = network();
+    const got = staticCached(first.factory, { storage })(SEASON, "t").getVersion();
+    first.versions[0]!.resolve(version);
+    await got;
+    for (const key of storage.keys()) {
+      const stored = JSON.parse(storage.getItem(key)!);
+      delete stored.version.value.mapTileRoot;
+      storage.setItem(key, JSON.stringify(stored));
+    }
+
+    const second = network();
+    void staticCached(second.factory, { storage })(SEASON, "t").getVersion();
+    expect(second.versions).toHaveLength(1);
+  });
+
   it("存储里的内容损坏时当作没有缓存", async () => {
     const storage = memoryStorage();
     const first = network();
@@ -204,7 +223,7 @@ describe("静态数据：持久化缓存", () => {
     const net = network();
     const source = staticCached(net.factory, { storage: memoryStorage() })(SEASON, "t");
     expect(source.server).toBe(SEASON);
-    expect(source.sectorTileUrl("shardSeason", "W9N9")).toBe("/map-tiles/shardSeason/zoom1/W9N9.png");
+    expect(source.mapTiles("shardSeason", undefined).sector("W9N9")).toBe("/map-tiles/shardSeason/zoom1/W9N9.png");
     expect(await source.getTime("shardSeason")).toBeGreaterThan(0);
   });
 });

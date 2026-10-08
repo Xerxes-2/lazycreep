@@ -70,7 +70,7 @@ function returningUser() {
   localStorage.setItem("msc.settings", JSON.stringify({ token: "test-token", shards: { season: "shardSeason" } }));
 }
 
-/** 上次启动留下的 Shard 列表与世界尺寸缓存 */
+/** 上次启动留下的 Shard 列表、世界尺寸与版本信息缓存（World Map 每次都取版本信息里的瓦片根地址） */
 async function cachedFromLastVisit() {
   const source = staticCached(() => new FixtureSource(bundle, { speed: Infinity }), { storage: localStorage })(
     bundle.server,
@@ -78,6 +78,7 @@ async function cachedFromLastVisit() {
   );
   await source.getShards();
   await source.getWorldSize("shardSeason");
+  await source.getVersion();
   source.close();
 }
 
@@ -145,6 +146,7 @@ describe("启动请求时序", () => {
     await settle(() => expect(shown.length).toBeGreaterThan(0));
     expect(tiles(shown[0]!).length).toBeGreaterThan(0);
     expect(tiles(shown[0]!).every((p) => p.kind === "image" && p.url.includes("/zoom1/"))).toBe(true);
+    expect(tiles(shown[0]!).every((p) => p.kind === "image" && p.url.startsWith("/season-static/season11/map/"))).toBe(true);
     // 缓存新鲜：Shard 列表与世界尺寸都不发请求
     expect(source.calls).not.toContain("getShards");
     expect(source.calls).not.toContain("getWorldSize");

@@ -129,6 +129,9 @@ describe("Minimap（#27）", () => {
     expect(tiles).toContain("1,1:W13S28.png");
     expect(tiles).toContain("2,1:W12S28.png");
     expect(tiles).toHaveLength(9);
+    // 本赛季的瓦片（版本信息的 map-url-replace），不是默认根地址下旧赛季留下的瓦片
+    const urls = scenes.get(minimapCanvas()!)!.primitives.flatMap((p) => (p.kind === "image" ? [p.url] : []));
+    expect(urls).toContain("/season-static/season11/map/shardSeason/W13S28.png");
   });
 
   it("点相邻格切换到该房间；roomMap2 订阅随之增删，不残留旧房间", async () => {
@@ -186,6 +189,7 @@ describe("Minimap（#27）", () => {
     shell.navigate({ shard: SHARD, room: "W13S28", replay: { tick: 1024950 } });
     await settle(() => expect(shell.location()).toMatchObject({ room: "W13S28", replay: { tick: 1024950 } }));
     await settle(() => expect(minimapCanvas()).not.toBeNull());
+    await settle(() => expect(scenes.get(minimapCanvas()!)).toBeDefined());
 
     tapCell(1, 0);
     await settle(() => expect(shell.location()).toMatchObject({ view: "room", room: "W13S27", replay: { tick: 1024950 } }));

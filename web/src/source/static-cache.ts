@@ -83,11 +83,15 @@ function decodeVersion(value: unknown): ServerVersion | undefined {
   if (!isNumber(value["historyChunkSize"])) return undefined;
   const renderer = rendererFromStored(value["renderer"]);
   if (value["renderer"] !== undefined && !renderer) return undefined;
+  // 旧版缓存没有瓦片根地址：丢弃重取（否则赛季服会用到旧赛季的瓦片）
+  const mapTileRoot = value["mapTileRoot"];
+  if (mapTileRoot !== null && typeof mapTileRoot !== "string") return undefined;
   return {
     package: value["package"],
     protocol: value["protocol"],
     historyChunkSize: value["historyChunkSize"],
     ...(renderer ? { renderer } : {}),
+    mapTileRoot,
   };
 }
 

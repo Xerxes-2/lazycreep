@@ -41,6 +41,7 @@ import {
   type Unsubscribe,
   type UserInfo,
 } from "./source.ts";
+import { mapTileUrls, type MapTiles } from "./map-tiles.ts";
 import type { VisibilitySignal } from "../power/visibility.ts";
 import { browserSocket, ChannelSocket, type ReconnectOptions, type SocketFactory } from "./socket.ts";
 import {
@@ -312,16 +313,8 @@ export class LiveSource implements Source {
     return terrainFromWire(shard, room, wire);
   }
 
-  tileUrl(shard: string, room: string): string {
-    return `${this.server.tileRoot}/${shard}/${room}.png`;
-  }
-
-  blockTileUrl(shard: string, cornerRoom: string): string {
-    return `${this.server.tileRoot}/${shard}/zoom2/${cornerRoom}.png`;
-  }
-
-  sectorTileUrl(shard: string, cornerRoom: string): string {
-    return `${this.server.tileRoot}/${shard}/zoom1/${cornerRoom}.png`;
+  mapTiles(shard: string, version: ServerVersion | undefined): MapTiles {
+    return mapTileUrls(version?.mapTileRoot ?? this.server.tileRoot, shard);
   }
 
   async getWorldSize(shard: string): Promise<WorldSize> {

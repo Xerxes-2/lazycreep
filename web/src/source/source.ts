@@ -3,6 +3,7 @@
  * 实现：FixtureSource（播放 `fixtures/` 的录制数据）；LiveSource（HTTP 经同源 Gateway，WebSocket 直连官方）。
  */
 import type { Badge } from "../badge/badge.ts";
+import type { MapTiles } from "./map-tiles.ts";
 import type { RendererOverride } from "./season-renderer.ts";
 
 /** 一个 Server 的连接配置。路径是相对 Gateway 的同源路径，WebSocket 是绝对地址。 */
@@ -242,6 +243,8 @@ export interface ServerVersion {
   readonly historyChunkSize: number;
   /** 赛季服下发的渲染器覆盖配置（#47）；MMO 没有 */
   readonly renderer?: RendererOverride;
+  /** 本赛季地图瓦片的同源根地址（`map-url-replace`，map-tiles.ts）；null 表示用 Server 的默认根地址 */
+  readonly mapTileRoot: string | null;
 }
 
 /**
@@ -318,17 +321,11 @@ export interface Source {
   getTime(shard: string, options?: TimeOptions): Promise<number>;
   getShards(): Promise<readonly ShardInfo[]>;
   getTerrain(shard: string, room: string): Promise<Terrain>;
-  tileUrl(shard: string, room: string): string;
   /**
-   * zoom2 块瓦片：一张图覆盖 4×4 个房间，按块西北角的房间命名；
-   * 传入的房间必须是块角（有符号坐标都是 4 的倍数），否则 CDN 返回 403。
+   * 某个 Shard 的地图瓦片地址（map-tiles.ts）。必须给版本信息：赛季服的本赛季瓦片根地址在里面；
+   * 版本信息取不到时传 undefined，用 Server 的默认根地址。
    */
-  blockTileUrl(shard: string, cornerRoom: string): string;
-  /**
-   * zoom1 扇区瓦片：一张图（200×200）覆盖 10×10 个房间，按扇区西北角的房间命名；
-   * 传入的房间必须是扇区角（有符号坐标都是 10 的倍数，如 W9N9、E0S0、E10S10），否则 CDN 返回 403。
-   */
-  sectorTileUrl(shard: string, cornerRoom: string): string;
+  mapTiles(shard: string, version: ServerVersion | undefined): MapTiles;
   getWorldSize(shard: string): Promise<WorldSize>;
   /**
    * 房间的所有权、矿物与区域状态（`POST game/map-stats`，statName `minerals0`，

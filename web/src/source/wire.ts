@@ -2,6 +2,7 @@
  * 服务器 wire 格式到 Source 类型的转换。FixtureSource 与 LiveSource 共用，
  * 保证录制数据与即时数据经过同一套转换。
  */
+import { mapTileRootFromFeatures } from "./map-tiles.ts";
 import { rendererFromWire } from "./season-renderer.ts";
 import type {
   WireConsole,
@@ -49,6 +50,7 @@ export function versionFromWire(wire: WireVersion): ServerVersion {
     protocol: wire.protocol,
     historyChunkSize: wire.serverData.historyChunkSize,
     ...(renderer ? { renderer } : {}),
+    mapTileRoot: mapTileRootFromFeatures(wire.serverData.features),
   };
 }
 

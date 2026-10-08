@@ -68,7 +68,7 @@ describe("赛季贴图的预检", () => {
   it("版本信息里没有渲染器配置（MMO）或取版本失败时，没有贴图也不预检", async () => {
     const { preflight } = preflights();
     const mmo = new FixtureSource({ ...bundle, server: SERVER_PRESETS.mmo }, { speed: Infinity });
-    mmo.getVersion = () => Promise.resolve({ package: 1, protocol: 14, historyChunkSize: 100 });
+    mmo.getVersion = () => Promise.resolve({ package: 1, protocol: 14, historyChunkSize: 100, mapTileRoot: null });
     const down = new FixtureSource(bundle, { speed: Infinity });
     down.getVersion = () => Promise.reject(new Error("down"));
     const loader = createSeasonArtLoader(preflight);

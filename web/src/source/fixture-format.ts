@@ -96,7 +96,7 @@ export interface WireVersion {
   readonly package: number;
   readonly protocol: number;
   /** renderer：赛季服的渲染器覆盖配置（#47），形状由 season-renderer.ts 校验 */
-  readonly serverData: { readonly historyChunkSize: number; readonly renderer?: unknown };
+  readonly serverData: { readonly historyChunkSize: number; readonly renderer?: unknown; readonly features?: unknown };
 }
 
 export interface WireTime {

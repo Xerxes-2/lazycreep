@@ -120,13 +120,18 @@ describe.skipIf(!LIVE)("经 Gateway 联调", () => {
     expect(res.headers.get("content-type")).toBe("image/png");
   });
 
-  it("zoom1 扇区瓦片：扇区角 200、PNG，非扇区角被 CDN 拒绝", async () => {
+  it("本赛季瓦片：版本信息给出赛季根地址，经 Gateway 的单房间、块角、扇区角瓦片 200、PNG，非扇区角被拒绝", async () => {
     const source = season(undefined);
-    const corner = await fetch(new URL(source.sectorTileUrl("shardSeason", "W9N9"), base));
-    expect(corner.status).toBe(200);
-    expect(corner.headers.get("content-type")).toBe("image/png");
-    const notCorner = await fetch(new URL(source.sectorTileUrl("shardSeason", "W8N8"), base));
-    expect(notCorner.status).toBe(403);
+    const version = await source.getVersion();
+    expect(version.mapTileRoot).toMatch(/^\/season-static\/season\d+\/map$/);
+    const tiles = source.mapTiles("shardSeason", version);
+    for (const url of [tiles.room("W13S28"), tiles.block("W15S28"), tiles.sector("W9N9")]) {
+      const res = await fetch(new URL(url, base));
+      expect(res.status, url).toBe(200);
+      expect(res.headers.get("content-type"), url).toBe("image/png");
+    }
+    const notCorner = await fetch(new URL(tiles.sector("W8N8"), base));
+    expect(notCorner.ok).toBe(false);
     source.close();
   });
 

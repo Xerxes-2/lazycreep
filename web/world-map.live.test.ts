@@ -39,11 +39,7 @@ describe.skipIf(!LIVE)("World Map 联调（赛季服）", () => {
           shard,
           size,
           me: me.id,
-          tiles: {
-            room: (r) => source.tileUrl(shard, r),
-            block: (r) => source.blockTileUrl(shard, r),
-            sector: (r) => source.sectorTileUrl(shard, r),
-          },
+          tiles: source.mapTiles(shard, await source.getVersion()),
         }),
         stats,
       );

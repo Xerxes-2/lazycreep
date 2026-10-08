@@ -137,7 +137,7 @@ describe("World Map 页面", () => {
     expect(lastScene()).toMatchObject({ width: 102, height: 102 });
     const tiles = lastScene().primitives.filter((p): p is ImagePrimitive => p.kind === "image");
     expect(tiles.length).toBeGreaterThan(0);
-    expect(tiles.every((p) => p.url.startsWith("/map-tiles/shardSeason/zoom1/"))).toBe(true);
+    expect(tiles.every((p) => p.url.startsWith("/season-static/season11/map/shardSeason/zoom1/"))).toBe(true);
     expect(lastViewport()!.scale).toBeCloseTo(Math.min(canvas.width, canvas.height) / 102);
   });
 
@@ -200,7 +200,7 @@ describe("World Map 页面", () => {
     const after = screenOf(W13S28.x, W13S28.y);
     expect(after.clientX).toBeCloseTo(at.clientX);
     expect(after.clientY).toBeCloseTo(at.clientY);
-    expect(lastScene().primitives.some((p) => p.kind === "image" && p.url === "/map-tiles/shardSeason/W13S28.png")).toBe(true);
+    expect(lastScene().primitives.some((p) => p.kind === "image" && p.url === "/season-static/season11/map/shardSeason/W13S28.png")).toBe(true);
   });
 
   it("拖动平移视口", async () => {
