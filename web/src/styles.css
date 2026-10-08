@@ -264,37 +264,61 @@ body {
 
 .sidebar-section__title {
   margin: 0;
-  font-size: 0.95rem;
+  font-size: var(--fs-title);
 }
 
+/* 区块标题（#39）：标题字号、粗体、主要文字色；与正文之间一条分隔线 */
 .sidebar-section__title button {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   width: 100%;
   min-height: 36px;
-  padding: 4px 10px;
+  padding: var(--space-2) 10px;
   border: 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--muted) 30%, transparent);
+  border-bottom: 1px solid var(--divider);
   background: color-mix(in srgb, var(--muted) 10%, transparent);
-  color: var(--fg);
   font: inherit;
-  font-weight: 600;
+  font-size: var(--fs-title);
+  font-weight: var(--weight-strong);
+  color: var(--color-primary);
   text-align: left;
   cursor: pointer;
 }
 
 .sidebar-section__title button::before {
   content: "▾";
-  color: var(--muted);
+  color: var(--color-faint);
 }
 
 .sidebar-section__title button[aria-expanded="false"]::before {
   content: "▸";
 }
 
+/* 区块正文（#39）：正文字号；分组标题粗体、比区块标题小；段落间距统一 */
 .sidebar-section__body {
-  padding: 8px 10px;
+  padding: var(--space-3) 10px var(--space-4);
+  font-size: var(--fs-body);
+  line-height: 1.45;
+  color: var(--color-primary);
+}
+
+.sidebar-section__body h3 {
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: var(--fs-group);
+  font-weight: var(--weight-strong);
+  color: var(--color-primary);
+}
+
+.sidebar-section__body h4 {
+  margin: var(--space-3) 0 var(--space-2);
+  font-size: var(--fs-small);
+  font-weight: var(--weight-strong);
+  color: var(--color-secondary);
+}
+
+.sidebar-section__body p {
+  margin: var(--space-2) 0;
 }
 
 /* Minimap（#27）：正方形画布，宽度随 Sidebar */
@@ -606,12 +630,14 @@ body {
   padding: 4px 8px 4px 0;
 }
 
+/* 次要文字与错误（#39） */
 .settings__muted {
-  color: var(--muted);
+  color: var(--color-secondary);
+  font-size: var(--fs-small);
 }
 
 .settings__error {
-  color: #d64545;
+  color: var(--color-danger);
 }
 
 .readings h2 {

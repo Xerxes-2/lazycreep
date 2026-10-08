@@ -52,3 +52,41 @@ describe("设计变量（#39）", () => {
     }
   });
 });
+
+/** 规则体里的字号、颜色、字重都来自变量，不是散落的字面量 */
+function usesTokens(body: string) {
+  for (const prop of ["font-size", "color", "font-weight"]) {
+    for (const m of body.matchAll(new RegExp(`(?:^|[;{\\s])${prop}:\\s*([^;]+);`, "g"))) {
+      expect(m[1]!.trim(), `${prop}: ${m[1]}`).toMatch(/^var\(--/);
+    }
+  }
+}
+
+describe("Sidebar 的通用层级套用变量（#39）", () => {
+  it("区块标题：标题字号、粗体、主要文字色，与正文之间有分隔线", () => {
+    const title = rule(".sidebar-section__title button");
+    expect(title).toMatch(/font-size:\s*var\(--fs-title\)/);
+    expect(title).toMatch(/font-weight:\s*var\(--weight-strong\)/);
+    expect(title).toMatch(/color:\s*var\(--color-primary\)/);
+    expect(title).toMatch(/border-bottom:[^;]*var\(--divider\)/);
+    usesTokens(title);
+  });
+
+  it("正文与分组标题：正文字号；分组标题粗体、比区块标题小", () => {
+    const body = rule(".sidebar-section__body");
+    expect(body).toMatch(/font-size:\s*var\(--fs-body\)/);
+    expect(body).toMatch(/color:\s*var\(--color-primary\)/);
+    const group = rule(".sidebar-section__body h3");
+    expect(group).toMatch(/font-size:\s*var\(--fs-group\)/);
+    expect(group).toMatch(/font-weight:\s*var\(--weight-strong\)/);
+    usesTokens(body);
+    usesTokens(group);
+  });
+
+  it("次要文字与错误：次要色小字号；错误用危险色", () => {
+    const muted = rule(".settings__muted");
+    expect(muted).toMatch(/color:\s*var\(--color-secondary\)/);
+    expect(muted).toMatch(/font-size:\s*var\(--fs-small\)/);
+    expect(rule(".settings__error")).toMatch(/color:\s*var\(--color-danger\)/);
+  });
+});
