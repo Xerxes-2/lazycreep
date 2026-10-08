@@ -50,9 +50,10 @@ async function fakeView(options: SceneViewOptions): Promise<SceneView> {
   };
 }
 
-function mount(props: Partial<MapViewProps> = {}) {
+function mount(props: Partial<MapViewProps> = {}, shard?: string) {
   const settings = createSettings(localStorage);
   settings.setToken("token");
+  if (shard !== undefined) settings.setShard(shard);
   dispose = render(
     () => (
       <I18nProvider>
@@ -137,6 +138,33 @@ describe("World Map 页面", () => {
     expect(tiles.length).toBeGreaterThan(0);
     expect(tiles.every((p) => p.url.startsWith("/map-tiles/shardSeason/zoom1/"))).toBe(true);
     expect(lastViewport()!.scale).toBeCloseTo(Math.min(canvas.width, canvas.height) / 102);
+  });
+
+  it("设置里选过的 Shard 已不存在时，Shard 列表回来后换成第一个，不留错误", async () => {
+    let sizeFailed = false;
+    const settings = mount(
+      {
+        sourceFor: () => {
+          const source = new FixtureSource(bundle, { speed: Infinity });
+          const getWorldSize = source.getWorldSize.bind(source);
+          source.getWorldSize = (shard) =>
+            getWorldSize(shard).catch((error: unknown) => {
+              sizeFailed = true;
+              throw error;
+            });
+          // Shard 列表在旧 Shard 的世界尺寸失败之后才回来
+          const getShards = source.getShards.bind(source);
+          source.getShards = () => vi.waitFor(() => expect(sizeFailed).toBe(true)).then(getShards);
+          return source;
+        },
+      },
+      "shardGone",
+    );
+    await settle(() => expect(shown.length).toBeGreaterThan(0));
+    expect(sizeFailed).toBe(true);
+    expect(lastScene()).toMatchObject({ width: 102, height: 102 });
+    expect(container.querySelector("[role=alert]")).toBeNull();
+    expect(settings.shard()).toBe("shardGone");
   });
 
   it("视口稳定后按可见区域取所有权并着色：自己的房间用己方颜色", async () => {

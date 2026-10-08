@@ -9,6 +9,7 @@ import { App } from "../App.tsx";
 import type { SceneView, SceneViewOptions } from "../scene/pixi-scene-view.ts";
 import { FixtureSource, fixtureBundle } from "../source/fixture-source.ts";
 import type { ConnectionState, Source } from "../source/source.ts";
+import { staticCached } from "../source/static-cache.ts";
 
 const bundle = fixtureBundle(
   Object.values(import.meta.glob<unknown>("../../../fixtures/season/*.json", { eager: true, import: "default" })),
@@ -155,6 +156,28 @@ describe("启动画面", () => {
     await settle(() => expect(boot()).toBeNull());
     // 外壳一直在下面
     expect(container.querySelector(".shell")).not.toBeNull();
+  });
+
+  it("Shard 列表与世界尺寸命中缓存（#35）、地图在拿到数据前就已显示时，阶段照样推进到完成", async () => {
+    withToken();
+    const cache = staticCached(() => new FixtureSource(bundle, { speed: Infinity }), { storage: localStorage })(
+      bundle.server,
+      undefined,
+    );
+    await cache.getShards();
+    await cache.getWorldSize("shardSeason");
+    const source = controlledSource();
+    const views = gatedViews();
+    views.release();
+    mount(source, views);
+
+    await settle(() => expect(stage()).toBe("connect"));
+    source.releaseHttp();
+    await settle(() => expect(stage()).toBe("auth"));
+    source.emit("authenticated");
+    await settle(() => expect(stage()).toBe("map"));
+    source.releaseMap();
+    await settle(() => expect(boot()).toBeNull());
   });
 
   it("token 无效时停在认证阶段，“打开设置”进入应用并打开 Server 设置", async () => {

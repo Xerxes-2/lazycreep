@@ -101,12 +101,15 @@ export function MapView(props: MapViewProps) {
     onCleanup(() => (alive = false));
   });
 
-  /** 选过且仍存在的 Shard，否则第一个；不分 Shard 的 Server 为空串；还不知道时 undefined */
+  /**
+   * 选过且仍存在的 Shard，否则第一个；不分 Shard 的 Server 为空串；还不知道时 undefined。
+   * Shard 列表回来之前先用设置里选过的（#35）：世界尺寸不必等 Shard 列表；列表回来后若它已不存在再换。
+   */
   const shard = createMemo<string | undefined>(() => {
     if (!source().server.sharded) return "";
     const list = shards();
-    if (!list) return undefined;
     const chosen = settings.shard();
+    if (!list) return chosen;
     return chosen !== undefined && list.some((s) => s.name === chosen) ? chosen : list[0]?.name;
   });
 
@@ -124,10 +127,12 @@ export function MapView(props: MapViewProps) {
   });
 
   const [mapState, setMapState] = createSignal<MapState>();
+  const [sizeError, setSizeError] = createSignal<string>();
   createEffect(() => {
     const src = source();
     const current = shard();
     setMapState(undefined);
+    setSizeError(undefined);
     if (current === undefined) return;
     let alive = true;
     src.getWorldSize(current).then(
@@ -148,7 +153,7 @@ export function MapView(props: MapViewProps) {
         const known = props.ownership?.stats(current);
         if (known) setMapState((state) => state && applyMapStats(state, known));
       },
-      (error: unknown) => alive && setLoadError(errorMessage(t, error)),
+      (error: unknown) => alive && setSizeError(errorMessage(t, error)),
     );
     onCleanup(() => (alive = false));
   });
@@ -428,13 +433,13 @@ export function MapView(props: MapViewProps) {
         </Show>
         <span class="world-map__hint">{t("worldMap.hint")}</span>
       </div>
-      <Show when={!mapState() && !loadError()}>
+      <Show when={!mapState() && !loadError() && !sizeError()}>
         <p class="settings__muted">{t("worldMap.loading")}</p>
       </Show>
       <Show when={!settings.token()}>
         <p class="settings__muted">{t("worldMap.noToken")}</p>
       </Show>
-      <Show when={loadError() ?? viewError()}>
+      <Show when={loadError() ?? sizeError() ?? viewError()}>
         {(message) => (
           <p class="settings__error" role="alert">
             {message()}

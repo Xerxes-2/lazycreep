@@ -63,12 +63,12 @@ export function TopBarStatus(props: TopBarStatusProps) {
     onCleanup(() => (alive = false));
   });
 
-  /** 选过且仍存在的 Shard，否则第一个；不分 Shard 的 Server 为空串；还不知道时 undefined */
+  /** 选过且仍存在的 Shard，否则第一个；不分 Shard 的 Server 为空串；还不知道时 undefined（列表回来前先用选过的，#35） */
   const shard = createMemo<string | undefined>(() => {
     if (!source().server.sharded) return "";
     const list = shards();
-    if (!list) return undefined;
     const chosen = settings.shard();
+    if (!list) return chosen;
     return chosen !== undefined && list.some((s) => s.name === chosen) ? chosen : list[0]?.name;
   });
 
