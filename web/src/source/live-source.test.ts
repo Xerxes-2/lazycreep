@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FixtureSource, fixtureBundle } from "./fixture-source.ts";
-import type { FixtureFile } from "./fixture-format.ts";
+import type { FixtureFile, WireVersion } from "./fixture-format.ts";
 import { LiveSource } from "./live-source.ts";
 import { SERVER_PRESETS } from "./servers.ts";
 import { SourceError, type ServerConfig } from "./source.ts";
@@ -57,7 +57,8 @@ function fakeGateway(routes: Record<string, Reply | (() => never)>) {
 
 const seasonRoutes: Record<string, Reply> = {
   "/season/api/version": {
-    body: { ok: 1, ...(recorded("version") as object), serverData: { historyChunkSize: 100, renderer: {} } },
+    // 真实响应的 serverData 还带着别的字段，转换时忽略
+    body: { ok: 1, ...(recorded("version") as WireVersion), serverData: { ...(recorded("version") as WireVersion).serverData, features: [] } },
   },
   "/season/api/game/time?shard=shardSeason": { body: { ok: 1, ...(recorded("time") as object) } },
   "/season/api/game/shards/info": { body: { ok: 1, ...(recorded("shards") as object) } },
@@ -204,10 +205,33 @@ describe("LiveSource map-stats 请求", () => {
     });
   });
 
+  it("徽章（#43）：user/find、auth/me 与 map-stats 的 users 都保留合法的徽章", async () => {
+    const BADGE = { type: 5, color1: "#ba0e09", color2: "#ffbf00", color3: "#ffbf00", param: -68, flip: false };
+    const { source } = live({
+      token: TOKEN,
+      routes: {
+        "/season/api/user/find?id=u1": { body: { ok: 1, user: { _id: "u1", username: "Alice", badge: BADGE, gcl: 1 } } },
+        "/season/api/auth/me": { body: { ok: 1, _id: "u1", username: "Alice", badge: BADGE } },
+        "/season/api/user/rooms?id=u1": { body: { ok: 1, shards: {} } },
+        "/season/api/game/map-stats": {
+          body: {
+            ok: 1,
+            gameTime: 5,
+            stats: { W38N13: { status: "normal", own: { user: "u1", level: 8 } } },
+            users: { u1: { _id: "u1", username: "Alice", badge: BADGE } },
+          },
+        },
+      },
+    });
+    expect((await source.getPlayer("u1")).badge).toEqual(BADGE);
+    expect((await source.getMe()).badge).toEqual(BADGE);
+    expect((await source.getMapStats(SHARD, ["W38N13"])).users["u1"]).toMatchObject({ badge: BADGE });
+  });
+
   it("速率限制（429）是 rateLimited", async () => {
     const { source } = live({
       token: TOKEN,
-      routes: { "/season/api/game/map-stats": { status: 429, body: { error: "Rate limit exceeded" } } },
+      routes: { "/season/api/game/map-stats":{ status: 429, body: { error: "Rate limit exceeded" } } },
     });
     await expect(source.getMapStats(SHARD, [OWN_ROOM])).rejects.toMatchObject({ kind: "rateLimited" });
   });

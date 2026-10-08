@@ -95,3 +95,60 @@ describe("生产构建不包含录制回放", () => {
     expect(precached.filter(fromFixture)).toEqual([]);
   });
 });
+
+describe("赛季贴图不进构建产物（#47）", () => {
+  // 下发的位图贴图（extractor.svg 与官方 ISC 美术同名，不在此列）
+  const seasonFiles = ["T.png", "reactor-core.png", "reactor-edge.png"];
+
+  it("dist 与 PWA 预缓存里没有赛季贴图，也没有 season-static 目录", () => {
+    expect(files.filter((f) => seasonFiles.includes(basename(f)) || f.startsWith("season-static"))).toEqual([]);
+    const sw = readFileSync(join(outDir, "sw.js"), "utf8");
+    const precached = [...sw.matchAll(/url:"([^"]+)"/g)].map((m) => m[1]!);
+    expect(precached.filter((url) => seasonFiles.includes(basename(url)) || url.includes("season-static"))).toEqual([]);
+  });
+
+  it("产物里不含下发配置的内容（贴图地址与 metadata 在运行时从版本信息取）", () => {
+    for (const file of files) {
+      const text = readFileSync(join(outDir, file), "latin1");
+      expect(text.includes("seasons/season11"), file).toBe(false);
+      expect(text.includes("rotateContainer"), file).toBe(false);
+    }
+  });
+});
+
+describe("官方美术随构建产物发布（#42）", () => {
+  const artDir = join(here, "public/official-art");
+  const svgs = readdirSync(artDir).filter((f) => f.endsWith(".svg"));
+
+  it("117 个官方 SVG 与 LICENSE、来源说明都在产物里", () => {
+    expect(svgs).toHaveLength(117);
+    for (const svg of svgs) expect(files).toContain(`official-art/${svg}`);
+    expect(files).toContain("official-art/LICENSE.txt");
+    expect(files).toContain("official-art/SOURCE.txt");
+    expect(readFileSync(join(outDir, "official-art/LICENSE.txt"), "utf8")).toMatch(/Artem Chivchalov/);
+  });
+
+  it("官方 SVG 与 LICENSE 都在 PWA 预缓存清单里", () => {
+    const sw = readFileSync(join(outDir, "sw.js"), "utf8");
+    const precached = new Set([...sw.matchAll(/url:"([^"]+)"/g)].map((m) => m[1]!));
+    for (const svg of svgs) expect(precached.has(`official-art/${svg}`), svg).toBe(true);
+    expect(precached.has("official-art/LICENSE.txt")).toBe(true);
+  });
+});
+
+describe("官方 PNG 纹理按需加载（#46）", () => {
+  const textureDir = join(here, "public/official-art/textures");
+  const pngs = readdirSync(textureDir).filter((f) => f.endsWith(".png"));
+
+  it("纹理（地形 4 张与光照的 glow）在产物里，但不在 PWA 预缓存清单里", () => {
+    expect(pngs.sort()).toEqual(["glow.png", "ground-mask.png", "ground.png", "noise1.png", "noise2.png"]);
+    const sw = readFileSync(join(outDir, "sw.js"), "utf8");
+    const precached = [...sw.matchAll(/url:"([^"]+)"/g)].map((m) => m[1]!);
+    for (const png of pngs) {
+      expect(files).toContain(`official-art/textures/${png}`);
+      expect(precached.filter((url) => url.includes(png)), png).toEqual([]);
+    }
+    // 应用图标等其他 PNG 照常预缓存
+    expect(precached).toContain("icon-192.png");
+  });
+});

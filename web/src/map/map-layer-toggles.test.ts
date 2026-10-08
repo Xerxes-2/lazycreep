@@ -6,6 +6,8 @@ import type { Nuke } from "../source/source.ts";
 import { aggregatePvp } from "../pvp/pvp-overview.ts";
 import { buildMapScene } from "./map-scene.ts";
 import { applyMapStats, applyPowerBanks, mapStateFrom } from "./map-state.ts";
+import { applyRoomUnits } from "./map-units.ts";
+import { badgeLayer } from "./map-badge-layer.ts";
 import { createMapLayerPrefs, mapLayers, MAP_LAYER_TOGGLES, type MapLayerToggle } from "./map-layer-toggles.ts";
 
 /** 102×102 的世界：W13S28 在世界坐标 (37, 79)，E0S0 在 (51, 51) */
@@ -26,6 +28,7 @@ state = applyMapStats(state, {
   users: { me: { _id: "me", username: "Me" } },
 });
 state = applyPowerBanks(state, "W13S28", [[10, 10]]);
+state = applyRoomUnits(state, "W13S28", { r: [[10, 11]], me: [[12, 12]] });
 
 const nuke: Nuke = { id: "n1", shard: "s", room: "E0S0", x: 25, y: 10, landTime: 60_000, launchRoom: "W13S28" };
 const group = aggregatePvp(
@@ -42,6 +45,8 @@ const PREFIX: Record<MapLayerToggle, readonly string[]> = {
   zones: ["zone:"],
   pvp: ["pvp:"],
   nukes: ["nuke:", "nuke-path:"],
+  units: ["units:"],
+  badges: ["badge:"],
 };
 
 function keys(primitives: readonly Primitive[], toggle: MapLayerToggle) {
@@ -57,7 +62,7 @@ function scene(on: Parameters<typeof mapLayers>[0]) {
   return buildMapScene(
     state,
     { theme: DEFAULT_THEME, zoom: 64, visible: { x0: 30, y0: 45, x1: 60, y1: 85 }, now: NOW },
-    mapLayers(on, group),
+    mapLayers(on, group, badgeLayer((id) => `/badge/${id}`)),
   ).primitives;
 }
 

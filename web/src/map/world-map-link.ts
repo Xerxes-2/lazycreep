@@ -22,6 +22,9 @@ export interface WorldMapLink {
   centerOn(text: string): CenterResult;
   /** 地图端注册居中实现；返回注销函数 */
   bindCenterOn(impl: (text: string) => CenterResult): () => void;
+  /** 从 Room View 回到地图时要居中的房间（保持缩放）；地图用户拖动 / 缩放后清除 */
+  focusRoom(): string | undefined;
+  setFocusRoom(room: string | undefined): void;
   readonly pointed: Accessor<PointedRoom | undefined>;
   setPointed(room: PointedRoom | undefined): void;
 }
@@ -29,6 +32,7 @@ export interface WorldMapLink {
 export function createWorldMapLink(): WorldMapLink {
   let impl: ((text: string) => CenterResult) | undefined;
   const [pointed, setPointed] = createSignal<PointedRoom>();
+  const [focusRoom, setFocusRoom] = createSignal<string>();
   return {
     centerOn: (text) => impl?.(text),
     bindCenterOn(next) {
@@ -39,5 +43,7 @@ export function createWorldMapLink(): WorldMapLink {
     },
     pointed,
     setPointed: (room) => setPointed(room),
+    focusRoom,
+    setFocusRoom: (room) => setFocusRoom(room),
   };
 }

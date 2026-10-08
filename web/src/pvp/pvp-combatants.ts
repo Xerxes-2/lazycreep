@@ -6,6 +6,7 @@
  * - 只能给“物体数”（位置点数），不能给单位数：roomMap2 不区分 creep 与建筑，房间所有者的建筑也计在内
  * - 名字与 GCL 来自 Source.getPlayer（user/find）；资料未到时只有 id
  */
+import type { Badge } from "../badge/badge.ts";
 import { playerPoints, type PlayerProfile, type RoomMapUpdate } from "../source/source.ts";
 
 /** 引擎常量（screeps/common lib/constants.js） */
@@ -27,6 +28,8 @@ export interface Combatant {
   readonly objects: number;
   /** 在 Ally List 里（按名字，不分大小写） */
   readonly ally: boolean;
+  /** 在这个 Server 上的徽章（#43）；资料未到或没有徽章时没有 */
+  readonly badge?: Badge;
 }
 
 const byName = new Intl.Collator("en", { numeric: true });
@@ -46,6 +49,7 @@ export function combatantsFrom(
       ...(found?.gcl === undefined ? {} : { gcl: gclLevel(found.gcl) }),
       objects: points.length,
       ally: found !== undefined && lowerAllies.has(found.username.toLowerCase()),
+      ...(found?.badge ? { badge: found.badge } : {}),
     });
   }
   return list.sort((a, b) => b.objects - a.objects || byName.compare(a.username ?? a.id, b.username ?? b.id));

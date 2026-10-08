@@ -72,7 +72,7 @@ describe("配色改动后 Room View 与 World Map 用新 Theme 重建 Scene（#5
       shell = createShellState(localStorage, settings);
       return (
         <I18nProvider>
-          <MapAndRoom
+          <MapAndRoom artStyle="geometric"
             settings={settings}
             shell={shell}
             sourceFor={() => new FixtureSource(bundle, { speed: Infinity })}

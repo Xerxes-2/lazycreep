@@ -91,16 +91,33 @@ export interface BarPrimitive extends PrimitiveBase {
 }
 
 /**
- * 图片（例如 World Map 的地形瓦片）：把 url 指向的图拉伸进矩形。只存 URL 与矩形，
- * 加载由适配层负责；加载完成前与加载失败时什么都不画。url 须同源（WebGL 纹理需要 CORS）。
+ * 图片（World Map 的地形瓦片、官方画风的贴图等）：把 url 指向的图拉伸进矩形。只存 URL 与矩形，
+ * 加载由适配层负责；加载完成前与加载失败时什么都不画。
+ *
+ * url 是贴图的唯一引用，也是适配层缓存纹理的键。合法形式（编码与识别都在 scene/image-sources.ts，
+ * 见 textureSourceKind）：
+ * - 同源地址（WebGL 纹理需要 CORS）：`.svg` 结尾的按当前缩放取档位栅格化，其余（PNG 等）按位图加载；
+ * - `data:image/svg+xml;charset=utf-8,…`（svgDataUrl，徽章）或其他 `data:image/svg+xml`：同 SVG；
+ * - `data:image/svg+xml;msc=composite,…`（compositeSvgUrl）：房间级合成贴图，内联引用的 PNG 后栅格化；
+ * - `data:image/bmp;base64,…`（pixel-image.ts 的 encodePixelImage）：像素图，同步解码、最近邻缩放。
  */
 export interface ImagePrimitive extends PrimitiveBase {
   readonly kind: "image";
+  /** 未旋转时矩形的左上角 */
   readonly x: number;
   readonly y: number;
   readonly width: number;
   readonly height: number;
   readonly url: string;
+  /** 混合方式，默认正常；"add" 为加色混合（World Map 单位图层） */
+  readonly blend?: "add";
+  /** 顺时针旋转的弧度（y 轴朝下），绕 (pivotX, pivotY)；默认 0 */
+  readonly rotation?: number;
+  /** 旋转中心（世界坐标）；默认矩形中心 */
+  readonly pivotX?: number;
+  readonly pivotY?: number;
+  /** 染色：与贴图逐像素相乘（白色部分变成这个颜色）；默认不染色 */
+  readonly tint?: Color;
 }
 
 export type Primitive =

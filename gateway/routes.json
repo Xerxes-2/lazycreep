@@ -1,6 +1,7 @@
 {
   "apiOrigin": "https://screeps.com",
   "tilesOrigin": "https://d3os7yery2usni.cloudfront.net",
+  "seasonStaticOrigin": "https://static.screeps.com",
   "apiPrefixes": ["/api", "/season/api", "/ptr/api"],
   "postAllowlist": ["game/map-stats", "user/console"]
 }

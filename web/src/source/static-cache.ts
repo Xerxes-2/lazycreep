@@ -1,5 +1,6 @@
 /**
- * 静态数据缓存（#35）：包在 Source 工厂外的薄装饰层，只接管 Shard 列表与世界尺寸，其余方法原样转发。
+ * 静态数据缓存（#35）：包在 Source 工厂外的薄装饰层，只接管 Shard 列表、世界尺寸与版本信息（#47 加入，
+ * 带赛季渲染器配置），其余方法原样转发。
  *
  * - 在途去重：同一 Source 内对同一静态请求（Shard 列表；某个 Shard 的世界尺寸）同时只有一个请求，
  *   Top Bar、设置、World Map、Minimap 等各自去要也只发一次。
@@ -15,7 +16,8 @@
  */
 import type { SourceFactory } from "../settings/SettingsPage.tsx";
 import { isRecord, readJson, writeJson, type KeyValueStorage, type StoredKey } from "../storage/local-store.ts";
-import type { ShardInfo, Source, WorldSize } from "./source.ts";
+import { rendererFromStored } from "./season-renderer.ts";
+import type { ServerVersion, ShardInfo, Source, WorldSize } from "./source.ts";
 
 /** 每个 Server 一个键：`msc.staticCache.<server id>` */
 export const STATIC_CACHE_STORAGE: StoredKey = {
@@ -28,6 +30,8 @@ export const STATIC_CACHE_STORAGE: StoredKey = {
 const HOUR = 3_600_000;
 export const SHARDS_FRESH_MS = 24 * HOUR;
 export const WORLD_SIZE_FRESH_MS = 7 * 24 * HOUR;
+/** 版本信息：渲染器配置只在赛季切换时变，包版本随官方发布；按一天核对一次 */
+export const VERSION_FRESH_MS = 24 * HOUR;
 
 export interface StaticCacheOptions {
   readonly storage: KeyValueStorage | undefined;
@@ -44,6 +48,7 @@ interface Entry<T> {
 interface Stored {
   readonly shards?: Entry<readonly ShardInfo[]>;
   readonly worldSize?: Readonly<Record<string, Entry<WorldSize>>>;
+  readonly version?: Entry<ServerVersion>;
 }
 
 const isNumber = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
@@ -72,9 +77,23 @@ function decodeSize(value: unknown): WorldSize | undefined {
   return { width: value["width"], height: value["height"] };
 }
 
+function decodeVersion(value: unknown): ServerVersion | undefined {
+  if (!isRecord(value) || !isNumber(value["package"]) || !isNumber(value["protocol"])) return undefined;
+  if (!isNumber(value["historyChunkSize"])) return undefined;
+  const renderer = rendererFromStored(value["renderer"]);
+  if (value["renderer"] !== undefined && !renderer) return undefined;
+  return {
+    package: value["package"],
+    protocol: value["protocol"],
+    historyChunkSize: value["historyChunkSize"],
+    ...(renderer ? { renderer } : {}),
+  };
+}
+
 function decodeStored(value: unknown): Stored | undefined {
   if (!isRecord(value)) return undefined;
   const shards = decodeEntry(value["shards"], decodeShards);
+  const version = decodeEntry(value["version"], decodeVersion);
   const sizes: Record<string, Entry<WorldSize>> = {};
   if (isRecord(value["worldSize"])) {
     for (const [shard, raw] of Object.entries(value["worldSize"])) {
@@ -82,7 +101,7 @@ function decodeStored(value: unknown): Stored | undefined {
       if (entry) sizes[shard] = entry;
     }
   }
-  return { ...(shards ? { shards } : {}), worldSize: sizes };
+  return { ...(shards ? { shards } : {}), ...(version ? { version } : {}), worldSize: sizes };
 }
 
 /** 一个 Server 的持久化缓存；每次读写都直接对存储，同一 Server 的多个 Source 互相看得见 */
@@ -95,7 +114,7 @@ function serverStore(storage: KeyValueStorage | undefined, serverId: string) {
   };
 }
 
-/** 包装一个 Source：getShards / getWorldSize 走缓存，其余原样转发 */
+/** 包装一个 Source：getShards / getWorldSize / getVersion 走缓存，其余原样转发 */
 export function withStaticCache(source: Source, options: StaticCacheOptions): Source {
   const now = options.now ?? Date.now;
   const store = serverStore(options.storage, source.server.id);
@@ -155,9 +174,19 @@ export function withStaticCache(source: Source, options: StaticCacheOptions): So
         })),
     );
 
+  const getVersion = (): Promise<ServerVersion> =>
+    cached(
+      "version",
+      store.read().version,
+      VERSION_FRESH_MS,
+      () => source.getVersion(),
+      (entry) => store.update((stored) => ({ ...stored, version: entry })),
+    );
+
   return new Proxy(source, {
     get(target, prop) {
       if (prop === "getShards") return getShards;
+      if (prop === "getVersion") return getVersion;
       if (prop === "getWorldSize") return getWorldSize;
       const value: unknown = Reflect.get(target, prop, target);
       return typeof value === "function" ? (value as (...args: unknown[]) => unknown).bind(target) : value;

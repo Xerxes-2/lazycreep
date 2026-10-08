@@ -44,7 +44,7 @@ function mount(narrow = false, token = "token") {
   dispose = render(
     () => (
       <I18nProvider>
-        <MapAndRoom
+        <MapAndRoom artStyle="geometric"
           settings={settings}
           sourceFor={() => new FixtureSource(bundle, { speed: Infinity })}
           createView={fakeView}

@@ -45,7 +45,7 @@ function mount() {
   dispose = render(
     () => (
       <I18nProvider>
-        <MapAndRoom
+        <MapAndRoom artStyle="geometric"
           settings={settings}
           shell={createShellState(localStorage, settings)}
           sourceFor={() => new FixtureSource(bundle, { speed: Infinity })}
@@ -106,9 +106,9 @@ describe("World Map 的 Sidebar 区块（#28）", () => {
     container.remove();
   });
 
-  it("区块顺序：房间搜索、图层、PvP Overview、指向房间信息；地图画布上不再有搜索表单", async () => {
+  it("区块顺序：房间搜索、图层、指向房间信息、PvP Overview（最下面）；地图画布上不再有搜索表单", async () => {
     mount();
-    expect(mapSections()).toEqual(["map.search", "map.layers", "map.pvp", "map.pointed"]);
+    expect(mapSections()).toEqual(["map.search", "map.layers", "map.pointed", "map.pvp"]);
     expect(section("map.pvp").querySelector(".pvp-overview")).not.toBeNull();
     expect(container.querySelector(".world-map form, .world-map input[name=world-map-search]")).toBeNull();
   });

@@ -197,12 +197,13 @@ mkdirSync(outDir, { recursive: true });
 if (want("version")) {
   const res = await api("/version");
   writeFixture(fixtureFileName({ kind: "version" }), {
-    meta: meta("version", { note: "serverData 只保留 historyChunkSize" }),
+    meta: meta("version", { note: "serverData 只保留 historyChunkSize 与 renderer" }),
     status: res.status,
     body: res.body && {
       package: res.body.package,
       protocol: res.body.protocol,
-      serverData: { historyChunkSize: res.body.serverData.historyChunkSize },
+      // renderer：赛季服的渲染器覆盖配置（#47），MMO 为空
+      serverData: { historyChunkSize: res.body.serverData.historyChunkSize, renderer: res.body.serverData.renderer },
     },
   });
 }
@@ -229,9 +230,15 @@ const roomsRes = await api("/user/rooms", { id: userId });
 const ownedRooms: string[] = roomsRes.body?.shards?.[shard] ?? [];
 if (want("me")) {
   writeFixture(fixtureFileName({ kind: "me" }), {
-    meta: meta("me", { note: "user/find（仅 _id 与 username）+ user/rooms（不含 reservations）" }),
+    meta: meta("me", { note: "user/find（仅 _id、username 与 badge）+ user/rooms（不含 reservations）" }),
     status: 200,
-    body: { user: { _id: userId, username: found.body.user.username }, rooms: { shards: roomsRes.body.shards } },
+    body: {
+      user: {
+        _id: userId,
+        username: found.body.user.username,
+        ...(found.body.user.badge ? { badge: found.body.user.badge } : {}),
+      },
+      rooms: { shards: roomsRes.body.shards } },
   });
 }
 
@@ -296,14 +303,14 @@ if (want("mapStats")) {
     meta: meta("mapStats", {
       shard,
       statName,
-      note: `以 ${own} 为中心、半径 ${radius} 的 ${names.length} 个房间；users 只保留 _id 与 username`,
+      note: `以 ${own} 为中心、半径 ${radius} 的 ${names.length} 个房间；users 只保留 _id、username 与 badge`,
     }),
     status: res.status,
     body: body && {
       gameTime: body.gameTime,
       stats: body.stats,
       users: Object.fromEntries(
-        Object.entries(body.users as Record<string, any>).map(([id, u]) => [id, { _id: u._id, username: u.username }]),
+        Object.entries(body.users as Record<string, any>).map(([id, u]) => [id, { _id: u._id, username: u.username, ...(u.badge ? { badge: u.badge } : {}) }]),
       ),
     },
   });
@@ -362,14 +369,19 @@ if (want("room") || want("roomMap2")) {
 }
 
 if (want("users") && seenPlayers.size > 0) {
-  const users: Record<string, { _id: string; username: string; gcl?: number }> = {};
+  const users: Record<string, { _id: string; username: string; gcl?: number; badge?: unknown }> = {};
   for (const id of seenPlayers) {
     const user = (await api("/user/find", { id })).body?.user;
     if (typeof user?.username !== "string") continue;
-    users[id] = { _id: id, username: user.username, ...(typeof user.gcl === "number" ? { gcl: user.gcl } : {}) };
+    users[id] = {
+      _id: id,
+      username: user.username,
+      ...(typeof user.gcl === "number" ? { gcl: user.gcl } : {}),
+      ...(user.badge ? { badge: user.badge } : {}),
+    };
   }
   writeFixture(fixtureFileName({ kind: "users" }), {
-    meta: meta("users", { note: "roomMap2 录制里出现的玩家的 user/find（仅 _id、username、gcl）" }),
+    meta: meta("users", { note: "roomMap2 录制里出现的玩家的 user/find（仅 _id、username、gcl、badge）" }),
     status: 200,
     body: users,
   });

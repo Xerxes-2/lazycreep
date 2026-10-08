@@ -10,7 +10,7 @@
  * 地图、PvP Overview 与告警共用一个 OwnershipHub（同一份 map-stats 缓存与额度）与一个 PvP feed；
  * 所有 roomMap2（告警、Minimap、PvP 参战者、地图）经同一个订阅中心（source/room-map-hub.ts），总数受预算约束。
  */
-import { createMemo, createSignal, onCleanup, Show, type Accessor, type JSX } from "solid-js";
+import { createEffect, createMemo, createSignal, on, onCleanup, Show, untrack, type Accessor, type JSX } from "solid-js";
 import { pageVisibility, type VisibilitySignal } from "../power/visibility.ts";
 import { AttackAlert } from "../alert/AttackAlert.tsx";
 import type { AlertSettings } from "../alert/alert-settings.ts";
@@ -23,11 +23,14 @@ import type { SectionContext } from "../shell/sidebar-sections.tsx";
 import { shownVisibility } from "../shell/view-visibility.ts";
 import { createPvpFeed } from "../pvp/pvp-feed.ts";
 import { createMapLayerPrefs, mapLayers } from "./map-layer-toggles.ts";
+import { badgeLayer } from "./map-badge-layer.ts";
+import { createMapBadges } from "./map-badges.ts";
 import { createOwnershipHub } from "./ownership-hub.ts";
 import { roomMapHubFor } from "../source/room-map-hub.ts";
 import { createWorldMapLink } from "./world-map-link.ts";
 import type { SceneView, SceneViewOptions } from "../scene/pixi-scene-view.ts";
 import type { Theme } from "../scene/theme.ts";
+import type { ArtStyle } from "../art/art-style.ts";
 import type { SourceFactory } from "../settings/SettingsPage.tsx";
 import type { Settings } from "../settings/settings.ts";
 import { browserStorage } from "../storage/local-store.ts";
@@ -57,6 +60,8 @@ export interface MapAndRoomProps {
   readonly narrow?: Accessor<boolean>;
   /** Scene 调色板与着色规则（#5），同时作用于地图与 Room View；默认 DEFAULT_THEME */
   readonly theme?: Theme | undefined;
+  /** Art Style：Room View 的画法（必须给出；默认值只在设置里，DEFAULT_ART_STYLE） */
+  readonly artStyle: ArtStyle;
   /** Main View 底部的 Console Panel */
   readonly bottom?: JSX.Element;
 }
@@ -75,6 +80,8 @@ export function MapAndRoom(props: MapAndRoomProps) {
     return hub;
   });
   const roomMaps = roomMapHubFor(source);
+  // World Map 徽章图层（#43）
+  const badges = badgeLayer(createMapBadges({ source }));
   // Attack Alert 需要 PvP / 核弹时，页面隐藏也继续轮询（#4 对 #14 规则的调整）
   const alertsNeedFeed = () => {
     const config = props.alerts?.config();
@@ -91,6 +98,18 @@ export function MapAndRoom(props: MapAndRoomProps) {
   // 窄屏底部面板的当前标签（#29）
   const tabs = createSheetTabs();
   const worldMap = createWorldMapLink();
+  // 从 Room View 回到地图（返回按钮、M 键、Top Bar、URL 都走 navigate）：以刚才的房间为中心
+  createEffect(
+    on(
+      () => shell.mainView(),
+      (view, previous) => {
+        if (view !== "map" || previous !== "room") return;
+        const room = untrack(() => shell.location().room);
+        if (room) worldMap.setFocusRoom(room);
+      },
+      { defer: true },
+    ),
+  );
   const layerPrefs = createMapLayerPrefs(browserStorage());
   // Room View 的区块（#26）：选中对象、房间状态、显示选项
   const [selectedId, setSelectedId] = createSignal<string>();
@@ -144,7 +163,7 @@ export function MapAndRoom(props: MapAndRoomProps) {
               visibility={shownVisibility(page, mapShown)}
               ownership={ownership()}
               roomMaps={roomMaps()}
-              layers={(shard) => mapLayers(layerPrefs.enabled(), pvp.groups()?.find((g) => g.shard === shard))}
+              layers={(shard) => mapLayers(layerPrefs.enabled(), pvp.groups()?.find((g) => g.shard === shard), badges)}
               link={worldMap}
               {...(props.allies ? { allies: props.allies } : {})}
               active={mapShown()}
@@ -171,6 +190,7 @@ export function MapAndRoom(props: MapAndRoomProps) {
               }}
               onBack={() => shell.navigate({ view: "map" })}
               display={display.display()}
+              artStyle={props.artStyle}
               onShownState={setRoomState}
               onEnterReplay={(target, tick) => shell.navigate(replayAt(target, tick, true))}
             />

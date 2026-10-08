@@ -207,6 +207,8 @@ export const zhCN = {
   "shell.sidebar": "侧栏",
   "shell.sidebar.toggle": "收起或展开侧栏",
   "shell.details.hint": "在房间视图里点选对象，详情显示在这里。",
+  // World Map 单位图层（#44）
+  "worldMapSidebar.layers.units": "单位",
   // 窄屏（#29）
   "shell.sheet.tabs": "侧栏区块",
   "shell.sheet.close": "收起侧栏",
@@ -343,11 +345,21 @@ export const zhCN = {
   "roomSidebar.display.title": "显示选项",
   "roomSidebar.display.say": "creep 的 say 气泡",
   "roomSidebar.display.visual": "RoomVisual",
-  "roomSidebar.display.bars": "血条",
+  "roomSidebar.display.bars": "血条（几何画风）",
   "roomSidebar.display.names": "玩家名",
+  // #49
+  "roomSidebar.display.lighting": "光照（官方画风）",
   "roomSidebar.tools": "房间工具",
   "roomSidebar.zoomIn": "放大",
   "roomSidebar.zoomOut": "缩小",
+
+  "art.style.title": "画风",
+  "art.style.official": "官方",
+  "art.style.geometric": "几何",
+  "art.style.hint": "Room View 画房间对象的方式。官方画风使用官方客户端的贴图；几何画风更轻。",
+
+  "badge.mapLayer": "徽章",
+  "badge.of": "{name} 的徽章",
 } as const satisfies Record<string, string>;
 
 export type MessageKey = keyof typeof zhCN;

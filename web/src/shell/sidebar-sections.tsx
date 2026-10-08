@@ -111,6 +111,7 @@ export const SIDEBAR_SECTIONS: Readonly<Record<MainViewMode, readonly SidebarSec
   map: [
     { id: "map.search", title: "worldMapSidebar.search.title", render: (ctx) => <RoomSearchSection link={ctx.worldMap} /> },
     { id: "map.layers", title: "worldMapSidebar.layers.title", render: (ctx) => <MapLayersSection prefs={ctx.mapLayers} /> },
+    { id: "map.pointed", title: "worldMapSidebar.pointed.title", render: (ctx) => <PointedRoomSection link={ctx.worldMap} /> },
     {
       id: "map.pvp",
       title: "pvp.title",
@@ -123,6 +124,5 @@ export const SIDEBAR_SECTIONS: Readonly<Record<MainViewMode, readonly SidebarSec
         />
       ),
     },
-    { id: "map.pointed", title: "worldMapSidebar.pointed.title", render: (ctx) => <PointedRoomSection link={ctx.worldMap} /> },
   ],
 };

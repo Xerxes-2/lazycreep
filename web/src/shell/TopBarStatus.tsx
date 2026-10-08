@@ -11,6 +11,7 @@
  */
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { useI18n, type MessageKey } from "../i18n";
+import { TopBarBadge } from "../badge/TopBarBadge.tsx";
 import { createTickRate } from "../power/tick-rate.ts";
 import { pageVisibility, pollWhileVisible, type VisibilitySignal } from "../power/visibility.ts";
 import type { SourceFactory } from "../settings/SettingsPage.tsx";
@@ -109,6 +110,7 @@ export function TopBarStatus(props: TopBarStatusProps) {
 
   return (
     <>
+      <TopBarBadge source={source} token={() => settings.token() || undefined} />
       <select
         name="top-bar-server"
         data-status="server"

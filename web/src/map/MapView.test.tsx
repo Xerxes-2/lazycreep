@@ -5,6 +5,7 @@ import { I18nProvider } from "../i18n";
 import type { ImagePrimitive, Scene } from "../scene/scene.ts";
 import type { SceneView, SceneViewOptions, Viewport } from "../scene/pixi-scene-view.ts";
 import { DEFAULT_THEME } from "../scene/theme.ts";
+import { decodePixelImage } from "../scene/pixel-image.ts";
 import { createSettings } from "../settings/settings.ts";
 import { FixtureSource, fixtureBundle } from "../source/fixture-source.ts";
 import type { RoomMapUpdate } from "../source/source.ts";
@@ -298,12 +299,35 @@ describe("World Map 页面", () => {
       search("W13S28");
       await settle(() => expect(roomMaps.has("W13S28")).toBe(true));
       expect(roomMaps.size).toBeLessThanOrEqual(100);
-      roomMaps.get("W13S28")!({ pb: [[25, 25]] });
+      roomMaps.get("W13S28")!({ pb: [[25, 25]], s: [[10, 10]] });
       await settle(() =>
         expect(lastScene().primitives.find((p) => p.key === "pb:W13S28:0")).toMatchObject({ kind: "circle" }),
       );
+      expect(lastScene().primitives.find((p) => p.key === "units:W13S28")).toMatchObject({ kind: "image", blend: "add" });
       for (let i = 0; i < 10; i++) wheel(screenOf(W13S28.x, W13S28.y), 200);
       await settle(() => expect(roomMaps.size).toBe(0));
+      expect(lastScene().primitives.some((p) => p.key.startsWith("units:"))).toBe(false);
+    });
+
+    it("同一动画帧里多个房间的 roomMap2 只让 Scene 重建一次，同一房间取最新一帧", async () => {
+      mount();
+      await settle(() => expect(shown.length).toBeGreaterThan(0));
+      search("W13S28");
+      await settle(() => expect(roomMaps.has("W13S28")).toBe(true));
+      const other = [...roomMaps.keys()].find((room) => room !== "W13S28")!;
+      roomMaps.get("W13S28")!({ s: [[1, 1]] });
+      roomMaps.get(other)!({ s: [[1, 1]] });
+      roomMaps.get("W13S28")!({ s: [[2, 2]] });
+      await settle(() => expect(lastScene().primitives.filter((p) => p.key.startsWith("units:"))).toHaveLength(2));
+      const before = shown.length;
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      expect(shown.length).toBe(before);
+      const scenesWithUnits = shown.filter((s) => s.primitives.some((p) => p.key.startsWith("units:")));
+      expect(scenesWithUnits).toHaveLength(1);
+      const image = scenesWithUnits[0]!.primitives.find((p): p is ImagePrimitive => p.key === "units:W13S28")!;
+      const pixels = decodePixelImage(image.url)!;
+      expect(pixels.rgba[(2 * 50 + 2) * 4 + 3]).toBe(255);
+      expect(pixels.rgba[(1 * 50 + 1) * 4 + 3]).toBe(0);
     });
 
     it("地图不活跃时（Room View 打开）不订阅 roomMap2", async () => {

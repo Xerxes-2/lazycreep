@@ -26,7 +26,7 @@ const state = {
 };
 
 /** 足够大，血条与玩家名都按缩放显示 */
-const near: RoomSceneView = { theme: DEFAULT_THEME, zoom: 40 };
+const near: RoomSceneView = { artStyle: "geometric", theme: DEFAULT_THEME, zoom: 40 };
 
 const build = (view: RoomSceneView): Scene => buildRoomScene({ state }, view);
 const visuals = (scene: Scene) => scene.primitives.filter((p) => p.layer === LAYER.visual);
@@ -35,9 +35,9 @@ const nameLabels = (scene: Scene) =>
   scene.primitives.filter((p) => p.kind === "text" && p.text === "Xerxes_2");
 
 describe("显示选项 → Room View 的 Scene", () => {
-  it("默认四项全开：RoomVisual、血条、creep 上方的玩家名都画出来", () => {
+  it("默认全开：RoomVisual、血条、creep 上方的玩家名都画出来", () => {
     const display = createRoomDisplayOptions(memoryStorage()).display();
-    expect(display).toEqual({ say: true, visual: true, bars: true, names: true });
+    expect(display).toEqual({ say: true, visual: true, bars: true, names: true, lighting: true });
     const scene = build({ ...near, display });
     expect(visuals(scene)).toHaveLength(1);
     expect(hitsBars(scene).map((p) => p.objectId).sort()).toEqual(["c1", "s1"]);
@@ -48,7 +48,7 @@ describe("显示选项 → Room View 的 Scene", () => {
   });
 
   it("玩家名与血条一样，缩小到看不清时只给选中对象画", () => {
-    const far = { theme: DEFAULT_THEME, zoom: 4 };
+    const far = { artStyle: "geometric", theme: DEFAULT_THEME, zoom: 4 } as const;
     expect(nameLabels(build(far))).toEqual([]);
     expect(nameLabels(build({ ...far, selectedId: "c1" }))).toHaveLength(1);
   });
@@ -84,7 +84,7 @@ describe("显示选项 → Room View 的 Scene", () => {
     first.set("say", false);
 
     const again = createRoomDisplayOptions(storage).display();
-    expect(again).toEqual({ say: false, visual: false, bars: true, names: false });
+    expect(again).toEqual({ say: false, visual: false, bars: true, names: false, lighting: true });
     const scene = build({ ...near, display: again });
     expect(visuals(scene)).toEqual([]);
     expect(nameLabels(scene)).toEqual([]);
@@ -96,8 +96,8 @@ describe("显示选项 → Room View 的 Scene", () => {
   it("存储内容损坏时退回默认", () => {
     const storage = memoryStorage();
     storage.setItem("msc.roomDisplay", '{"visual": "nope", "bars": false');
-    expect(createRoomDisplayOptions(storage).display()).toEqual({ say: true, visual: true, bars: true, names: true });
+    expect(createRoomDisplayOptions(storage).display()).toEqual({ say: true, visual: true, bars: true, names: true, lighting: true });
     storage.setItem("msc.roomDisplay", '{"visual": "nope", "bars": false}');
-    expect(createRoomDisplayOptions(storage).display()).toEqual({ say: true, visual: true, bars: false, names: true });
+    expect(createRoomDisplayOptions(storage).display()).toEqual({ say: true, visual: true, bars: false, names: true, lighting: true });
   });
 });

@@ -31,6 +31,7 @@ describe("PWA configuration", () => {
       "/ptr/api/game/time",
       "/room-history/shardSeason/W1N1/100.json",
       "/map-tiles/shard0/W1N1.png",
+      "/season-static/season11/renderer/T.png",
     ]) {
       expect(denied(path), path).toBe(true);
     }

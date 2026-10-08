@@ -47,7 +47,7 @@ function mount(narrow = false) {
   dispose = render(
     () => (
       <I18nProvider>
-        <MapAndRoom
+        <MapAndRoom artStyle="geometric"
           settings={settings}
           shell={(shell = createShellState(localStorage, settings))}
           sourceFor={() => new FixtureSource(bundle, { speed: Infinity })}
@@ -79,6 +79,12 @@ function tap(point: { clientX: number; clientY: number }) {
   }
 }
 
+/** 视口中心对应的世界坐标（画布尺寸来自假视图） */
+function centerOf(v: { x: number; y: number; scale: number }) {
+  const c = mapCanvas();
+  return { x: (c.width / 2 - v.x) / v.scale, y: (c.height / 2 - v.y) / v.scale };
+}
+
 /** W13S28 房间中心的世界坐标 */
 const W13S28 = { x: 37.5, y: 79.5 };
 
@@ -97,7 +103,7 @@ describe("World Map 与 Room View", () => {
     container.remove();
   });
 
-  it("地图上点房间：Main View 切到该房间的 Room View，地图不显示；返回地图时视口不变", async () => {
+  it("地图上点房间：Main View 切到该房间的 Room View，地图不显示；返回地图时保持缩放并以该房间为中心", async () => {
     mount();
     await settle(() => expect(viewports.get(mapCanvas())).toBeDefined());
     for (let i = 0; i < 10; i++) {
@@ -115,7 +121,32 @@ describe("World Map 与 Room View", () => {
     backButton()!.click();
     expect(slot("map").hidden).toBe(false);
     expect(slot("room").hidden).toBe(true);
-    expect(viewports.get(mapCanvas())).toEqual(zoomed);
+    await settle(() => {
+      const v = viewports.get(mapCanvas())!;
+      expect(v.scale).toBeCloseTo(zoomed.scale);
+      expect(centerOf(v)).toEqual(expect.objectContaining({ x: expect.closeTo(W13S28.x, 3), y: expect.closeTo(W13S28.y, 3) }));
+    });
+  });
+
+  it("在 Room View 里换了房间再返回地图：以最后看的房间为中心，缩放不变", async () => {
+    mount();
+    await settle(() => expect(viewports.get(mapCanvas())).toBeDefined());
+    for (let i = 0; i < 10; i++) {
+      mapCanvas().dispatchEvent(new WheelEvent("wheel", { ...at(W13S28), deltaY: -200, bubbles: true, cancelable: true }));
+    }
+    const zoomed = { ...viewports.get(mapCanvas())! };
+    tap(at(W13S28));
+    // 在 Room View 里经 navigate 换到西边相邻的 W14S28（Minimap、PvP、URL 都走这个入口）
+    shell.navigate({ room: "W14S28" });
+    expect(shell.location()).toMatchObject({ view: "room", room: "W14S28" });
+
+    shell.navigate({ view: "map" });
+    expect(slot("map").hidden).toBe(false);
+    await settle(() => {
+      const v = viewports.get(mapCanvas())!;
+      expect(v.scale).toBeCloseTo(zoomed.scale);
+      expect(centerOf(v)).toEqual(expect.objectContaining({ x: expect.closeTo(W13S28.x - 1, 3), y: expect.closeTo(W13S28.y, 3) }));
+    });
   });
 
   it("切回 Room View 时房间与视口保持，不重建视图", async () => {
@@ -165,7 +196,7 @@ describe("World Map 与 Room View", () => {
     dispose = render(
       () => (
         <I18nProvider>
-          <MapAndRoom
+          <MapAndRoom artStyle="geometric"
             settings={settings}
             sourceFor={() => new FixtureSource(bundle, { speed: Infinity })}
             createView={fakeView}
@@ -218,7 +249,7 @@ describe("World Map 与 Room View", () => {
     dispose = render(
       () => (
         <I18nProvider>
-          <MapAndRoom
+          <MapAndRoom artStyle="geometric"
             settings={settings}
             sourceFor={() => {
               leases++;

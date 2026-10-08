@@ -67,7 +67,7 @@ function mount(detailsMount?: HTMLElement, open?: RoomViewProps["open"]) {
   dispose = render(
     () => (
       <I18nProvider>
-        <RoomView
+        <RoomView artStyle="geometric"
           settings={createSettings(localStorage)}
           sourceFor={trackingSource}
           createView={fakeView}

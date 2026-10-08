@@ -2,6 +2,7 @@
  * 服务器 wire 格式到 Source 类型的转换。FixtureSource 与 LiveSource 共用，
  * 保证录制数据与即时数据经过同一套转换。
  */
+import { rendererFromWire } from "./season-renderer.ts";
 import type {
   WireConsole,
   WireHistoryChunk,
@@ -14,6 +15,7 @@ import type {
   WireTerrain,
   WireVersion,
 } from "./fixture-format.ts";
+import { parseBadge } from "../badge/badge.ts";
 import type {
   ConsoleEvent,
   HistoryChunk,
@@ -41,7 +43,13 @@ export function pvpFromWire(wire: WirePvp, interval: number): PvpShard[] {
 }
 
 export function versionFromWire(wire: WireVersion): ServerVersion {
-  return { package: wire.package, protocol: wire.protocol, historyChunkSize: wire.serverData.historyChunkSize };
+  const renderer = rendererFromWire(wire.serverData.renderer);
+  return {
+    package: wire.package,
+    protocol: wire.protocol,
+    historyChunkSize: wire.serverData.historyChunkSize,
+    ...(renderer ? { renderer } : {}),
+  };
 }
 
 export function nukesFromWire(wire: WireNukes): Nuke[] {
@@ -69,7 +77,8 @@ export function terrainFromWire(shard: string, room: string, wire: WireTerrain):
 }
 
 export function meFromWire(wire: WireMe): UserInfo {
-  return { id: wire.user._id, username: wire.user.username, rooms: wire.rooms.shards };
+  const badge = parseBadge(wire.user.badge);
+  return { id: wire.user._id, username: wire.user.username, rooms: wire.rooms.shards, ...(badge ? { badge } : {}) };
 }
 
 export function consoleEventFromWire(wire: WireConsole): ConsoleEvent {
@@ -91,7 +100,7 @@ export function mapStatsFromWire(shard: string, wire: WireMapStats, rooms: reado
   const users: Record<string, RoomUser> = {};
   const addUser = (id: string) => {
     const user = wire.users[id];
-    if (user) users[id] = { _id: user._id, username: user.username };
+    if (user) users[id] = { _id: user._id, username: user.username, ...(user.badge === undefined ? {} : { badge: user.badge }) };
   };
   for (const room of rooms) {
     const stats = wire.stats[room];

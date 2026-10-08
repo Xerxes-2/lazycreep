@@ -194,18 +194,32 @@ describe("FixtureSource 一次性数据", () => {
     await expect(source.getUsername("000000000000000000000000")).rejects.toThrow();
   });
 
-  it("按 id 查玩家资料：录到的 user/find 带 GCL 点数；只有名字可查的不带 GCL", async () => {
+  it("按 id 查玩家资料：录到的 user/find 带 GCL 点数；只有名字可查的不带 GCL；徽章取自录到的房间流 users", async () => {
     expect(await source.getPlayer("65b2ded6e582880012134da6")).toEqual({
       id: "65b2ded6e582880012134da6",
       username: "volotsyouga",
       gcl: 115491280,
+      badge: expect.objectContaining({ color1: "#080811" }),
     });
+    // Source Keeper 没有徽章
+    expect((await source.getPlayer("3")).badge).toBeUndefined();
     expect(await source.getPlayer("57168c9fd490897e6186537f")).toEqual({ id: "57168c9fd490897e6186537f", username: "Kazkel" });
     await expect(source.getPlayer("000000000000000000000000")).rejects.toThrow();
   });
 
   it("版本信息带历史 chunk 大小", async () => {
-    expect(await source.getVersion()).toEqual({ package: 247, protocol: 14, historyChunkSize: 100 });
+    expect(await source.getVersion()).toMatchObject({ package: 247, protocol: 14, historyChunkSize: 100 });
+  });
+
+  it("赛季版本信息带渲染器覆盖配置：贴图换成同源的 Gateway 路径，metadata 原样（#47）", async () => {
+    const { renderer } = await source.getVersion();
+    expect(renderer?.resources).toEqual({
+      T: "/season-static/season11/renderer/T.png",
+      extractor: "/season-static/season11/renderer/extractor.svg",
+      "reactor-core": "/season-static/season11/renderer/reactor-core.png",
+      "reactor-edge": "/season-static/season11/renderer/reactor-edge.png",
+    });
+    expect(Object.keys(renderer?.metadata ?? {}).sort()).toEqual(["mineral", "reactor"]);
   });
 
   it("录到的 401 以 unauthorized 拒绝，和 LiveSource 一样", async () => {

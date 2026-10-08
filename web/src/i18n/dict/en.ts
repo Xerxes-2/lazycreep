@@ -209,6 +209,8 @@ export const en: Partial<Record<MessageKey, string>> = {
   "shell.sidebar": "Sidebar",
   "shell.sidebar.toggle": "Collapse or expand the Sidebar",
   "shell.details.hint": "Select an object in the Room View to see its details here.",
+  // World Map units layer (#44)
+  "worldMapSidebar.layers.units": "Units",
   // Narrow layout (#29)
   "shell.sheet.tabs": "Sidebar sections",
   "shell.sheet.close": "Collapse the Sidebar",
@@ -345,9 +347,19 @@ export const en: Partial<Record<MessageKey, string>> = {
   "roomSidebar.display.title": "Display options",
   "roomSidebar.display.say": "Creep say bubbles",
   "roomSidebar.display.visual": "RoomVisual",
-  "roomSidebar.display.bars": "Hit bars",
+  "roomSidebar.display.bars": "Hit bars (geometric art)",
   "roomSidebar.display.names": "Player names",
+  // #49
+  "roomSidebar.display.lighting": "Lighting (official art)",
   "roomSidebar.tools": "Room tools",
   "roomSidebar.zoomIn": "Zoom in",
   "roomSidebar.zoomOut": "Zoom out",
+
+  "art.style.title": "Art style",
+  "art.style.official": "Official",
+  "art.style.geometric": "Geometric",
+  "art.style.hint": "How Room View draws room objects. Official uses the official client's art; geometric is lighter.",
+
+  "badge.mapLayer": "Badges",
+  "badge.of": "{name}'s badge",
 };

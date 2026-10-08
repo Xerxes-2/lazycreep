@@ -4,6 +4,7 @@
  */
 import { For, Match, Switch } from "solid-js";
 import { useI18n } from "../i18n";
+import { BadgeIcon } from "../badge/BadgeIcon.tsx";
 import type { Accessor } from "solid-js";
 import { createCombatantFeed, type CombatantFeed, type RoomCombatants } from "./combatant-feed.ts";
 import type { PvpFeed } from "./pvp-feed.ts";
@@ -56,6 +57,7 @@ export function PvpCombatants(props: { readonly state: RoomCombatants }) {
                 data-objects={player.objects}
                 data-ally={player.ally ? "" : undefined}
               >
+                <BadgeIcon badge={player.badge} />
                 {player.username ?? player.id}
                 {player.gcl === undefined ? "" : ` · ${t("pvpCombatants.gcl", { level: player.gcl })}`}
                 {` · ${t("pvpCombatants.objects", { count: player.objects })}`}
