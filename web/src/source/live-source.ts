@@ -319,6 +319,10 @@ export class LiveSource implements Source {
     return `${this.server.tileRoot}/${shard}/zoom2/${cornerRoom}.png`;
   }
 
+  sectorTileUrl(shard: string, cornerRoom: string): string {
+    return `${this.server.tileRoot}/${shard}/zoom1/${cornerRoom}.png`;
+  }
+
   async getWorldSize(shard: string): Promise<WorldSize> {
     const wire = await this.api<WireWorldSize>("/game/world-size", this.shardQuery(shard));
     return { width: wire.width, height: wire.height };

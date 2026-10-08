@@ -105,6 +105,16 @@ describe.skipIf(!LIVE)("经 Gateway 联调", () => {
     expect(res.headers.get("content-type")).toBe("image/png");
   });
 
+  it("zoom1 扇区瓦片：扇区角 200、PNG，非扇区角被 CDN 拒绝", async () => {
+    const source = season(undefined);
+    const corner = await fetch(new URL(source.sectorTileUrl("shardSeason", "W9N9"), base));
+    expect(corner.status).toBe(200);
+    expect(corner.headers.get("content-type")).toBe("image/png");
+    const notCorner = await fetch(new URL(source.sectorTileUrl("shardSeason", "W8N8"), base));
+    expect(notCorner.status).toBe(403);
+    source.close();
+  });
+
   it("时间与 Shard 列表", async () => {
     const source = season(undefined);
     const shards = await source.getShards();

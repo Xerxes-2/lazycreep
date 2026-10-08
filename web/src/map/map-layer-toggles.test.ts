@@ -13,7 +13,7 @@ const NOW = 1_000_000;
 let state = mapStateFrom({
   shard: "s",
   size: { width: 102, height: 102 },
-  tiles: { room: (r) => `/tile/${r}`, block: (r) => `/block/${r}` },
+  tiles: { room: (r) => `/tile/${r}`, block: (r) => `/block/${r}`, sector: (r) => `/sector/${r}` },
   me: "me",
 });
 state = applyMapStats(state, {

@@ -142,6 +142,7 @@ describe("LiveSource HTTP：与同样 wire 数据的 FixtureSource 结果一致"
   it("瓦片 URL 是同源 Gateway 路径", () => {
     expect(source.tileUrl(SHARD, OWN_ROOM)).toBe("/map-tiles/shardSeason/W13S28.png");
     expect(source.blockTileUrl(SHARD, "W16S28")).toBe("/map-tiles/shardSeason/zoom2/W16S28.png");
+    expect(source.sectorTileUrl(SHARD, "W19S20")).toBe("/map-tiles/shardSeason/zoom1/W19S20.png");
   });
 
   it("世界尺寸", async () => {

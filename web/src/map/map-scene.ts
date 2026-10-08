@@ -1,6 +1,6 @@
 /**
  * buildMapScene：MapState → Scene（World Map）。世界单位 1 = 一个房间，Scene 覆盖整个世界。
- * 只为与可见区域相交的房间产出图元；缩放级别决定用单房间瓦片还是 zoom2 块瓦片。
+ * 只为与可见区域相交的房间产出图元；缩放级别决定用单房间瓦片、zoom2 块瓦片还是 zoom1 扇区瓦片。
  *
  * 由若干“层”组成（MAP_LAYERS），每层是 `(ctx) => Primitive[]`：层级常量在 MAP_LAYER 里，
  * 按缩放降密在层内看 ctx.zoom 决定，房间遍历用 ctx.visibleRooms。
@@ -28,8 +28,17 @@ export const MAP_LAYER = {
 /** 每个房间至少这么多 CSS 像素时用单房间瓦片（150px），否则用 zoom2 块瓦片（每房间 50px）。 */
 export const ROOM_TILE_MIN_ZOOM = 48;
 
+/**
+ * 每个房间至少这么多 CSS 像素时用 zoom2 块瓦片，否则用 zoom1 扇区瓦片（200px 盖 10 个房间，每房间 20px）。
+ * 取 zoom1 的原生分辨率：再往下缩，zoom1 已不比 zoom2 糊，张数却只有约 1/6（赛季世界 144 张对 676 张）。
+ */
+export const BLOCK_TILE_MIN_ZOOM = 20;
+
 /** 一张 zoom2 块瓦片覆盖的房间数（每边） */
 export const BLOCK_ROOMS = 4;
+
+/** 一张 zoom1 扇区瓦片覆盖的房间数（每边） */
+export const SECTOR_ROOMS = 10;
 
 /** 世界坐标的矩形 [x0, x1) × [y0, y1) */
 export interface WorldRect {
@@ -112,26 +121,32 @@ export const paintTiles: MapLayerPainter = (ctx) => {
       url: state.tiles.room(room.name),
     }));
   }
-  // 块角是有符号坐标为 4 的倍数的房间
-  const offset = worldOffset(state.size);
+  return ctx.zoom >= BLOCK_TILE_MIN_ZOOM
+    ? cornerTiles(ctx, BLOCK_ROOMS, "block", state.tiles.block)
+    : cornerTiles(ctx, SECTOR_ROOMS, "sector", state.tiles.sector);
+};
+
+/** 一张瓦片盖 span×span 个房间，按西北角房间（有符号坐标为 span 的倍数）命名 */
+function cornerTiles(ctx: MapPaintContext, span: number, kind: string, url: (corner: string) => string): Primitive[] {
+  const offset = worldOffset(ctx.state.size);
   const corners = new Map<string, { x: number; y: number }>();
   for (const room of ctx.visibleRooms) {
-    const sx = Math.floor((room.x - offset.x) / BLOCK_ROOMS) * BLOCK_ROOMS;
-    const sy = Math.floor((room.y - offset.y) / BLOCK_ROOMS) * BLOCK_ROOMS;
+    const sx = Math.floor((room.x - offset.x) / span) * span;
+    const sy = Math.floor((room.y - offset.y) / span) * span;
     const name = roomName({ x: sx, y: sy });
     if (!corners.has(name)) corners.set(name, { x: sx + offset.x, y: sy + offset.y });
   }
   return [...corners].map(([name, at]) => ({
     kind: "image",
-    key: `block:${name}`,
+    key: `${kind}:${name}`,
     layer: MAP_LAYER.tile,
     x: at.x,
     y: at.y,
-    width: BLOCK_ROOMS,
-    height: BLOCK_ROOMS,
-    url: state.tiles.block(name),
+    width: span,
+    height: span,
+    url: url(name),
   }));
-};
+}
 
 const OWNED_ALPHA = 0.45;
 const RESERVED_ALPHA = 0.2;
