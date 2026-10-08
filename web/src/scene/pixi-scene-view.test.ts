@@ -283,6 +283,51 @@ describe("Pixi 适配层", () => {
         expect(textures.loads).toEqual(["/big/W1N1", "/t/a.png", "/big/W2N2", "/big/W1N1"]);
       });
 
+      describe("可缩放的大贴图（房间级合成贴图）的档位", () => {
+        const room = (url = "/big/W1N1"): ImagePrimitive => ({ key: "terrain", kind: "image", layer: 0, x: 0, y: 0, width: 50, height: 50, url });
+
+        async function tiers(width: number, height: number, resolution: number) {
+          const frames = manualFrames();
+          const sizes: number[] = [];
+          const view = await createSceneView({
+            width,
+            height,
+            resolution,
+            renderer: await canvasRenderer(),
+            schedule: frames.schedule,
+            textures: {
+              load: async (_url: string, size?: { width: number; height: number }) => (sizes.push(size!.width), Texture.WHITE),
+              unload: () => undefined,
+              scalable: () => true,
+            },
+          });
+          views.push(view);
+          view.show(imageScene(room()));
+          await new Promise((r) => setTimeout(r, 0));
+          return { view, sizes, frames };
+        }
+
+        it("整房间铺满画布时：档位随画布尺寸与像素比（上限 2）变化", async () => {
+          // 手机竖屏 390×700、像素比 3：每格 7.8 × 2 → 780 → 1024
+          expect((await tiers(390, 700, 3)).sizes).toEqual([1024]);
+          // 小窗口 400×300、像素比 1：每格 6 → 300 → 512
+          expect((await tiers(400, 300, 1)).sizes).toEqual([512]);
+          // 桌面 1600×1000、像素比 2：每格 20 × 2 → 2000 → 2048（上限）
+          expect((await tiers(1600, 1000, 2)).sizes).toEqual([2048]);
+        });
+
+        it("放大越过档位才重新合成，同档位内缩放不重新合成", async () => {
+          const { view, sizes, frames } = await tiers(400, 300, 1);
+          for (const scale of [6.5, 7, 9, 10.2, 12, 20, 40, 80]) {
+            view.setViewport({ x: 0, y: 0, scale });
+            frames.flush();
+            await new Promise((r) => setTimeout(r, 0));
+          }
+          // 6 → 512；10.24 以上 → 1024；20.48 以上 → 2048（上限；相机最大每格 75）
+          expect(sizes).toEqual([512, 1024, 2048]);
+        });
+      });
+
       it("加载失败不抛错，也不触发渲染", async () => {
         const { view, step, textures } = await withTextures();
         view.show(imageScene(tile("a", "/t/missing.png")));

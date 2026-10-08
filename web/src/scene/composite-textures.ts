@@ -5,13 +5,17 @@
  * URL 是带 {@link COMPOSITE_SVG_PREFIX} 的 `data:image/svg+xml`，本身就是合法的 SVG 图片
  * （交给普通的 SVG 栅格化也能画，只是 `<image>` 引用的位图在 <img> 里不加载）。这里的加载：
  * - 把 SVG 里 `href` 引用的同源 PNG 取来（首次用到时 fetch、走 HTTP 缓存，全页只取一次）内联成 data URL，
- *   再按 SVG 根元素自带的 width/height（像素）栅格化；不进全页共享的 SVG 栅格化缓存。
+ *   再按适配层请求的像素尺寸栅格化（档位规则与 SVG 贴图相同，见 texture-sources.ts：50 格 × 当前每格像素
+ *   × min(像素比, 2)，2 的幂，上限 2048；手机整房间约 1024）。放大越过档位时适配层以更大尺寸再加载，
+ *   这里重新合成并换掉旧纹理。不进全页共享的 SVG 栅格化缓存。
+ * - 栅格化用的画布留作纹理资源：Pixi v8 在 WebGL 上下文丢失恢复后要从 `source.resource` 重新上传，
+ *   释放了就恢复不了；内存靠按需的档位控制（1024² 4 MB，上限 2048² 16 MB）。
  * - {@link TextureLoader.transient}：没有图元在用就立即卸载。每个房间、每次 rampart 变化都是新 URL，
  *   一张就是几 MB，不能像官方小贴图那样闲置着等淘汰。
  */
 import { ImageSource, Texture } from "pixi.js";
 import { fetchDataUrl, rasterizeSvgText, type RasterImage } from "./image-sources.ts";
-import type { TextureLoader } from "./texture-sources.ts";
+import type { TextureLoader, TextureSize } from "./texture-sources.ts";
 
 export const COMPOSITE_SVG_PREFIX = "data:image/svg+xml;msc=composite,";
 
@@ -37,8 +41,8 @@ export function referencedImages(svg: string): string[] {
 export interface CompositeOptions {
   /** 位图 URL → data URL；默认 fetch（HTTP 缓存）+ base64，全页共享 */
   readonly inlineImage?: (url: string) => Promise<string>;
-  /** 内联后的 SVG 文本 → 栅格（按根元素的 width/height）；默认经 <img> 画进画布 */
-  readonly rasterize?: (svg: string) => Promise<RasterImage>;
+  /** 内联后的 SVG 文本 → width×height 像素的栅格；默认共享的 SVG 栅格化（image-sources.ts） */
+  readonly rasterize?: (svg: string, width: number, height: number) => Promise<RasterImage>;
 }
 
 const inlined = new Map<string, Promise<string>>();
@@ -53,30 +57,24 @@ function sharedInline(url: string): Promise<string> {
   return made;
 }
 
-function svgSize(svg: string): { width: number; height: number } {
-  const root = /<svg\b[^>]*>/.exec(svg)?.[0] ?? "";
-  const attr = (name: string) => Number(new RegExp(`\\b${name}="(\\d+)"`).exec(root)?.[1] ?? 0) || 1;
-  return { width: attr("width"), height: attr("height") };
-}
-
-function rasterizeAtOwnSize(svg: string): Promise<RasterImage> {
-  const { width, height } = svgSize(svg);
-  return rasterizeSvgText(svg, width, height);
-}
+/** 没给尺寸时的栅格边长 */
+const DEFAULT_SIZE = 1024;
 
 /** 合成贴图自己加载、其余 URL 交给 inner。 */
 export function withCompositeImages(inner: TextureLoader, options: CompositeOptions = {}): TextureLoader {
   const inline = options.inlineImage ?? sharedInline;
-  const rasterize = options.rasterize ?? rasterizeAtOwnSize;
+  const rasterize = options.rasterize ?? rasterizeSvgText;
   const made = new Map<string, Texture>();
-  const loadComposite = async (url: string, text: string) => {
+  const loadComposite = async (url: string, text: string, size: TextureSize | undefined) => {
     let svg = text;
     for (const ref of referencedImages(text)) {
       const data = await inline(ref);
       svg = svg.split(`href="${ref}"`).join(`href="${data}"`);
     }
-    const resource = await rasterize(svg);
+    const resource = await rasterize(svg, size?.width ?? DEFAULT_SIZE, size?.height ?? DEFAULT_SIZE);
+    // 保留 mipmap：档位只增不减，放大到 2048 后再缩回整房间时要缩小 2–4 倍，没有 mipmap 噪声纹理会闪烁出摩尔纹
     const texture = new Texture({ source: new ImageSource({ resource, autoGenerateMipmaps: true }) });
+    made.get(url)?.destroy(true);
     made.set(url, texture);
     return texture;
   };
@@ -84,7 +82,7 @@ export function withCompositeImages(inner: TextureLoader, options: CompositeOpti
     // 不是合成贴图时原样转交（不多包一层 Promise，像素图仍然同步可用）
     load(url, size) {
       const text = compositeSvgText(url);
-      return text === undefined ? inner.load(url, size) : loadComposite(url, text);
+      return text === undefined ? inner.load(url, size) : loadComposite(url, text, size);
     },
     unload(url) {
       const texture = made.get(url);
@@ -96,7 +94,7 @@ export function withCompositeImages(inner: TextureLoader, options: CompositeOpti
       return isCompositeUrl(url) || (inner.transient?.(url) ?? false);
     },
     scalable(url) {
-      return !isCompositeUrl(url) && (inner.scalable?.(url) ?? false);
+      return isCompositeUrl(url) || (inner.scalable?.(url) ?? false);
     },
   };
 }

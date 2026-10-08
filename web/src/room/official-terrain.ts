@@ -8,7 +8,8 @@
  *   我们的 Scene 图元没有遮罩，polygon 也没有洞（墙圈住的平原、rampart 围成的环都需要洞），
  *   所以整块地形（地面、沼泽、墙、噪声、阴影）合成一张房间大小的 SVG，作为一个 image 图元
  *   （composite-textures.ts 负责内联 PNG 与栅格化）。图元只有一个，Pixi 的逐图元比较几乎没有开销；
- *   代价是一次性栅格化（每个房间一次、constructedWall 变化时再一次）与一张 2048² 的纹理。
+ *   代价是一次性栅格化（每个房间一次、constructedWall 变化时再一次、放大越过档位时再一次）与一张房间大小的纹理
+ *   （尺寸按设备与缩放取档位，手机整房间约 1024²，上限 2048²，见 composite-textures.ts）。
  * - lighting 图层：官方整个画面乘以 0x808080 的环境光，建筑另有光晕提亮（光晕见 official-lighting.ts，#49）；
  *   我们只把环境光（含墙的模糊阴影）乘进地形与道路的颜色，建筑保持原色。
  * - 沼泽噪声不流动（官方 swampTexture: 'animated' 的平移动画），出口标记（exit-*.svg）不画。
@@ -29,11 +30,6 @@ import type { Terrain } from "../source/source.ts";
 import { LAYER, center, num, type ObjectPainter, type ObjectPainters, type PaintContext } from "./room-paint.ts";
 import type { RoomState } from "./room-state.ts";
 import { PATH_ROOM_SIZE as N, cellGrid, renderPath, type CellGrid } from "./render-path.ts";
-
-/** 地形贴图的栅格尺寸（像素）：约 41 像素 / 格，16 MB */
-export const TERRAIN_RASTER = 2048;
-/** 合并 rampart 的栅格尺寸（像素） */
-export const RAMPART_RASTER = 1024;
 
 /** 官方环境光 0x808080 */
 const AMBIENT = 0x80 / 0xff;
@@ -58,7 +54,7 @@ function terrainSvg(walls: string, swamps: string): string {
     `<image href="${officialTextureUrl(name)}" width="${size}" height="${size}" preserveAspectRatio="none"${filter}/></pattern>`;
   const add = `style="mix-blend-mode:plus-lighter"`;
   const parts = [
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${TERRAIN_RASTER}" height="${TERRAIN_RASTER}" viewBox="0 0 5000 5000">`,
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 5000 5000">`,
     `<defs>`,
     // noise2 的 tint 0x66FF00
     `<filter id="green" color-interpolation-filters="sRGB"><feColorMatrix values="0.4 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 1 0"/></filter>`,
@@ -105,7 +101,7 @@ function terrainSvg(walls: string, swamps: string): string {
 
 function rampartSvg(path: string, color: Color): string {
   return (
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${RAMPART_RASTER}" height="${RAMPART_RASTER}" viewBox="0 0 5000 5000">` +
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 5000 5000">` +
     `<path d="${path}" fill="${hex(scaleColor(color, 0.3))}" stroke="${hex(color)}" stroke-width="25" paint-order="stroke"/></svg>`
   );
 }

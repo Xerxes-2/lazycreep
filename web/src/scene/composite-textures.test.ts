@@ -12,21 +12,23 @@ function setup() {
   const fetched: string[] = [];
   const rasterized: string[] = [];
   const innerLoads: string[] = [];
+  const sizes: [number, number][] = [];
   const inner: TextureLoader = {
     load: async (url) => (innerLoads.push(url), Texture.WHITE),
     unload: () => undefined,
   };
   const loader = withCompositeImages(inner, {
     inlineImage: async (url) => (fetched.push(url), "data:image/png;base64,AAAA"),
-    rasterize: async (text) => {
+    rasterize: async (text, width, height) => {
       rasterized.push(text);
+      sizes.push([width, height]);
       const canvas = document.createElement("canvas");
-      canvas.width = 64;
-      canvas.height = 64;
+      canvas.width = width;
+      canvas.height = height;
       return canvas;
     },
   });
-  return { loader, fetched, rasterized, innerLoads };
+  return { loader, fetched, rasterized, innerLoads, sizes };
 }
 
 describe("合成贴图 URL", () => {
@@ -45,7 +47,7 @@ describe("withCompositeImages", () => {
     const { loader, fetched, rasterized } = setup();
     const url = compositeSvgUrl(svg);
     expect(fetched).toEqual([]);
-    const texture = await loader.load(url);
+    const texture = await loader.load(url, { width: 64, height: 64 });
     expect(fetched).toEqual(["/official-art/textures/noise1.png"]);
     expect(rasterized).toHaveLength(1);
     expect(rasterized[0]).toContain('href="data:image/png;base64,AAAA"');
@@ -53,6 +55,21 @@ describe("withCompositeImages", () => {
     expect(texture.width).toBe(64);
     loader.unload(url);
     expect(texture.destroyed).toBe(true);
+  });
+
+  it("按请求的像素尺寸栅格化；再以更大尺寸加载时重新合成、换掉旧纹理", async () => {
+    const { loader, sizes } = setup();
+    const url = compositeSvgUrl(svg);
+    expect(loader.scalable?.(url)).toBe(true);
+    const small = await loader.load(url, { width: 512, height: 512 });
+    const big = await loader.load(url, { width: 1024, height: 1024 });
+    expect(sizes).toEqual([
+      [512, 512],
+      [1024, 1024],
+    ]);
+    expect(big.width).toBe(1024);
+    expect(small.destroyed).toBe(true);
+    expect(big.destroyed).toBe(false);
   });
 
   it("合成贴图闲置即卸载（transient），其他 URL 交给原加载器", async () => {
