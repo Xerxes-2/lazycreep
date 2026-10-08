@@ -3,7 +3,8 @@
  */
 import { describe, expect, it } from "vitest";
 import { Texture } from "pixi.js";
-import { COMPOSITE_SVG_PREFIX, compositeSvgText, compositeSvgUrl, withCompositeImages } from "./composite-textures.ts";
+import { withCompositeImages } from "./composite-textures.ts";
+import { compositeSvgText, compositeSvgUrl, textureSourceKind } from "./image-sources.ts";
 import type { TextureLoader } from "./texture-sources.ts";
 
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><pattern id="n"><image href="/official-art/textures/noise1.png"/></pattern><path d="M 0 50 h 10 Z" fill="#111"/><rect fill="url(#n)"/></svg>`;
@@ -34,7 +35,7 @@ function setup() {
 describe("合成贴图 URL", () => {
   it("是带标记的 SVG data URL，可以原样还原出 SVG 文本（# 与 % 已转义）", () => {
     const url = compositeSvgUrl(svg);
-    expect(url.startsWith(COMPOSITE_SVG_PREFIX)).toBe(true);
+    expect(textureSourceKind(url)).toBe("composite");
     expect(url.startsWith("data:image/svg+xml")).toBe(true);
     expect(url).not.toContain("#");
     expect(compositeSvgText(url)).toBe(svg);

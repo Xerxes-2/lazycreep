@@ -2,7 +2,7 @@
  * 合成贴图（#46）：一整张房间大小的 SVG（官方画风的地形、合并后的 rampart），用 SVG 的图案、裁剪与混合
  * 把官方 PNG 噪声纹理“遮罩”进墙与沼泽——Scene 的图元没有遮罩，这样只占一个 image 图元。
  *
- * URL 是带 {@link COMPOSITE_SVG_PREFIX} 的 `data:image/svg+xml`，本身就是合法的 SVG 图片
+ * URL 由 image-sources.ts 的 compositeSvgUrl 编码（`data:image/svg+xml;msc=composite,…`），本身就是合法的 SVG 图片
  * （交给普通的 SVG 栅格化也能画，只是 `<image>` 引用的位图在 <img> 里不加载）。这里的加载：
  * - 把 SVG 里 `href` 引用的同源 PNG 取来（首次用到时 fetch、走 HTTP 缓存，全页只取一次）内联成 data URL，
  *   再按适配层请求的像素尺寸栅格化（档位规则与 SVG 贴图相同，见 texture-sources.ts：50 格 × 当前每格像素
@@ -14,24 +14,8 @@
  *   一张就是几 MB，不能像官方小贴图那样闲置着等淘汰。
  */
 import { ImageSource, Texture } from "pixi.js";
-import { fetchDataUrl, rasterizeSvgText, type RasterImage } from "./image-sources.ts";
+import { compositeSvgText, fetchDataUrl, isCompositeUrl, rasterizeSvgText, type RasterImage } from "./image-sources.ts";
 import type { TextureLoader, TextureSize } from "./texture-sources.ts";
-
-export const COMPOSITE_SVG_PREFIX = "data:image/svg+xml;msc=composite,";
-
-/** SVG 文本 → 合成贴图 URL（只转义 data URL 里有特殊含义的 `%` 与 `#`） */
-export function compositeSvgUrl(svg: string): string {
-  return COMPOSITE_SVG_PREFIX + svg.replace(/[%#]/g, (c) => encodeURIComponent(c));
-}
-
-export function isCompositeUrl(url: string): boolean {
-  return url.startsWith(COMPOSITE_SVG_PREFIX);
-}
-
-/** 合成贴图 URL → SVG 文本；不是合成贴图时为 undefined */
-export function compositeSvgText(url: string): string | undefined {
-  return isCompositeUrl(url) ? decodeURIComponent(url.slice(COMPOSITE_SVG_PREFIX.length)) : undefined;
-}
 
 /** SVG 里引用的同源位图（`href="/…png"`） */
 export function referencedImages(svg: string): string[] {

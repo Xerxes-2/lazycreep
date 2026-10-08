@@ -8,10 +8,64 @@
 /** 栅格化结果：可以直接作为纹理资源的画布或位图 */
 export type RasterImage = HTMLCanvasElement | ImageBitmap | OffscreenCanvas;
 
-/** URL 是否指向 SVG（`.svg` 结尾的地址或 `data:image/svg+xml`） */
+// ---- 纹理来源：image 图元 url 的合法形式（scene.ts 的 ImagePrimitive.url）与成对的编码 / 识别 ----
+//
+// data URL 一律自带内容（URL 由内容决定、Scene 仍是可序列化的纯数据、适配层按 URL 天然去重，
+// 不需要 revoke）；按下面的前缀区分，前缀互不包含。
+
+/** 普通 SVG 文本的 data URL：`data:image/svg+xml;charset=utf-8,` + encodeURIComponent（徽章等） */
+const SVG_DATA_PREFIX = "data:image/svg+xml;charset=utf-8,";
+/**
+ * 合成贴图（composite-textures.ts，房间级地形、rampart）：`data:image/svg+xml;msc=composite,` + 只转义 `%` 与 `#`
+ * 的 SVG 文本（体积大，全转义会膨胀约三成）。它本身也是合法的 SVG data URL。
+ */
+const COMPOSITE_PREFIX = "data:image/svg+xml;msc=composite,";
+/** 像素图（pixel-image.ts，World Map 单位图层）：`data:image/bmp;base64,` + 32 位 BMP */
+export const PIXEL_IMAGE_PREFIX = "data:image/bmp;base64,";
+
+/**
+ * image 图元 url 的种类：
+ * - `pixels`：{@link PIXEL_IMAGE_PREFIX} 像素图，适配层同步解码、最近邻缩放
+ * - `composite`：{@link compositeSvgUrl} 合成贴图，内联引用的 PNG 后栅格化，闲置即卸载
+ * - `svg`：`.svg` 结尾的同源地址或其他 `data:image/svg+xml`（如 {@link svgDataUrl}），按档位栅格化
+ * - `bitmap`：其余（PNG 等同源地址），fetch + 解码，尺寸固定
+ */
+export type TextureSourceKind = "pixels" | "composite" | "svg" | "bitmap";
+
+export function textureSourceKind(url: string): TextureSourceKind {
+  if (url.startsWith(PIXEL_IMAGE_PREFIX)) return "pixels";
+  if (url.startsWith(COMPOSITE_PREFIX)) return "composite";
+  return isSvgUrl(url) ? "svg" : "bitmap";
+}
+
+/** URL 是否指向 SVG（`.svg` 结尾的地址或 `data:image/svg+xml`，含合成贴图） */
 export function isSvgUrl(url: string): boolean {
   if (url.startsWith("data:")) return url.startsWith("data:image/svg+xml");
   return /\.svg(?:[?#]|$)/i.test(url);
+}
+
+/** SVG 文本 → 普通 SVG data URL */
+export function svgDataUrl(svg: string): string {
+  return SVG_DATA_PREFIX + encodeURIComponent(svg);
+}
+
+/** SVG 文本 → 合成贴图 URL */
+export function compositeSvgUrl(svg: string): string {
+  return COMPOSITE_PREFIX + svg.replace(/[%#]/g, (c) => encodeURIComponent(c));
+}
+
+export function isCompositeUrl(url: string): boolean {
+  return url.startsWith(COMPOSITE_PREFIX);
+}
+
+/** 合成贴图 URL → SVG 文本；不是合成贴图时为 undefined */
+export function compositeSvgText(url: string): string | undefined {
+  return isCompositeUrl(url) ? decodeURIComponent(url.slice(COMPOSITE_PREFIX.length)) : undefined;
+}
+
+/** 是否像是像素图 URL（只看前缀，不解码） */
+export function isPixelImageUrl(url: string): boolean {
+  return url.startsWith(PIXEL_IMAGE_PREFIX);
 }
 
 async function fetchOk(url: string): Promise<Response> {

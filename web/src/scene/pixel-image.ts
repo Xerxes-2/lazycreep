@@ -5,6 +5,8 @@
  * 换帧时不会因异步加载而闪一下空白。
  */
 
+import { PIXEL_IMAGE_PREFIX } from "./image-sources.ts";
+
 export interface PixelImage {
   readonly width: number;
   readonly height: number;
@@ -12,7 +14,6 @@ export interface PixelImage {
   readonly rgba: Uint8Array;
 }
 
-const PREFIX = "data:image/bmp;base64,";
 const FILE_HEADER = 14;
 /** BITMAPV4HEADER：带 alpha 掩码，浏览器才认透明 */
 const INFO_HEADER = 108;
@@ -47,20 +48,15 @@ export function encodePixelImage(image: PixelImage): string {
   let binary = "";
   const CHUNK = 0x8000;
   for (let i = 0; i < bytes.length; i += CHUNK) binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
-  return PREFIX + btoa(binary);
-}
-
-/** 是否像是 encodePixelImage 写出的 URL（只看前缀，不解码） */
-export function isPixelImageUrl(url: string): boolean {
-  return url.startsWith(PREFIX);
+  return PIXEL_IMAGE_PREFIX + btoa(binary);
 }
 
 /** 只认 encodePixelImage 写出的格式；别的 URL（含其他 BMP）返回 undefined。 */
 export function decodePixelImage(url: string): PixelImage | undefined {
-  if (!url.startsWith(PREFIX)) return undefined;
+  if (!url.startsWith(PIXEL_IMAGE_PREFIX)) return undefined;
   let binary: string;
   try {
-    binary = atob(url.slice(PREFIX.length));
+    binary = atob(url.slice(PIXEL_IMAGE_PREFIX.length));
   } catch {
     return undefined;
   }

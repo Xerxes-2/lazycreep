@@ -12,9 +12,7 @@
 import { createSignal } from "solid-js";
 import { badgeKey, type Badge } from "./badge.ts";
 import { badgeSvg, BADGE_PLACEHOLDER_SVG } from "./badge-svg.ts";
-import { rasterizeSvgText } from "../scene/image-sources.ts";
-
-const svgDataUrl = (svg: string) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+import { rasterizeSvgText, svgDataUrl } from "../scene/image-sources.ts";
 
 const SVG_CACHE_LIMIT = 2000;
 const svgUrls = new Map<string, string>();

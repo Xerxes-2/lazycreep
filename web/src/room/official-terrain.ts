@@ -24,7 +24,7 @@
  */
 import { officialArtUrl } from "../art/official-art.ts";
 import { officialTextureUrl } from "../art/official-textures.ts";
-import { compositeSvgUrl } from "../scene/composite-textures.ts";
+import { compositeSvgUrl } from "../scene/image-sources.ts";
 import type { Color, ImagePrimitive, LinePrimitive, Primitive } from "../scene/scene.ts";
 import type { Terrain } from "../source/source.ts";
 import { LAYER, center, num, type ObjectPainter, type ObjectPainters, type PaintContext } from "./room-paint.ts";

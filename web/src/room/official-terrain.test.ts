@@ -4,7 +4,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { officialArtUrl } from "../art/official-art.ts";
 import { officialTextureUrl } from "../art/official-textures.ts";
-import { compositeSvgText } from "../scene/composite-textures.ts";
+import { compositeSvgText } from "../scene/image-sources.ts";
 import type { ImagePrimitive, LinePrimitive, Primitive, Scene } from "../scene/scene.ts";
 import { DEFAULT_THEME } from "../scene/theme.ts";
 import type { Terrain } from "../source/source.ts";
