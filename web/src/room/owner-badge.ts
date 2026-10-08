@@ -3,7 +3,7 @@
  * `engine/src/lib/processors/userBadge.js`，ISC，commit a2db4a7）。
  *
  * - 徽章取房间流的 `users[obj.user].badge`，经 parseBadge → badgeSvg 成 `data:image/svg+xml` URL 的 image 图元。
- *   URL 按徽章内容缓存（badgeSvgUrl），适配层按 URL 只栅格化一次，同一玩家的所有对象共用一张纹理。
+ *   URL 按徽章内容缓存（badgeSvgUrl），适配层按 URL 共享一张纹理（同一玩家的 creep 与 controller 等按其中最大的尺寸栅格化）。
  * - 官方尺寸：controller 半径 37、spawn 与 powerSpawn 38（各自 metadata 的 ellipse3 / ellipse4）、creep / powerCreep 26。
  * - 没有主人：不画。有主人但没有可用徽章（如 Source Keeper）：照官方退路画主人色的纯色圆。
  * - creep 等小徽章在缩放低于 {@link BADGE_MIN_ZOOM} 时也退成纯色圆。

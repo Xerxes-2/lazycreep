@@ -39,8 +39,8 @@ export function panBy(viewport: Viewport, dx: number, dy: number): Viewport {
   return { ...viewport, x: viewport.x + dx, y: viewport.y + dy };
 }
 
-/** 最多放大到短边只剩这么多格 */
-const MIN_SPAN = 4;
+/** 最多放大到短边只剩这么多格（纹理栅格化也按它定最大每格像素，见 texture-sources.ts） */
+export const MAX_ZOOM_SPAN = 4;
 /** 最多缩小到场景长边的这么多倍 */
 const MAX_SPAN_RATIO = 1.5;
 
@@ -50,7 +50,7 @@ export function clampCamera(camera: Camera, scene: Pick<Scene, "width" | "height
   return {
     cx: clamp(camera.cx, 0, scene.width),
     cy: clamp(camera.cy, 0, scene.height),
-    span: clamp(camera.span, MIN_SPAN, Math.max(scene.width, scene.height) * MAX_SPAN_RATIO),
+    span: clamp(camera.span, MAX_ZOOM_SPAN, Math.max(scene.width, scene.height) * MAX_SPAN_RATIO),
   };
 }
 

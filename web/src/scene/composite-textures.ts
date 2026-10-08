@@ -95,5 +95,8 @@ export function withCompositeImages(inner: TextureLoader, options: CompositeOpti
     transient(url) {
       return isCompositeUrl(url) || (inner.transient?.(url) ?? false);
     },
+    scalable(url) {
+      return !isCompositeUrl(url) && (inner.scalable?.(url) ?? false);
+    },
   };
 }

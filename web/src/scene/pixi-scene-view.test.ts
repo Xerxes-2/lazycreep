@@ -9,7 +9,7 @@ import { autoDetectRenderer, Texture } from "pixi.js";
 import type { ImagePrimitive, Scene } from "./scene.ts";
 import { createSceneView, type SceneRenderer, type SceneView } from "./pixi-scene-view.ts";
 import { encodePixelImage } from "./pixel-image.ts";
-import { SVG_MAX_ZOOM, createSvgRasterCache, type SvgRasterCache } from "./texture-sources.ts";
+import { createSvgRasterCache, type SvgRasterCache } from "./texture-sources.ts";
 
 function fake2dContext(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
   const noop = () => undefined;
@@ -348,9 +348,18 @@ describe("Pixi 适配层", () => {
         return { view, frames, render, settleFrames };
       }
 
-      it("同一贴图在多帧、多对象、缩放变化、多个视图下只栅格化一次；尺寸按最大缩放 × 像素比（上限 2）", async () => {
+      /** 画布 400×300、像素比 3（按 2 算）：相机最多放大到短边 4 格，即每格 75 CSS 像素、150 设备像素 */
+      const zoomTo = async (view: SceneView, scale: number, frames: ReturnType<typeof manualFrames>) => {
+        view.setViewport({ x: 0, y: 0, scale });
+        frames.flush();
+        await new Promise((r) => setTimeout(r, 0));
+      };
+      const sizes = (calls: [string, number, number][]) => calls.map(([, w]) => w);
+
+      it("同一贴图在多帧、多对象、多个视图下只栅格化一次；尺寸按当前每格像素 × 像素比（上限 2）取 2 的幂档位", async () => {
         const { calls, cache } = countingRasterizer();
         const { view, frames, render, settleFrames } = await svgView(cache);
+        view.setViewport({ x: 0, y: 0, scale: 10 });
 
         view.show(imageScene(sprite("a", 0), sprite("b", 3, { rotation: Math.PI / 4, tint: 0xff0000, alpha: 0.5 })));
         frames.flush();
@@ -358,25 +367,63 @@ describe("Pixi 适配层", () => {
         await settleFrames();
         expect(render).toHaveBeenCalledTimes(2);
 
-        // 新 Tick：对象移动、换染色；缩放变化
+        // 新 Tick：对象移动、换染色；同一档位内缩放变化
         view.show(imageScene(sprite("a", 1), sprite("b", 4, { tint: 0x00ff00 }), sprite("c", 8)));
-        view.setViewport({ x: 0, y: 0, scale: 40 });
-        frames.flush();
-        view.setViewport({ x: 0, y: 0, scale: 2 });
-        frames.flush();
+        await zoomTo(view, 12, frames);
+        await zoomTo(view, 6, frames);
 
         // 另一个视图共用同一份栅格化缓存
         const other = await svgView(cache);
+        other.view.setViewport({ x: 0, y: 0, scale: 10 });
         other.view.show(imageScene(sprite("z", 0)));
         other.frames.flush();
         await other.settleFrames();
 
-        expect(calls).toEqual([["/official-art/storage.svg", 2 * SVG_MAX_ZOOM * 2, 2 * SVG_MAX_ZOOM * 2]]);
+        // 2 格 × 10 CSS 像素 × 2 = 40 → 64
+        expect(calls).toEqual([["/official-art/storage.svg", 64, 64]]);
+      });
+
+      it("放大相机越过档位才重新栅格化：每个档位至多一次，上限取相机的最大缩放；缩小不再栅格化", async () => {
+        const { calls, cache } = countingRasterizer();
+        const { view, frames } = await svgView(cache);
+        view.setViewport({ x: 0, y: 0, scale: 5 });
+        view.show(imageScene(sprite("a", 0)));
+        frames.flush();
+        await new Promise((r) => setTimeout(r, 0));
+        for (let scale = 5; scale < 1000; scale *= 1.1) await zoomTo(view, scale, frames);
+        for (let scale = 1000; scale > 5; scale /= 1.3) await zoomTo(view, scale, frames);
+        // 2 格 × 5 × 2 = 20 → 32；最大 2 格 × 75 × 2 = 300 → 512
+        expect(sizes(calls)).toEqual([32, 64, 128, 256, 512]);
+      });
+
+      it("按存量缩放的贴图变大时重新栅格化到更大尺寸；再变小不重新栅格化", async () => {
+        const { calls, cache } = countingRasterizer();
+        const { view, frames } = await svgView(cache);
+        view.setViewport({ x: 0, y: 0, scale: 50 });
+        const energy = (width: number) => sprite("e", 0, { url: "/official-art/link-energy.svg", width, height: width });
+        for (const width of [0.1, 0.1, 0.5, 0.3, 0.1]) {
+          view.show(imageScene(energy(width)));
+          frames.flush();
+          await new Promise((r) => setTimeout(r, 0));
+        }
+        // 0.1 格 × 100 = 10 → 16；0.5 格 × 100 = 50 → 64
+        expect(sizes(calls)).toEqual([16, 64]);
+      });
+
+      it("不同大小的图元共用一张贴图时按较大者栅格化", async () => {
+        const { calls, cache } = countingRasterizer();
+        const { view, frames } = await svgView(cache);
+        view.setViewport({ x: 0, y: 0, scale: 50 });
+        view.show(imageScene(sprite("small", 0, { width: 0.3, height: 0.3 }), sprite("big", 3, { width: 1.2, height: 1.2 })));
+        frames.flush();
+        await new Promise((r) => setTimeout(r, 0));
+        expect(sizes(calls).at(-1)).toBe(128);
       });
 
       it("纹理被淘汰后再用到时重新上传，但不重新栅格化", async () => {
         const { calls, cache } = countingRasterizer();
         const { view, frames, settleFrames } = await svgView(cache, 0);
+        view.setViewport({ x: 0, y: 0, scale: 10 });
         view.show(imageScene(sprite("a", 0)));
         frames.flush();
         await settleFrames();
@@ -386,6 +433,39 @@ describe("Pixi 适配层", () => {
         frames.flush();
         await settleFrames();
         expect(calls).toHaveLength(1);
+      });
+
+      it("共享栅格缓存超过上限时按最久未用卸载没有视图在用的；在用的不卸载", async () => {
+        const calls: string[] = [];
+        // 每张 16×16 = 1 KB，上限 2 KB
+        const cache = createSvgRasterCache(
+          async (url, width, height) => {
+            calls.push(url);
+            const canvas = document.createElement("canvas");
+            canvas.width = width;
+            canvas.height = height;
+            return canvas;
+          },
+          { limitBytes: 2048 },
+        );
+        const use = async (url: string) => {
+          await cache.get(url, 16, 16);
+          cache.retain(url);
+        };
+        await use("/a.svg");
+        await use("/b.svg");
+        await use("/c.svg");
+        // 都在用：超过上限也不卸载
+        await cache.get("/a.svg", 16, 16);
+        expect(calls).toEqual(["/a.svg", "/b.svg", "/c.svg"]);
+        cache.release("/b.svg");
+        cache.release("/a.svg");
+        // a 刚用过、b 最久未用：只卸载 b，回到上限之内
+        await cache.get("/c.svg", 16, 16);
+        await cache.get("/a.svg", 16, 16);
+        expect(calls).toEqual(["/a.svg", "/b.svg", "/c.svg"]);
+        await cache.get("/b.svg", 16, 16);
+        expect(calls).toEqual(["/a.svg", "/b.svg", "/c.svg", "/b.svg"]);
       });
 
       it("栅格化失败不抛错；之后再请求会重试", async () => {

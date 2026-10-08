@@ -9,7 +9,7 @@ import { Container, Graphics, Sprite, Text, Texture, Ticker, autoDetectRenderer,
 import { withCompositeImages } from "./composite-textures.ts";
 import { withPixelImages } from "./pixel-textures.ts";
 import type { ImagePrimitive, Primitive, Scene, Stroke } from "./scene.ts";
-import { defaultTextures, svgPixelsPerUnit, type SvgRasterCache, type TextureLoader } from "./texture-sources.ts";
+import { defaultTextures, rasterPixelsPerUnit, rasterSize, type SvgRasterCache, type TextureLoader, type TextureSize } from "./texture-sources.ts";
 
 export type { TextureLoader };
 
@@ -77,11 +77,20 @@ interface Entry {
 /**
  * image 图元的纹理：按 url 共享，加载完成后贴到所有在用的 Sprite 上并请求一帧。
  * 没有 Sprite 在用的纹理先闲置，闲置数超过上限时卸载最早闲置的。
+ *
+ * 可缩放的贴图（loader.scalable）按“用到它的最大图元 × 当前每单位像素”请求，档位见 texture-sources.ts；
+ * 图元变大或放大越过档位时再请求一次更大的（同一 url 同时只有一个请求在途），新纹理就绪前仍显示旧的。
  */
-function createTextureCache(loader: TextureLoader, limit: number, onLoaded: () => void) {
+function createTextureCache(loader: TextureLoader, limit: number, pixelsPerUnit: () => number, onLoaded: () => void) {
   interface Slot {
     texture: Texture | undefined;
     readonly users: Map<Sprite, ImagePrimitive>;
+    /** 用到它的图元里最大的世界尺寸（只增不减） */
+    extentW: number;
+    extentH: number;
+    /** 已请求（含在途）的像素尺寸 */
+    requested: TextureSize | undefined;
+    loading: boolean;
   }
   const slots = new Map<string, Slot>();
   /** 插入顺序即闲置先后 */
@@ -109,18 +118,21 @@ function createTextureCache(loader: TextureLoader, limit: number, onLoaded: () =
       idle.delete(url);
       const slot = slots.get(url);
       slots.delete(url);
-      if (slot?.texture) loader.unload(url);
+      if (slot?.texture || slot?.loading) loader.unload(url);
     }
   };
 
-  const slotFor = (p: ImagePrimitive): Slot => {
-    const url = p.url;
-    const existing = slots.get(url);
-    if (existing) return existing;
-    const slot: Slot = { texture: undefined, users: new Map() };
-    slots.set(url, slot);
-    loader.load(url, { width: p.width, height: p.height }).then(
+  /** 需要时（第一次、或可缩放且越过档位）发起加载 */
+  const request = (url: string, slot: Slot) => {
+    if (closed || slot.loading) return;
+    const size = rasterSize(slot.extentW, slot.extentH, pixelsPerUnit());
+    const previous = slot.requested;
+    if (previous && !(loader.scalable?.(url) && (size.width > previous.width || size.height > previous.height))) return;
+    slot.requested = previous ? { width: Math.max(size.width, previous.width), height: Math.max(size.height, previous.height) } : size;
+    slot.loading = true;
+    loader.load(url, slot.requested).then(
       (texture) => {
+        slot.loading = false;
         if (closed || slots.get(url) !== slot) {
           // 加载期间已被淘汰或视图已销毁
           loader.unload(url);
@@ -129,11 +141,21 @@ function createTextureCache(loader: TextureLoader, limit: number, onLoaded: () =
         slot.texture = texture;
         for (const [sprite, p] of slot.users) paint(sprite, p, texture);
         if (slot.users.size > 0) onLoaded();
+        // 在途期间又需要更大的
+        request(url, slot);
       },
       () => {
-        // 加载失败（例如 403 的非块角瓦片）：保持空白，不重试
+        // 加载失败（例如 403 的非块角瓦片）：保持原样（空白或旧纹理），不重试
+        slot.loading = false;
       },
     );
+  };
+
+  const slotFor = (p: ImagePrimitive): Slot => {
+    const existing = slots.get(p.url);
+    if (existing) return existing;
+    const slot: Slot = { texture: undefined, users: new Map(), extentW: 0, extentH: 0, requested: undefined, loading: false };
+    slots.set(p.url, slot);
     return slot;
   };
 
@@ -144,6 +166,9 @@ function createTextureCache(loader: TextureLoader, limit: number, onLoaded: () =
       const slot = slotFor(p);
       idle.delete(p.url);
       slot.users.set(sprite, p);
+      slot.extentW = Math.max(slot.extentW, Math.abs(p.width));
+      slot.extentH = Math.max(slot.extentH, Math.abs(p.height));
+      request(p.url, slot);
       paint(sprite, p, slot.texture);
     },
     detach(sprite: Sprite, url: string) {
@@ -152,15 +177,19 @@ function createTextureCache(loader: TextureLoader, limit: number, onLoaded: () =
       slot.users.delete(sprite);
       if (slot.users.size === 0 && loader.transient?.(url)) {
         slots.delete(url);
-        if (slot.texture) loader.unload(url);
+        if (slot.texture || slot.loading) loader.unload(url);
       } else if (slot.users.size === 0) {
         idle.add(url);
         evict();
       }
     },
+    /** 缩放变了：在用的可缩放贴图需要时升档 */
+    rescale() {
+      for (const [url, slot] of slots) if (slot.users.size > 0) request(url, slot);
+    },
     close() {
       closed = true;
-      for (const [url, slot] of slots) if (slot.texture) loader.unload(url);
+      for (const [url, slot] of slots) if (slot.texture || slot.loading) loader.unload(url);
       slots.clear();
       idle.clear();
     },
@@ -326,18 +355,15 @@ export async function createSceneView(options: SceneViewOptions): Promise<SceneV
     viewport = next;
     world.position.set(viewport.x, viewport.y);
     world.scale.set(viewport.scale);
+    if (changed) textures.rescale();
     return changed;
   };
 
+  const resolution = options.resolution ?? globalThis.devicePixelRatio ?? 1;
   const textures = createTextureCache(
-    withCompositeImages(withPixelImages(
-      options.textures ??
-        defaultTextures({
-          ...(options.svgRasters ? { svg: options.svgRasters } : {}),
-          pixelsPerUnit: svgPixelsPerUnit(options.resolution ?? globalThis.devicePixelRatio ?? 1),
-        }),
-    )),
+    withCompositeImages(withPixelImages(options.textures ?? defaultTextures(options.svgRasters ? { svg: options.svgRasters } : {}))),
     options.textureCacheSize ?? 512,
+    () => rasterPixelsPerUnit(viewport.scale, resolution, width, height),
     () => requestRender(),
   );
 
@@ -401,12 +427,13 @@ export async function createSceneView(options: SceneViewOptions): Promise<SceneV
       if (destroyed || scene === current) return;
       const previous = current;
       current = scene;
-      let changed = sync(scene);
+      // 先定视口（自动适配取决于 Scene）：新图元按这一帧的缩放请求纹理
+      let changed = applyViewport();
+      if (sync(scene)) changed = true;
       if (!previous || previous.background !== scene.background) {
         renderer.background.color = scene.background;
         changed = true;
       }
-      if (applyViewport()) changed = true;
       if (!previous) changed = true;
       if (changed) requestRender();
     },
@@ -416,7 +443,8 @@ export async function createSceneView(options: SceneViewOptions): Promise<SceneV
       width = nextWidth;
       height = nextHeight;
       renderer.resize(width, height);
-      applyViewport();
+      // 尺寸变了，最大缩放也跟着变
+      if (!applyViewport()) textures.rescale();
       requestRender();
     },
     setViewport(next) {

@@ -3,7 +3,7 @@
  * 不经 fetch / createImageBitmap，换帧时不会先空白一下；其余 URL 交给原来的加载器。
  */
 import { BufferImageSource, Texture } from "pixi.js";
-import { decodePixelImage } from "./pixel-image.ts";
+import { decodePixelImage, isPixelImageUrl } from "./pixel-image.ts";
 import type { TextureLoader } from "./pixi-scene-view.ts";
 
 export function withPixelImages(loader: TextureLoader): TextureLoader {
@@ -29,5 +29,6 @@ export function withPixelImages(loader: TextureLoader): TextureLoader {
       texture.destroy(true);
     },
     transient: (url) => loader.transient?.(url) ?? false,
+    scalable: (url) => !isPixelImageUrl(url) && (loader.scalable?.(url) ?? false),
   };
 }

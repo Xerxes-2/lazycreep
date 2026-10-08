@@ -50,6 +50,11 @@ export function encodePixelImage(image: PixelImage): string {
   return PREFIX + btoa(binary);
 }
 
+/** 是否像是 encodePixelImage 写出的 URL（只看前缀，不解码） */
+export function isPixelImageUrl(url: string): boolean {
+  return url.startsWith(PREFIX);
+}
+
 /** 只认 encodePixelImage 写出的格式；别的 URL（含其他 BMP）返回 undefined。 */
 export function decodePixelImage(url: string): PixelImage | undefined {
   if (!url.startsWith(PREFIX)) return undefined;
