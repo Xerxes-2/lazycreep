@@ -5,8 +5,8 @@
  * 文字测量、逐对象绘制调用）都真实走一遍，只是像素不落地。
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { autoDetectRenderer, Texture } from "pixi.js";
-import type { ImagePrimitive, Scene } from "./scene.ts";
+import { autoDetectRenderer, Graphics, Texture, type Container } from "pixi.js";
+import type { ImagePrimitive, Primitive, PrimitiveAnimation, Scene } from "./scene.ts";
 import { createSceneView, type SceneRenderer, type SceneView } from "./pixi-scene-view.ts";
 import { encodePixelImage } from "./pixel-image.ts";
 import { createSvgRasterCache, type SvgRasterCache } from "./texture-sources.ts";
@@ -535,5 +535,216 @@ describe("Pixi 适配层", () => {
       expect(step()).toBe(0);
       views = [];
     });
+  });
+});
+
+describe("有界动画（ADR 0008）", () => {
+  /** 假时钟 + 手动帧队列 + 计数渲染器；node(key) 取图元对应的显示对象 */
+  async function animated() {
+    const frames = manualFrames();
+    let time = 0;
+    const renderer = await canvasRenderer();
+    const render = vi.spyOn(renderer, "render");
+    const view = await createSceneView({ width: 400, height: 300, renderer, schedule: frames.schedule, now: () => time });
+    views.push(view);
+    return {
+      view,
+      frames,
+      /** 把时钟拨到 at 并跑完已排队的帧；返回累计渲染次数 */
+      at(ms: number) {
+        time = ms;
+        frames.flush();
+        return render.mock.calls.length;
+      },
+      node(key: string) {
+        const stage = render.mock.calls.at(-1)?.[0] as { container: Container } | undefined;
+        const found = stage?.container.getChildByLabel(key, true);
+        if (!found) throw new Error(`没有 ${key}`);
+        return found;
+      },
+    };
+  }
+
+  /** 透明度 0 →（100 ms）1 →（300 ms）0 的闪光 */
+  const flashAnimation = (id: number): PrimitiveAnimation => ({
+    id,
+    tweens: [{ property: "alpha", from: 0, steps: [{ to: 1, duration: 100 }, { duration: 300 }] }],
+  });
+  const flash = (id: number | undefined, extra: Partial<Primitive> = {}): Primitive =>
+    ({ key: "flash", kind: "circle", layer: 50, x: 5, y: 5, radius: 1, fill: 0xffffff, alpha: 0, ...(id === undefined ? {} : { animation: flashAnimation(id) }), ...extra }) as Primitive;
+  const withPrims = (...primitives: Primitive[]): Scene => ({ ...scene, primitives: [...scene.primitives, ...primitives] });
+
+  it("没有动画时只渲染一帧，不再请求帧", async () => {
+    const { view, frames, at } = await animated();
+    view.show(withPrims(flash(undefined)));
+    expect(at(0)).toBe(1);
+    expect(frames.pending).toBe(0);
+    expect(at(1000)).toBe(1);
+  });
+
+  it("有动画时逐帧推进，到期后停在终态并停止请求帧", async () => {
+    const { view, frames, at, node } = await animated();
+    view.show(withPrims(flash(7)));
+    expect(at(0)).toBe(1);
+    expect(node("flash").alpha).toBe(0);
+    expect(frames.pending).toBe(1);
+    expect(at(50)).toBe(2);
+    expect(node("flash").alpha).toBeCloseTo(0.5);
+    at(100);
+    expect(node("flash").alpha).toBeCloseTo(1);
+    at(250);
+    expect(node("flash").alpha).toBeCloseTo(0.5);
+    expect(at(400)).toBe(5);
+    expect(node("flash").alpha).toBe(0);
+    expect(frames.pending).toBe(0);
+    expect(at(1000)).toBe(5);
+  });
+
+  it("同一动画（描述相同）的新 Scene 不重播；描述变了（下一个 Tick）从头播放", async () => {
+    const { view, at, node, frames } = await animated();
+    view.show(withPrims(flash(7)));
+    at(0);
+    at(50);
+    // 同一 Tick 内重建 Scene（例如选中别的对象）：动画接着播
+    view.show(structuredClone(withPrims(flash(7), { key: "other", kind: "rect", layer: 1, x: 0, y: 0, width: 1, height: 1 })));
+    at(75);
+    expect(node("flash").alpha).toBeCloseTo(0.75);
+    at(400);
+    expect(frames.pending).toBe(0);
+    // 连续两个 Tick 同样内容的动作：标识不同，重播
+    view.show(withPrims(flash(8)));
+    expect(node("flash").alpha).toBe(0);
+    at(450);
+    expect(node("flash").alpha).toBeCloseTo(0.5);
+    expect(frames.pending).toBe(1);
+  });
+
+  it("新 Scene 到来时，被取消的旧动画跳到终态", async () => {
+    const { view, at, node, frames } = await animated();
+    const turning: Primitive = {
+      key: "turret",
+      kind: "polygon",
+      layer: 20,
+      points: [10, 10, 12, 10, 11, 12],
+      fill: 0xffffff,
+      animation: { id: 1, originX: 11, originY: 11, tweens: [{ property: "turn", from: Math.PI / 2, steps: [{ duration: 300 }] }] },
+    };
+    view.show(withPrims(flash(1), turning));
+    at(0);
+    // 绕 (11, 11) 转了 90°：本地原点 (0, 0) 落在 (22, 0)
+    expect(node("turret").rotation).toBeCloseTo(Math.PI / 2);
+    expect(node("turret").position.x).toBeCloseTo(22);
+    expect(node("turret").position.y).toBeCloseTo(0);
+    at(150);
+    expect(node("turret").rotation).toBeCloseTo(Math.PI / 4);
+
+    // 下一个 Tick 没有这两个动画：立刻是终态，不再请求帧
+    const { animation: _ignored, ...still } = turning;
+    view.show(withPrims(flash(undefined), still as Primitive));
+    expect(node("flash").alpha).toBe(0);
+    expect(node("turret").rotation).toBe(0);
+    expect(node("turret").position.x).toBeCloseTo(0);
+    at(160);
+    expect(frames.pending).toBe(0);
+  });
+
+  it("贴图的转向叠加在自身旋转上；平移与缩放绕 origin", async () => {
+    const { view, at, node } = await animated();
+    const url = encodePixelImage({ width: 2, height: 2, rgba: new Uint8Array(16).fill(255) });
+    const sprite: Primitive = {
+      key: "sprite",
+      kind: "image",
+      layer: 20,
+      x: 4,
+      y: 4,
+      width: 2,
+      height: 2,
+      url,
+      rotation: 1,
+      pivotX: 5,
+      pivotY: 5,
+      animation: {
+        id: 1,
+        originX: 5,
+        originY: 5,
+        tweens: [
+          { property: "turn", from: -1, steps: [{ duration: 100 }] },
+          { property: "offsetX", from: -1, steps: [{ duration: 100, easing: "easeInOutQuad" }] },
+          { property: "scale", from: 0, steps: [{ duration: 100 }] },
+        ],
+      },
+    };
+    view.show(withPrims(sprite));
+    at(0);
+    const shown = node("sprite");
+    expect(shown.rotation).toBeCloseTo(0);
+    expect(shown.position.x).toBeCloseTo(4);
+    expect(shown.scale.x).toBeCloseTo(0);
+    at(50);
+    expect(shown.rotation).toBeCloseTo(0.5);
+    expect(shown.position.x).toBeCloseTo(4.5);
+    at(100);
+    expect(shown.rotation).toBeCloseTo(1);
+    expect(shown.position.x).toBe(5);
+    expect(shown.position.y).toBe(5);
+    expect(shown.width).toBeCloseTo(2);
+  });
+
+  it("光束按 trimStart / trimEnd 伸缩，终态长度为 0", async () => {
+    const { view, at, node } = await animated();
+    const beam: Primitive = {
+      key: "beam",
+      kind: "line",
+      layer: 50,
+      points: [0, 0, 10, 0],
+      stroke: { color: 0x3c75c7, width: 0.18 },
+      blend: "add",
+      trimStart: 1,
+      trimEnd: 1,
+      animation: {
+        id: 1,
+        tweens: [
+          { property: "trimEnd", from: 0, steps: [{ duration: 100 }] },
+          { property: "trimStart", from: 0, delay: 100, steps: [{ duration: 100 }] },
+        ],
+      },
+    };
+    view.show(withPrims(beam));
+    const width = () => (node("beam") as Graphics).getLocalBounds().width;
+    at(0);
+    expect(width()).toBe(0);
+    at(50);
+    expect(width()).toBeCloseTo(5, 0);
+    at(150);
+    expect((node("beam") as Graphics).getLocalBounds().x).toBeCloseTo(5, 0);
+    at(200);
+    expect(width()).toBe(0);
+    expect((node("beam") as Graphics).blendMode).toBe("add");
+  });
+
+  it("逐帧插值只碰动画中的显示对象，不重画其余图元", async () => {
+    const { view, at } = await animated();
+    view.show(withPrims(flash(1)));
+    at(0);
+    const redraws = vi.spyOn(Graphics.prototype, "clear");
+    at(50);
+    at(100);
+    at(200);
+    expect(redraws).not.toHaveBeenCalled();
+  });
+
+  it("settle()：动画立即跳到终态且不请求帧；之后的 show() 补画一帧", async () => {
+    const { view, at, node, frames } = await animated();
+    view.show(withPrims(flash(1)));
+    expect(at(0)).toBe(1);
+    view.settle();
+    expect(node("flash").alpha).toBe(0);
+    // 已排队的那一帧不渲染，也不再排下一帧
+    expect(at(100)).toBe(1);
+    expect(frames.pending).toBe(0);
+    // 回到屏幕：同一个动画不重播，但画布要补画终态
+    view.show(structuredClone(withPrims(flash(1))));
+    expect(at(150)).toBe(2);
+    expect(frames.pending).toBe(0);
   });
 });

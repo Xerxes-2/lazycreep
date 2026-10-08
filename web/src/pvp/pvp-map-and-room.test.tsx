@@ -31,6 +31,7 @@ async function fakeView(options: SceneViewOptions): Promise<SceneView> {
       if (isMap) mapScene = scene;
     },
     requestRender: () => {},
+    settle: () => {},
     resize: () => {},
     setViewport: () => {},
     destroy: () => {},

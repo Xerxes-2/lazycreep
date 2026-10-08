@@ -83,6 +83,7 @@ function gatedViews() {
       viewport: { x: 0, y: 0, scale: 1 },
       show: () => {},
       requestRender: () => {},
+      settle: () => {},
       resize: () => {},
       setViewport: () => {},
       destroy: () => {},

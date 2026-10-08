@@ -246,6 +246,7 @@ describe("窄屏：点选对象切到选中对象标签（#29）", () => {
       },
       show: (scene) => void scenes.set(canvas, scene),
       requestRender: () => {},
+      settle: () => {},
       resize: () => {},
       setViewport: (next) => {
         if (next) viewports.set(canvas, next);

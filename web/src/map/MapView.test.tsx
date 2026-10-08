@@ -42,6 +42,7 @@ async function fakeView(options: SceneViewOptions): Promise<SceneView> {
     },
     show: (scene) => void shown.push(scene),
     requestRender: () => {},
+    settle: () => {},
     resize: () => {},
     setViewport: (next) => {
       viewports.push(next);

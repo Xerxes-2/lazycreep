@@ -37,6 +37,7 @@ async function fakeView(options: SceneViewOptions): Promise<SceneView> {
     viewport: { x: 0, y: 0, scale: CELL },
     show: (scene) => void scenes.set(canvas, scene),
     requestRender: () => {},
+    settle: () => {},
     resize: () => {},
     setViewport: () => {},
     destroy: () => {},
