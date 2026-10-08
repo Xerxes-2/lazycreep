@@ -80,6 +80,9 @@ export const zhCN = {
   "replay.cache.usage": "已用 {mb} MB",
   "replay.cache.unavailable": "本浏览器无法使用本地缓存，历史每次重新下载。",
 
+  "copy.label": "复制 {text}",
+  "copy.done": "已复制",
+  "copy.failed": "复制失败",
   "roomDetails.title": "对象详情",
   "roomDetails.close": "收起",
   "roomDetails.raw": "其他字段",

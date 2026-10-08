@@ -312,6 +312,30 @@ describe("Room View 交互", () => {
       expect(listed()).toContain("6a9d95c951150f63501b522f");
     });
 
+    it("详情里 creep 名、玩家名与 Body 简报各有一键复制", async () => {
+      const written: string[] = [];
+      Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async (text: string) => void written.push(text) } });
+      try {
+        mount();
+        await openRoom("W13S28");
+        tap(...screenOf(CREEP), "mouse");
+        await pickFrom(CREEP);
+        await settle(() => expect(container.querySelector("[data-testid=room-details]")).not.toBeNull());
+        const copy = (name: string) => container.querySelector<HTMLButtonElement>(`[data-testid=room-details] button[data-copy=${name}]`)!;
+        copy("name").click();
+        copy("owner").click();
+        copy("body").click();
+        await settle(() => expect(written).toHaveLength(3));
+        expect(written[0]).toBe(field("[data-field=name]").textContent);
+        expect(written[1]).toBe("Xerxes_2");
+        expect(written[2]).toMatch(/^\d+[A-Z]+( \d+[A-Z]+)*$/);
+        // 只有这三个字段带复制
+        expect(container.querySelectorAll("[data-testid=room-details] button[data-copy]")).toHaveLength(3);
+      } finally {
+        delete (navigator as { clipboard?: unknown }).clipboard;
+      }
+    });
+
     it("墓碑：死于几 Tick 前、死前剩余寿命、生前 body 网格", async () => {
       mount();
       await openRoom("W13S28");

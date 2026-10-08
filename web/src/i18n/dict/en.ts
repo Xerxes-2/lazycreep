@@ -82,6 +82,9 @@ export const en: Partial<Record<MessageKey, string>> = {
   "replay.cache.usage": "{mb} MB used",
   "replay.cache.unavailable": "Local cache is unavailable in this browser; history is downloaded every time.",
 
+  "copy.label": "Copy {text}",
+  "copy.done": "Copied",
+  "copy.failed": "Copy failed",
   "roomDetails.title": "Object details",
   "roomDetails.close": "Close",
   "roomDetails.raw": "Other fields",

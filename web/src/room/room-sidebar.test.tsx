@@ -137,6 +137,9 @@ describe("Room View 的 Sidebar 区块与左侧按钮列（#26）", () => {
     await openW13S28();
     await settle(() => expect(infoField("owner")).toBe("Xerxes_2"));
     expect(infoField("room")).toBe("W13S28");
+    // 房间名带一键复制；其余行不带
+    expect(q('[data-section="room.info"] [data-info="room"] button[data-copy=room]')?.getAttribute("aria-label")).toBe("复制 W13S28");
+    expect(q('[data-section="room.info"] [data-info="owner"] button[data-copy]')).toBeNull();
     expect(infoField("level")).toBe("8");
     // 新手区与重生区只有 map-stats 有：等 World Map 取到所在扇区
     await settle(() => expect(infoField("novice")).toBe("否"));

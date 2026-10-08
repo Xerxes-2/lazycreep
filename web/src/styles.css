@@ -946,6 +946,39 @@ body {
   color: var(--color-accent);
 }
 
+/* 一键复制（跟在文字后面的小图标） */
+.copy-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  width: 20px;
+  height: 20px;
+  margin-left: 4px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-m);
+  background: transparent;
+  color: var(--color-secondary);
+  cursor: pointer;
+}
+
+.copy-button:hover,
+.copy-button:focus-visible {
+  border-color: var(--divider);
+  color: var(--color-accent);
+}
+
+.copy-button[data-state="copied"] {
+  color: var(--color-accent);
+}
+
+/* 触屏：按得到 */
+.shell[data-layout="narrow"] .copy-button {
+  width: 32px;
+  height: 32px;
+}
+
 .shell[data-layout="narrow"] .icon-button {
   width: 44px;
   height: 44px;

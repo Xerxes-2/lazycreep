@@ -9,6 +9,7 @@
 import { createEffect, createMemo, createSignal, Index, on, Show } from "solid-js";
 import { useI18n, type MessageKey } from "../i18n";
 import type { BodyCell } from "./object-details.ts";
+import { CopyButton } from "../shell/CopyButton.tsx";
 
 const KNOWN_PARTS = new Set(["tough", "work", "carry", "move", "attack", "ranged_attack", "heal", "claim"]);
 
@@ -71,6 +72,7 @@ export function BodyGrid(props: BodyGridProps) {
       </div>
       <div class="body-grid__summary" data-body-summary>
         {props.summary}
+        <CopyButton text={props.summary} name="body" />
       </div>
       <Show when={activeCell()}>
         {(cell) => (

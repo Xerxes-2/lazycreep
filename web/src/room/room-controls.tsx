@@ -21,6 +21,7 @@ import type { RoomUser } from "../source/source.ts";
 import type { KeyValueStorage } from "../storage/local-store.ts";
 import { loadCamera, saveCamera } from "./room-camera-store.ts";
 import { BodyGrid } from "./BodyGrid.tsx";
+import { CopyButton } from "../shell/CopyButton.tsx";
 import { describeObject, type DetailField } from "./object-details.ts";
 import type { RoomObject } from "./room-state.ts";
 
@@ -144,6 +145,9 @@ export interface RoomDetailsPanelProps {
   readonly onClose: () => void;
 }
 
+/** 详情里带一键复制的字段：名字（creep 等）与所有者（玩家名）；Body 简报的复制在 BodyGrid 里 */
+const COPYABLE: ReadonlySet<DetailField["key"]> = new Set(["name", "owner"]);
+
 /** 选中对象的详情：宽屏为侧栏、窄屏为底部卡片（CSS 断点）。 */
 export function RoomDetailsPanel(props: RoomDetailsPanelProps) {
   const { t } = useI18n();
@@ -169,6 +173,9 @@ export function RoomDetailsPanel(props: RoomDetailsPanelProps) {
                   <dd data-field={field().key}>
                     <Show when={field().key === "body" && d().body} fallback={fieldText(field())}>
                       {(cells) => <BodyGrid objectId={d().id} cells={cells()} summary={field().value} />}
+                    </Show>
+                    <Show when={COPYABLE.has(field().key)}>
+                      <CopyButton text={field().value} name={field().key} />
                     </Show>
                   </dd>
                 </>

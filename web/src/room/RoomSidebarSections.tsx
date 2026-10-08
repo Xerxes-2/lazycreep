@@ -5,6 +5,7 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, Show, type Accessor } from "solid-js";
 import { useI18n, type MessageKey } from "../i18n";
 import type { OwnershipHub } from "../map/ownership-hub.ts";
+import { CopyButton } from "../shell/CopyButton.tsx";
 import type { ShellLocation } from "../shell/shell-state.ts";
 import { ROOM_DISPLAY_KEYS, type RoomDisplayOptions } from "./display-options.ts";
 import { roomInfo, type Until } from "./room-info.ts";
@@ -105,7 +106,12 @@ export function RoomInfoSection(props: RoomInfoSectionProps) {
               {([key, label, value]) => (
                 <>
                   <dt>{t(label)}</dt>
-                  <dd data-info={key}>{value}</dd>
+                  <dd data-info={key}>
+                    {value}
+                    <Show when={key === "room"}>
+                      <CopyButton text={value} name="room" />
+                    </Show>
+                  </dd>
                 </>
               )}
             </For>
