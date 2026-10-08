@@ -12,6 +12,7 @@
 import { createSignal } from "solid-js";
 import { badgeKey, type Badge } from "./badge.ts";
 import { badgeSvg, BADGE_PLACEHOLDER_SVG } from "./badge-svg.ts";
+import { rasterizeSvgText } from "../scene/image-sources.ts";
 
 const svgDataUrl = (svg: string) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 
@@ -39,19 +40,8 @@ export type Rasterize = (svg: string, size: number) => Promise<string>;
  */
 export const BADGE_RASTER_SIZE = 128;
 
-/** 浏览器里的栅格化：<img> 解码 SVG，画进 canvas，导出 PNG data URL */
-export const browserRasterize: Rasterize = async (svg, size) => {
-  const image = new Image(size, size);
-  image.src = svgDataUrl(svg);
-  await image.decode();
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error("canvas 2d 不可用");
-  context.drawImage(image, 0, 0, size, size);
-  return canvas.toDataURL("image/png");
-};
+/** 浏览器里的栅格化：共享的 SVG 栅格化（scene/image-sources.ts），导出 PNG data URL */
+export const browserRasterize: Rasterize = async (svg, size) => (await rasterizeSvgText(svg, size, size)).toDataURL("image/png");
 
 export interface BadgeRasters {
   /**

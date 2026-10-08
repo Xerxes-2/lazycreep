@@ -13,6 +13,7 @@
 import { createSignal, type Accessor } from "solid-js";
 import type { RendererOverride } from "../source/season-renderer.ts";
 import type { Source } from "../source/source.ts";
+import { checkImage } from "../scene/image-sources.ts";
 
 /** 画法会用到的赛季贴图名（版本信息里 resources 的键） */
 export const SEASON_TEXTURES = ["T", "reactor-core", "reactor-edge"] as const;
@@ -66,19 +67,12 @@ export function seasonArt(renderer: RendererOverride, ready: ReadonlySet<string>
 /** 预检一张贴图：取到并能解码才算可用 */
 export type Preflight = (url: string) => Promise<void>;
 
-async function preflightImage(url: string): Promise<void> {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`${url}：HTTP ${response.status}`);
-  const bitmap = await createImageBitmap(await response.blob());
-  bitmap.close();
-}
-
 export interface SeasonArtLoader {
   /** 这个 Source 的赛季贴图：没有配置或还没有一张可用时为 undefined；每张贴图预检完更新一次 */
   forSource(source: Source): Accessor<SeasonArt | undefined>;
 }
 
-export function createSeasonArtLoader(preflight: Preflight = preflightImage): SeasonArtLoader {
+export function createSeasonArtLoader(preflight: Preflight = checkImage): SeasonArtLoader {
   const loaded = new WeakMap<Source, Accessor<SeasonArt | undefined>>();
   return {
     forSource(source) {

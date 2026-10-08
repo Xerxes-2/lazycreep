@@ -6,17 +6,16 @@
  *   （{@link SVG_MAX_ZOOM}）× 设备像素比（上限 2）。缩放、新 Tick、多个对象、多个视图都复用这一份。
  * - 其余 URL（PNG 等）：首次被图元用到时才 fetch，走浏览器 HTTP 缓存。
  *
- * 不用 Pixi 的 Assets（在本适配层下全局 ticker 已停，它的加载不完成）。
+ * 取图与栅格化本身在 image-sources.ts。不用 Pixi 的 Assets（在本适配层下全局 ticker 已停，它的加载不完成）。
  */
 import { ImageSource, Texture } from "pixi.js";
+import { fetchBitmap, isSvgUrl, rasterizeSvgUrl, type RasterImage } from "./image-sources.ts";
+
 
 /** 栅格化时假定的最大缩放：画布上 1 个世界单位（Room View 的 1 格）最多这么多 CSS 像素 */
 export const SVG_MAX_ZOOM = 128;
 /** 设备像素比的上限 */
 export const MAX_RASTER_DPR = 2;
-
-/** 栅格化结果：可以直接作为纹理资源的画布或位图 */
-export type RasterImage = HTMLCanvasElement | ImageBitmap | OffscreenCanvas;
 
 /** 把 url 指向的 SVG 画成 width×height 像素 */
 export type SvgRasterizer = (url: string, width: number, height: number) => Promise<RasterImage>;
@@ -26,17 +25,12 @@ export interface SvgRasterCache {
   get(url: string, width: number, height: number): Promise<RasterImage>;
 }
 
-export function isSvgUrl(url: string): boolean {
-  if (url.startsWith("data:")) return url.startsWith("data:image/svg+xml");
-  return /\.svg(?:[?#]|$)/i.test(url);
-}
-
 /** 栅格化时每个世界单位的像素数 */
 export function svgPixelsPerUnit(devicePixelRatio: number): number {
   return SVG_MAX_ZOOM * Math.min(MAX_RASTER_DPR, Math.max(1, devicePixelRatio || 1));
 }
 
-export function createSvgRasterCache(rasterize: SvgRasterizer = rasterizeSvg): SvgRasterCache {
+export function createSvgRasterCache(rasterize: SvgRasterizer = rasterizeSvgUrl): SvgRasterCache {
   const cache = new Map<string, Promise<RasterImage>>();
   return {
     get(url, width, height) {
@@ -56,35 +50,6 @@ let shared: SvgRasterCache | undefined;
 /** 全页共享的 SVG 栅格化缓存 */
 export function sharedSvgRasters(): SvgRasterCache {
   return (shared ??= createSvgRasterCache());
-}
-
-/**
- * 浏览器里的 SVG 栅格化：取 SVG 文本，把根元素的 width/height 改成目标像素（矢量按目标尺寸绘制、
- * 也让没有 width/height 的 SVG 有确定尺寸），经 <img> 画进画布。
- */
-export async function rasterizeSvg(url: string, width: number, height: number): Promise<RasterImage> {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`${url}：HTTP ${response.status}`);
-  const doc = new DOMParser().parseFromString(await response.text(), "image/svg+xml");
-  const root = doc.documentElement;
-  if (root.nodeName !== "svg") throw new Error(`${url}：不是 SVG`);
-  root.setAttribute("width", String(width));
-  root.setAttribute("height", String(height));
-  root.setAttribute("preserveAspectRatio", "none");
-  const blob = new Blob([new XMLSerializer().serializeToString(doc)], { type: "image/svg+xml" });
-  const objectUrl = URL.createObjectURL(blob);
-  try {
-    const image = new Image(width, height);
-    image.src = objectUrl;
-    await image.decode();
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    canvas.getContext("2d")?.drawImage(image, 0, 0, width, height);
-    return canvas;
-  } finally {
-    URL.revokeObjectURL(objectUrl);
-  }
 }
 
 /** 第一个用到贴图的图元的世界尺寸；SVG 按它决定栅格化尺寸 */
@@ -107,12 +72,6 @@ export interface DefaultTexturesOptions {
   readonly pixelsPerUnit?: number;
   /** 位图的获取，默认 fetch + createImageBitmap（按需、走 HTTP 缓存） */
   readonly fetchBitmap?: (url: string) => Promise<RasterImage>;
-}
-
-async function fetchBitmap(url: string): Promise<RasterImage> {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`${url}：HTTP ${response.status}`);
-  return createImageBitmap(await response.blob());
 }
 
 /**

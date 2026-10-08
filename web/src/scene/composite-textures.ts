@@ -10,7 +10,8 @@
  *   一张就是几 MB，不能像官方小贴图那样闲置着等淘汰。
  */
 import { ImageSource, Texture } from "pixi.js";
-import type { RasterImage, TextureLoader } from "./texture-sources.ts";
+import { fetchDataUrl, rasterizeSvgText, type RasterImage } from "./image-sources.ts";
+import type { TextureLoader } from "./texture-sources.ts";
 
 export const COMPOSITE_SVG_PREFIX = "data:image/svg+xml;msc=composite,";
 
@@ -42,23 +43,11 @@ export interface CompositeOptions {
 
 const inlined = new Map<string, Promise<string>>();
 
-async function fetchAsDataUrl(url: string): Promise<string> {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`${url}：HTTP ${response.status}`);
-  const blob = await response.blob();
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(reader.error ?? new Error(`${url}：读取失败`));
-    reader.readAsDataURL(blob);
-  });
-}
-
 /** 全页共享：每个位图只取一次（失败后下次重试） */
 function sharedInline(url: string): Promise<string> {
   const hit = inlined.get(url);
   if (hit) return hit;
-  const made = fetchAsDataUrl(url);
+  const made = fetchDataUrl(url);
   inlined.set(url, made);
   made.catch(() => inlined.delete(url));
   return made;
@@ -70,27 +59,15 @@ function svgSize(svg: string): { width: number; height: number } {
   return { width: attr("width"), height: attr("height") };
 }
 
-async function rasterizeSvgText(svg: string): Promise<RasterImage> {
+function rasterizeAtOwnSize(svg: string): Promise<RasterImage> {
   const { width, height } = svgSize(svg);
-  const objectUrl = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
-  try {
-    const image = new Image(width, height);
-    image.src = objectUrl;
-    await image.decode();
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    canvas.getContext("2d")?.drawImage(image, 0, 0, width, height);
-    return canvas;
-  } finally {
-    URL.revokeObjectURL(objectUrl);
-  }
+  return rasterizeSvgText(svg, width, height);
 }
 
 /** 合成贴图自己加载、其余 URL 交给 inner。 */
 export function withCompositeImages(inner: TextureLoader, options: CompositeOptions = {}): TextureLoader {
   const inline = options.inlineImage ?? sharedInline;
-  const rasterize = options.rasterize ?? rasterizeSvgText;
+  const rasterize = options.rasterize ?? rasterizeAtOwnSize;
   const made = new Map<string, Texture>();
   const loadComposite = async (url: string, text: string) => {
     let svg = text;
