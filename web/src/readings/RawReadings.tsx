@@ -1,6 +1,7 @@
 /**
  * 开发用的原始读数：订阅一个房间，显示最新 gameTime、本次会话收到的帧数与连接状态。
  * 用来端到端确认 LiveSource 的 WebSocket 层，不做任何渲染。
+ * 给了 dataSource 时顶上还有 Room View 的数据来源开关（服务器 / 录制数据，#51）。
  */
 import { createEffect, createSignal, onCleanup, Show } from "solid-js";
 import { useI18n, type MessageKey } from "../i18n";
@@ -8,6 +9,8 @@ import type { Settings } from "../settings/settings.ts";
 import type { SourceFactory } from "../settings/SettingsPage.tsx";
 import type { ConnectionState, StreamError } from "../source/source.ts";
 import { useSharedSource } from "../source/use-shared-source.ts";
+import type { DataSourceChoice } from "../room/data-source.ts";
+import { DataSourceSwitch } from "../room/DataSourceSwitch.tsx";
 
 export const STATE_KEYS: Record<ConnectionState, MessageKey> = {
   connecting: "connection.connecting",
@@ -22,7 +25,7 @@ interface Target {
   readonly room: string;
 }
 
-export function RawReadings(props: { settings: Settings; sourceFor: SourceFactory }) {
+export function RawReadings(props: { settings: Settings; sourceFor: SourceFactory; dataSource?: DataSourceChoice | undefined }) {
   const { t } = useI18n();
   const settings = props.settings;
 
@@ -68,6 +71,13 @@ export function RawReadings(props: { settings: Settings; sourceFor: SourceFactor
   return (
     <section class="readings" aria-labelledby="readings-title">
       <h2 id="readings-title">{t("readings.title")}</h2>
+      <Show when={props.dataSource}>
+        {(choice) => (
+          <div class="readings__form">
+            <DataSourceSwitch choice={choice()} />
+          </div>
+        )}
+      </Show>
       <form class="readings__form" data-testid="readings-form" onSubmit={submit}>
         <Show when={settings.server().sharded}>
           <label>

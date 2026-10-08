@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { App } from "../App";
 import { FixtureSource, fixtureBundle } from "../source/fixture-source.ts";
+import { TIME_REUSE_MS } from "../source/shared-time.ts";
 import type { ConnectionState, CpuUpdate, StreamErrorListener, Unsubscribe } from "../source/source.ts";
 
 /**
@@ -127,6 +128,17 @@ describe("Top Bar 状态（#25）", () => {
     expect(created[0]!.timeRequests.every((shard) => shard === "shardSeason")).toBe(true);
   });
 
+  it("game/time 去重（#38）不吞掉 Top Bar 的采样：轮询间隔短于复用窗口时，每次轮询仍是一次新请求", async () => {
+    mount();
+    const source = () => created[0]!;
+    await settle(() => expect(source().timeRequests.length).toBeGreaterThan(0));
+    const start = source().timeRequests.length;
+    const startedAt = performance.now();
+    // 轮询 10 ms 一次；复用窗口 1 秒。若 Top Bar 拿复用结果，窗口内底层请求不会增加
+    await settle(() => expect(source().timeRequests.length).toBeGreaterThanOrEqual(start + 5));
+    expect(performance.now() - startedAt).toBeLessThan(TIME_REUSE_MS);
+  });
+
   it("五种连接状态在 Top Bar 上各不相同", async () => {
     mount();
     await settle(() => expect(status("connection")).not.toBeNull());
@@ -195,7 +207,7 @@ describe("Top Bar 状态（#25）", () => {
 
     q('.attack-alert__item[data-reason="stranger"]')!.querySelector<HTMLButtonElement>("[data-action=open-alert-room]")!.click();
     expect(shownView()).toEqual(["room"]);
-    expect(q<HTMLInputElement>("[name=room-view-room]")!.value).toBe("E13N21");
+    expect(q<HTMLElement>(".room-view")!.dataset.room).toBe("E13N21");
   });
 });
 

@@ -193,12 +193,11 @@ describe("窄屏结构（#29）", () => {
 
   it("断点来回切换：Main View 的两个视图实例与房间不变，面板结构随之切换", () => {
     const [narrow, setNarrow] = createSignal(false);
+    // 按地址打开房间（#32）
+    history.replaceState(null, "", "/#!/season/room/shardSeason/W13S28");
     mountApp(narrow);
-    press("m");
-    const roomInput = q<HTMLInputElement>("[name=room-view-room]")!;
-    roomInput.value = "W13S28";
-    roomInput.dispatchEvent(new Event("input", { bubbles: true }));
-    q<HTMLFormElement>("form[data-testid=room-view-form]")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    const shownRoom = () => q<HTMLElement>(".room-view")!.dataset.room;
+    expect(shownRoom()).toBe("W13S28");
     const roomView = q(".room-view");
     const mapView = q(".world-map");
     expect(roomView).not.toBeNull();
@@ -209,13 +208,13 @@ describe("窄屏结构（#29）", () => {
     expect(tabs()).toEqual(SIDEBAR_SECTIONS.room.map((s) => s.id));
     expect(q(".room-view")).toBe(roomView);
     expect(q(".world-map")).toBe(mapView);
-    expect(q<HTMLInputElement>("[name=room-view-room]")!.value).toBe("W13S28");
+    expect(shownRoom()).toBe("W13S28");
 
     setNarrow(false);
     expect(q(".sidebar [role=tab]")).toBeNull();
     expect(q(".room-view")).toBe(roomView);
     expect(q(".world-map")).toBe(mapView);
-    expect(q<HTMLInputElement>("[name=room-view-room]")!.value).toBe("W13S28");
+    expect(shownRoom()).toBe("W13S28");
   });
 
   it("触摸目标：窄屏下外壳内的按钮（含标签与关闭）至少 44px", () => {

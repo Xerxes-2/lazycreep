@@ -1,13 +1,15 @@
 /**
- * Room View（Live 最小版）：选一个房间，逐 Tick 画出地形、建筑与 creep，并显示当前 Tick。
+ * Room View（Live 最小版）：逐 Tick 画出所选房间的地形、建筑与 creep。
  * 数据流：Source 房间流 → reduceLiveTick → RoomState → buildRoomScene → SceneView。
- * 是 Main View 的一种模式（#24）；开发用开关可以在服务器与录制数据（FixtureSource）之间切换数据来源。
- * 录制数据只在开发构建里可用：生产构建既不打包 `fixtures/` 也不显示开关（#14）。
+ * 是 Main View 的一种模式（#24），画布占满整个 Room View：房间经 open（World Map、Minimap、PvP 卡片与 URL，
+ * 都走 shell.navigate）打开，连接状态与 Tick 速度在 Top Bar（#51）。根元素的 data-shard / data-room /
+ * data-tick / data-mode 反映画面上的房间、Tick 与 Live / Replay。
+ * 数据来源（服务器或录制数据 FixtureSource）由 dataSource 给出，只在开发构建里由 Menu 的原始读数项切换；
+ * 生产构建既不打包 `fixtures/` 也没有开关（#14）。
  */
-import { batch, createEffect, createMemo, createSignal, on, onCleanup, onMount, Show, untrack } from "solid-js";
+import { batch, createEffect, createMemo, createSignal, on, onCleanup, onMount, Show, untrack, type Accessor } from "solid-js";
 import { Portal } from "solid-js/web";
 import { useI18n } from "../i18n";
-import { createTickRate } from "../power/tick-rate.ts";
 import { useVisible } from "../power/use-visible.ts";
 import type { VisibilitySignal } from "../power/visibility.ts";
 import { createSceneView, type SceneView, type SceneViewOptions } from "../scene/pixi-scene-view.ts";
@@ -16,8 +18,7 @@ import { DEFAULT_THEME, type Theme } from "../scene/theme.ts";
 import { errorMessage, type SourceFactory } from "../settings/SettingsPage.tsx";
 import type { Settings } from "../settings/settings.ts";
 import { FixtureSource, fixtureBundle } from "../source/fixture-source.ts";
-import { STATE_KEYS } from "../readings/RawReadings.tsx";
-import type { ConnectionState, Source, StreamError, Terrain } from "../source/source.ts";
+import type { Source, StreamError, Terrain } from "../source/source.ts";
 import { browserStorage, type KeyValueStorage } from "../storage/local-store.ts";
 import { cameraKey } from "./room-camera-store.ts";
 import { RoomDetailsPanel, createRoomControls } from "./room-controls.tsx";
@@ -34,9 +35,7 @@ import type { ArtStyle } from "../art/art-style.ts";
 import { RoomToolbar } from "./RoomToolbar.tsx";
 import { replayAt, replayTick, type RoomRequest, type RoomTarget } from "../shell/shell-state.ts";
 import { seasonArtOf } from "./room-art.ts";
-
-/** 数据来源：服务器（经共享 Source），或开发构建里的录制数据（FixtureSource） */
-type DataSource = "server" | "recording";
+import type { DataSource } from "./data-source.ts";
 
 type Target = RoomTarget;
 /** 从外部打开的房间；给了 replay 就以该 Tick 进入 Replay */
@@ -57,6 +56,8 @@ export interface RoomViewProps {
   readonly sourceFor: SourceFactory;
   /** 录制数据的 Source；开发构建默认加载 `fixtures/season/`，生产构建默认没有 */
   readonly fixtureSource?: () => Promise<Source>;
+  /** 数据来源（开发构建里由 Menu 切换，#51）；不给时是服务器。没有录制数据时总是服务器 */
+  readonly dataSource?: Accessor<DataSource> | undefined;
   /** 默认是 Pixi 适配层；测试里换成记录 Scene 的假实现 */
   readonly createView?: (options: SceneViewOptions) => Promise<SceneView>;
   /** 页面可见性（#14）：不可见时暂停渲染；默认跟随 document */
@@ -101,7 +102,7 @@ export function RoomView(props: RoomViewProps) {
   // import.meta.env.DEV 在生产构建里是常量 false：loadSeasonFixtures 连同 fixtures 一起被摇掉
   const loadFixtures = props.fixtureSource ?? (import.meta.env.DEV ? loadSeasonFixtures : undefined);
 
-  const [dataSource, setDataSource] = createSignal<DataSource>("server");
+  const dataSource = () => props.dataSource?.() ?? "server";
   const [source, setSource] = createSignal<Source>();
   const [sourceError, setSourceError] = createSignal<string>();
 
@@ -130,13 +131,6 @@ export function RoomView(props: RoomViewProps) {
     });
   });
 
-  const [connection, setConnection] = createSignal<ConnectionState>("disconnected");
-  createEffect(() => {
-    const src = source();
-    if (src) onCleanup(src.onConnection(setConnection));
-    else setConnection("disconnected");
-  });
-
   const [me, setMe] = createSignal<string>();
   createEffect(() => {
     const src = source();
@@ -153,16 +147,11 @@ export function RoomView(props: RoomViewProps) {
     onCleanup(() => (alive = false));
   });
 
-  const sharded = () => source()?.server.sharded ?? (dataSource() === "recording" || settings.server().sharded);
-
-  const [shardInput, setShardInput] = createSignal(settings.shard() ?? "shardSeason");
-  const [roomInput, setRoomInput] = createSignal("");
   const [target, setTarget] = createSignal<Target>();
   const [roomState, setRoomState] = createSignal<RoomState>();
   const [terrain, setTerrain] = createSignal<Terrain>();
   const [streamError, setStreamError] = createSignal<StreamError>();
   const [terrainError, setTerrainError] = createSignal<string>();
-  const [tickMs, setTickMs] = createSignal<number>();
 
   const replay = createReplayController({
     source,
@@ -187,8 +176,9 @@ export function RoomView(props: RoomViewProps) {
       (opened) => {
         if (!opened) return;
         batch(() => {
-          setShardInput(opened.shard);
-          setRoomInput(opened.room);
+          // 与换房间同一批清掉旧房间的状态：Scene 不会先拿新房间配旧对象画一帧
+          setRoomState(undefined);
+          setTerrain(undefined);
           setTarget({ shard: opened.shard, room: opened.room });
           if (opened.replay) {
             const { tick, latest } = opened.replay;
@@ -204,7 +194,6 @@ export function RoomView(props: RoomViewProps) {
       settings.shard,
       (chosen) => {
         if (chosen === undefined) return;
-        setShardInput(chosen);
         const current = untrack(target);
         if (current && current.shard !== chosen) {
           replay.close();
@@ -222,23 +211,15 @@ export function RoomView(props: RoomViewProps) {
     setTerrain(undefined);
     setStreamError(undefined);
     setTerrainError(undefined);
-    setTickMs(undefined);
     if (!src || !current) return;
     let alive = true;
-    const rate = createTickRate();
     // Replay 期间退订 Live 房间流
     const off = replay.active()
       ? () => {}
       : src.subscribeRoom(
           current.shard,
           current.room,
-          (tick) => {
-            if (tick.gameTime !== undefined) {
-              rate.record(tick.gameTime);
-              setTickMs(rate.msPerTick());
-            }
-            setRoomState((state) => reduceLiveTick(state, tick));
-          },
+          (tick) => setRoomState((state) => reduceLiveTick(state, tick)),
           setStreamError,
         );
     src.getTerrain(current.shard, current.room).then(
@@ -360,13 +341,8 @@ export function RoomView(props: RoomViewProps) {
     if (v && s) v.show(s);
   });
 
-  const submit = (event: SubmitEvent) => {
-    event.preventDefault();
-    const room = roomInput().trim().toUpperCase();
-    if (!room) return;
-    replay.close();
-    setTarget({ shard: sharded() ? shardInput().trim() : "", room });
-  };
+  /** 画面上的 Tick：Replay 期间是重放到的 Tick，否则是 Live 的 Tick */
+  const shownTick = () => (replay.active() ? replay.snapshot()?.target : roomState()?.gameTime);
 
   const details = () => (
     <RoomDetailsPanel
@@ -375,59 +351,21 @@ export function RoomView(props: RoomViewProps) {
         return id === undefined ? undefined : shownState()?.objects[id];
       })()}
       users={shownState()?.users ?? {}}
-      gameTime={replay.active() ? replay.snapshot()?.target : roomState()?.gameTime}
+      gameTime={shownTick()}
       onClose={() => controls.select(undefined)}
     />
   );
 
   return (
-    <section class="room-view" aria-labelledby="room-view-title">
+    <section
+      class="room-view"
+      aria-labelledby="room-view-title"
+      data-shard={target()?.shard}
+      data-room={target()?.room}
+      data-tick={shownTick()}
+      data-mode={target() ? (replay.active() ? "replay" : "live") : undefined}
+    >
       <h2 id="room-view-title">{t("roomView.title")}</h2>
-      <form class="room-view__form" data-testid="room-view-form" onSubmit={submit}>
-        <Show when={loadFixtures}>
-          <label>
-            {t("roomView.source")}
-            <select
-              name="room-view-source"
-              value={dataSource()}
-              onChange={(e) => setDataSource(e.currentTarget.value as DataSource)}
-            >
-              <option value="server">{t("roomView.source.server")}</option>
-              <option value="recording">{t("roomView.source.recording")}</option>
-            </select>
-          </label>
-        </Show>
-        <Show when={sharded()}>
-          <label>
-            {t("readings.shard")}
-            <input name="room-view-shard" value={shardInput()} onInput={(e) => setShardInput(e.currentTarget.value)} />
-          </label>
-        </Show>
-        <label>
-          {t("readings.room")}
-          <input
-            name="room-view-room"
-            placeholder="W13S28"
-            value={roomInput()}
-            onInput={(e) => setRoomInput(e.currentTarget.value)}
-          />
-        </label>
-        <button type="submit">{t("roomView.open")}</button>
-      </form>
-      <p class="room-view__status">
-        <span data-testid="room-view-state">{t(STATE_KEYS[connection()])}</span>
-        {" · "}
-        {t("roomView.tick")}{" "}
-        <span data-testid="room-view-tick">
-          {(replay.active() ? replay.snapshot()?.target : roomState()?.gameTime) ?? "—"}
-        </span>
-        <Show when={replay.active()}> · {t("replay.mode")}</Show>
-        {" · "}
-        {t("power.tickRate")}{" "}
-        <span data-testid="room-view-tick-rate">
-          {tickMs() === undefined ? "—" : t("power.msPerTick", { ms: Math.round(tickMs()!) })}
-        </span>
-      </p>
       <Show when={replay.entryError() ?? enterError()}>
         {(error) => (
           <p class="settings__error" role="alert">

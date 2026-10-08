@@ -87,11 +87,7 @@ describe("配色改动后 Room View 与 World Map 用新 Theme 重建 Scene（#5
 
     // 当前视图之外的 Main View 不构建 Scene：先看地图，再到 Room View
     await settle(() => expect(lastScene(".world-map")?.background).toBe(DEFAULT_THEME.background));
-    shell.navigate({ view: "room" });
-    const room = container.querySelector<HTMLInputElement>("[name=room-view-room]")!;
-    room.value = "W13S28";
-    room.dispatchEvent(new Event("input", { bubbles: true }));
-    container.querySelector<HTMLFormElement>("[data-testid=room-view-form]")!.requestSubmit();
+    shell.navigate({ shard: "shardSeason", room: "W13S28" });
 
     await settle(() => expect(fills(lastScene(".room-view")).has(DEFAULT_THEME.terrainWall)).toBe(true));
 

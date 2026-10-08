@@ -66,7 +66,8 @@ const settle = (assertion: () => void) => vi.waitFor(assertion, { timeout: 3000,
 const mapCanvas = () => container.querySelector<HTMLCanvasElement>(".world-map canvas")!;
 const slot = (view: string) => container.querySelector<HTMLElement>(`.main-view [data-view="${view}"]`)!;
 const backButton = () => container.querySelector<HTMLButtonElement>("button[data-action=back-to-map]");
-const roomInput = () => container.querySelector<HTMLInputElement>("[name=room-view-room]")!;
+/** Room View 根元素：data-shard / data-room / data-tick 反映画面上的房间与 Tick */
+const roomView = () => container.querySelector<HTMLElement>(".room-view")!.dataset;
 
 function at(world: { x: number; y: number }) {
   const v = viewports.get(mapCanvas())!;
@@ -114,9 +115,9 @@ describe("World Map 与 Room View", () => {
 
     expect(slot("map").hidden).toBe(true);
     expect(slot("room").hidden).toBe(false);
-    expect(roomInput().value).toBe("W13S28");
+    expect(roomView().room).toBe("W13S28");
     expect(shell.location()).toMatchObject({ view: "room", room: "W13S28" });
-    await settle(() => expect(container.querySelector("[data-testid=room-view-tick]")!.textContent).not.toBe("—"));
+    await settle(() => expect(roomView().tick).toBeDefined());
 
     backButton()!.click();
     expect(slot("map").hidden).toBe(false);
@@ -170,7 +171,7 @@ describe("World Map 与 Room View", () => {
     expect(slot("room").hidden).toBe(true);
     shell.toggleMainView();
     expect(slot("room").hidden).toBe(false);
-    expect(roomInput().value).toBe("W13S28");
+    expect(roomView().room).toBe("W13S28");
     expect(container.querySelector(".room-view canvas")).toBe(roomCanvas);
     expect(viewports.get(roomCanvas)).toEqual(roomViewport);
     expect(canvases).toHaveLength(views);
@@ -182,8 +183,8 @@ describe("World Map 与 Room View", () => {
     shell.navigate({ shard: "shard2", room: "W1N1" });
     expect(settings.shard()).toBe("shard2");
     expect(slot("room").hidden).toBe(false);
-    expect(container.querySelector<HTMLInputElement>("[name=room-view-shard]")!.value).toBe("shard2");
-    expect(roomInput().value).toBe("W1N1");
+    expect(roomView().shard).toBe("shard2");
+    expect(roomView().room).toBe("W1N1");
     expect(shell.location()).toMatchObject({ view: "room", shard: "shard2", room: "W1N1" });
     backButton()!.click();
     expect(shell.location()).toMatchObject({ view: "map", shard: "shard2", room: "W1N1" });
@@ -221,22 +222,22 @@ describe("World Map 与 Room View", () => {
     expect(slot("room").hidden).toBe(false);
     expect(mapCanvas()).toBe(canvas);
     expect(viewports.get(canvas)).toEqual(zoomed);
-    expect(roomInput().value).toBe("W13S28");
+    expect(roomView().room).toBe("W13S28");
     expect(canvases).toHaveLength(views);
   });
 
-  it("切换 Shard 后 Room View 不再显示旧 Shard 的房间，Shard 输入跟随", async () => {
+  it("切换 Shard 后 Room View 不再显示旧 Shard 的房间", async () => {
     const settings = mount();
     await settle(() => expect(viewports.get(mapCanvas())).toBeDefined());
     for (let i = 0; i < 10; i++) {
       mapCanvas().dispatchEvent(new WheelEvent("wheel", { ...at(W13S28), deltaY: -200, bubbles: true, cancelable: true }));
     }
     tap(at(W13S28));
-    await settle(() => expect(container.querySelector("[data-testid=room-view-tick]")!.textContent).not.toBe("—"));
+    await settle(() => expect(roomView().tick).toBeDefined());
 
     settings.setShard("shard2");
-    expect(container.querySelector<HTMLInputElement>("[name=room-view-shard]")!.value).toBe("shard2");
-    await settle(() => expect(container.querySelector("[data-testid=room-view-tick]")!.textContent).toBe("—"));
+    expect(roomView().room).toBeUndefined();
+    await settle(() => expect(roomView().tick).toBeUndefined());
   });
 
   it("切换 Shard 不换共享 Source 的租约、不重建所有权缓存；房间仍在新 Shard 上时 Room View 不中断", async () => {
@@ -273,7 +274,7 @@ describe("World Map 与 Room View", () => {
       mapCanvas().dispatchEvent(new WheelEvent("wheel", { ...at(W13S28), deltaY: -200, bubbles: true, cancelable: true }));
     }
     tap(at(W13S28));
-    await settle(() => expect(container.querySelector("[data-testid=room-view-tick]")!.textContent).not.toBe("—"));
+    await settle(() => expect(roomView().tick).toBeDefined());
     await settle(() => expect(mapStats).toHaveBeenCalled());
     await new Promise((resolve) => setTimeout(resolve, 50));
     const leasesBefore = leases;
@@ -281,7 +282,7 @@ describe("World Map 与 Room View", () => {
 
     // 重选同一个 Shard（例如从告警进入本 Shard 的房间）：房间留着，流不重订
     settings.setShard("shardSeason");
-    expect(container.querySelector("[data-testid=room-view-tick]")!.textContent).not.toBe("—");
+    expect(roomView().tick).toBeDefined();
 
     // 切走再切回：所有权缓存还在，不为同一区域重新请求 map-stats
     settings.setShard("shard2");

@@ -126,7 +126,7 @@ describe("Attack Alert 接入", () => {
       .click();
     expect(container.querySelector<HTMLElement>('.main-view [data-view="map"]')!.hidden).toBe(true);
     expect(container.querySelector<HTMLElement>('.main-view [data-view="room"]')!.hidden).toBe(false);
-    expect(container.querySelector<HTMLInputElement>("[name=room-view-room]")!.value).toBe("E13N21");
+    expect(container.querySelector<HTMLElement>(".room-view")!.dataset.room).toBe("E13N21");
     expect(banners()).not.toContain("stranger:E13N21");
   });
 
@@ -138,7 +138,7 @@ describe("Attack Alert 接入", () => {
     expect(nuke.title).toContain("W17N21");
     expect(nuke.body).toContain("W12N25");
     nuke.onClick();
-    expect(container.querySelector<HTMLInputElement>("[name=room-view-room]")!.value).toBe("W17N21");
+    expect(container.querySelector<HTMLElement>(".room-view")!.dataset.room).toBe("W17N21");
   });
 
   it("切换 Shard 不重建数据源与判定器：冷却保留，已告警的房间不重复告警", async () => {

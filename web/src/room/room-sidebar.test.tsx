@@ -95,7 +95,7 @@ const tool = (action: string) => q<HTMLButtonElement>(`.room-view__tools [data-a
 
 async function openW13S28() {
   shell.navigate({ shard: "shardSeason", room: "W13S28" });
-  await settle(() => expect(q("[data-testid=room-view-tick]")!.textContent).toBe("1025238"));
+  await settle(() => expect(q<HTMLElement>(".room-view")!.dataset.tick).toBe("1025238"));
 }
 
 function tapObject(id: string) {
@@ -217,7 +217,7 @@ describe("Room View 的 Sidebar 区块与左侧按钮列（#26）", () => {
     container.innerHTML = "";
     history.replaceState(null, "", "/#!/season/room/shardSeason/W13S28");
     dispose = render(() => <App sourceFor={() => new FixtureSource(bundle, { speed: Infinity })} />, container);
-    await settle(() => expect(q("[data-testid=room-view-tick]")!.textContent).toBe("1025238"));
+    await settle(() => expect(q<HTMLElement>(".room-view")!.dataset.tick).toBe("1025238"));
     expect(location.hash).toBe("#!/season/room/shardSeason/W13S28");
     const entries = history.length;
 

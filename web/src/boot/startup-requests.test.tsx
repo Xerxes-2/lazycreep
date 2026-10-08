@@ -120,6 +120,22 @@ describe("启动请求时序", () => {
     expect(source.calls.filter((c) => c === "getShards")).toHaveLength(1);
   });
 
+  it("game/time（#38）：启动后到首次轮询前只请求一次（Top Bar 与自动打开的设置页同时要）", async () => {
+    // 有启动画面时，没有 token 的启动会自动打开设置页（Menu 的 Server 项）
+    const bootHost = document.createElement("div");
+    bootHost.id = "boot";
+    document.body.append(bootHost);
+    const source = heldSource();
+    mount(source);
+    await settle(() => expect(source.calls).toContain("getShards"));
+    source.release();
+    await settle(() => {
+      expect(container.querySelector("[data-testid=server-time]")?.textContent).toMatch(/\d{7}/);
+      expect(container.querySelector('.top-bar [data-status="tick"]')?.textContent).toMatch(/\d{7}/);
+    });
+    expect(source.calls.filter((c) => c === "getTime")).toHaveLength(1);
+  });
+
   it("有缓存时 World Map 的首个 Scene 不等任何网络请求，已含瓦片", async () => {
     returningUser();
     await cachedFromLastVisit();

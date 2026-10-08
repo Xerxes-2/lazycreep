@@ -58,14 +58,11 @@ export const zhCN = {
   "roomView.source": "数据来源",
   "roomView.source.server": "服务器",
   "roomView.source.recording": "录制数据",
-  "roomView.open": "打开",
-  "roomView.tick": "Tick",
 
   "power.tickRate": "Tick 速度",
   "power.msPerTick": "{ms} ms/Tick",
 
   "replay.enter": "回放",
-  "replay.mode": "回放中",
   "replay.backToLive": "回到即时",
   "replay.play": "播放",
   "replay.pause": "暂停",

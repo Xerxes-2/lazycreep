@@ -274,6 +274,12 @@ export class SourceError extends Error {
   }
 }
 
+/** getTime 的选项（#38） */
+export interface TimeOptions {
+  /** 可接受的已到达结果的最大年龄（毫秒）；0 表示只并入在途请求、不拿旧结果。默认用去重层的复用窗口 */
+  readonly maxAgeMs?: number;
+}
+
 /** 所有返回 Promise 的方法失败时以 SourceError 拒绝。 */
 export interface Source {
   readonly server: ServerConfig;
@@ -308,7 +314,8 @@ export interface Source {
   getPvp(interval: number): Promise<readonly PvpShard[]>;
   getNukes(): Promise<readonly Nuke[]>;
   getVersion(): Promise<ServerVersion>;
-  getTime(shard: string): Promise<number>;
+  /** 当前 Tick；options 只对去重层（shared-time.ts）有意义，底层实现可忽略 */
+  getTime(shard: string, options?: TimeOptions): Promise<number>;
   getShards(): Promise<readonly ShardInfo[]>;
   getTerrain(shard: string, room: string): Promise<Terrain>;
   tileUrl(shard: string, room: string): string;

@@ -71,15 +71,10 @@ const settle = (assertion: () => void) => vi.waitFor(assertion, { timeout: 3000,
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 const shownView = () =>
   [...container.querySelectorAll<HTMLElement>(".main-view [data-view]")].filter((el) => !el.hidden).map((el) => el.dataset["view"]);
-const roomInput = () => q<HTMLInputElement>("[name=room-view-room]")!.value;
-const tick = () => q("[data-testid=room-view-tick]")!.textContent;
+/** Room View 画面上的房间与 Tick（根元素的 data-room / data-tick） */
+const roomInput = () => q<HTMLElement>(".room-view")!.dataset.room;
+const tick = () => q<HTMLElement>(".room-view")!.dataset.tick;
 const storedSettings = () => JSON.parse(localStorage.getItem("msc.settings") ?? "{}") as { serverId?: string; shards?: Record<string, string> };
-
-function input(name: string, value: string) {
-  const el = q<HTMLInputElement>(`[name=${name}]`)!;
-  el.value = value;
-  el.dispatchEvent(new Event("input", { bubbles: true }));
-}
 
 /** 拖动 Replay 时间轴：从 10% 处按下、拖到 x（千分比） */
 function dragTimeline(x: number) {
@@ -99,12 +94,6 @@ function tapMinimap(col: number, row: number) {
   for (const type of ["pointerdown", "pointerup"]) {
     canvas.dispatchEvent(new PointerEvent(type, { ...point, pointerId: 1, bubbles: true, button: 0 }));
   }
-}
-
-function watch(room: string) {
-  input("room-view-shard", "shardSeason");
-  input("room-view-room", room);
-  q("form[data-testid=room-view-form]")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
 }
 
 /** 浏览器前进后退：history.back/forward 在 jsdom 里异步触发 popstate */
@@ -148,8 +137,8 @@ describe("URL 导航（#32）", () => {
     expect(location.hash).toBe("#!/season/map/shardSeason");
     const start = history.length;
 
-    q<HTMLButtonElement>('[data-action=main-view][data-mode="room"]')!.click();
-    watch("W13S28");
+    // 进入房间：Room View 不再有房间输入框（#51），房间经 World Map、Minimap、PvP 卡片或地址打开
+    await typeAddress("#!/season/room/shardSeason/W13S28");
     await settle(() => expect(tick()).toBe("1025238"));
     expect(location.hash).toBe("#!/season/room/shardSeason/W13S28");
 
@@ -240,8 +229,7 @@ describe("URL 导航（#32）", () => {
   it("前进 / 后退在视图之间切换；拖动 Replay 时间轴不产生历史记录", async () => {
     mount();
     await flush();
-    q<HTMLButtonElement>('[data-action=main-view][data-mode="room"]')!.click();
-    watch("W13S28");
+    await typeAddress("#!/season/room/shardSeason/W13S28");
     await settle(() => expect(tick()).toBe("1025238"));
     await flush();
     q<HTMLButtonElement>("[data-action=back-to-map]")!.click();
