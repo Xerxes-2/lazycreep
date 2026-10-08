@@ -25,6 +25,7 @@ import { CONNECTION_STORAGE } from "../settings/settings.ts";
 import { MAIN_VIEW_STORAGE, SHELL_STORAGE } from "../shell/shell-state.ts";
 import { removeKey, type KeyValueStorage, type StoredKey, type StoredKind } from "../storage/local-store.ts";
 import { STATIC_CACHE_STORAGE } from "../source/static-cache.ts";
+import { TERRAIN_CACHE_STORAGE } from "../source/terrain-cache.ts";
 import { COLOR_SCHEME_STORAGE } from "./color-scheme.ts";
 import { KEYBINDINGS_STORAGE } from "./keybindings.ts";
 import { UI_THEME_STORAGE } from "./ui-theme.ts";
@@ -51,6 +52,7 @@ export const STORED_KEYS: readonly StoredKey[] = [
   ALERT_MEMORY_STORAGE,
   MAIN_VIEW_STORAGE,
   STATIC_CACHE_STORAGE,
+  TERRAIN_CACHE_STORAGE,
 ];
 
 /**
