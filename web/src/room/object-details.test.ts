@@ -109,12 +109,11 @@ describe("对象详情", () => {
     };
     const text = (d: ObjectDetails, key: string) => d.fields.find((f) => f.key === key)?.text;
 
-    it("名字、死于几 Tick 前、推断死因、活了多久、生前 body、creep id；不再出现在其他字段里", () => {
+    it("名字、死于几 Tick 前、死前剩余寿命、生前 body、creep id；不再出现在其他字段里", () => {
       const d = describeObject(tombstone, users, 1041664);
       expect(field(d, "name")).toBe("Shade1372");
-      expect(text(d, "died")).toEqual({ key: "diedAgo", params: { ago: 28, tick: 1041636 } });
-      expect(text(d, "deathCause")).toEqual({ key: "early", params: { left: 1394 } });
-      expect(field(d, "lived")).toBe("106 / 1500");
+      expect(text(d, "died")).toEqual({ key: "ago", params: { ago: 28, tick: 1041636 } });
+      expect(field(d, "lifeLeft")).toBe("1394");
       expect(field(d, "body")).toBe("2M 2C");
       // 墓碑的 body 只有类型：血量未知，画成满格
       expect(d.body?.map((c) => [c.type, c.hits, c.fill])).toEqual([
@@ -129,12 +128,43 @@ describe("对象详情", () => {
       expect(d.raw).toEqual([]);
     });
 
-    it("死时剩余寿命为 1 算寿终；带 CLAIM 的寿命按 600 算；最后说的话；Tick 未知时只给死亡 Tick", () => {
-      const d = describeObject({ ...tombstone, creepTicksToLive: 1, creepBody: ["claim", "move"], creepSaying: "bye" }, users, undefined);
-      expect(text(d, "deathCause")).toEqual({ key: "aged" });
-      expect(field(d, "lived")).toBe("599 / 600");
+    it("最后说的话；Tick 未知时只给死亡 Tick", () => {
+      const d = describeObject({ ...tombstone, creepSaying: "bye" }, users, undefined);
       expect(field(d, "saying")).toBe("bye");
-      expect(text(d, "died")).toEqual({ key: "diedAt", params: { tick: 1041636 } });
+      expect(text(d, "died")).toEqual({ key: "at", params: { tick: 1041636 } });
+    });
+  });
+
+  describe("废墟", () => {
+    const ruin = {
+      _id: "r1",
+      type: "ruin",
+      room: "W13S28",
+      x: 10,
+      y: 11,
+      structure: { id: "s9", type: "extension", hits: 0, hitsMax: 1000, user: "u1" },
+      destroyTime: 1000,
+      decayTime: 1500,
+      store: { energy: 50 },
+    };
+    const text = (d: ObjectDetails, key: string) => d.fields.find((f) => f.key === key)?.text;
+
+    it("毁于几 Tick 前、原建筑的类型、血量上限、主人与 id；不再出现在其他字段里", () => {
+      const d = describeObject(ruin, users, 1100);
+      expect(text(d, "destroyed")).toEqual({ key: "ago", params: { ago: 100, tick: 1000 } });
+      expect(field(d, "structureType")).toBe("extension");
+      expect(field(d, "structureHitsMax")).toBe("1000");
+      expect(field(d, "structureOwner")).toBe("Xerxes_2");
+      expect(field(d, "structureId")).toBe("s9");
+      expect(field(d, "decay")).toBe("400");
+      expect(field(d, "store")).toBe("energy 50");
+      expect(d.raw).toEqual([]);
+    });
+
+    it("废墟自己有主人时不重复列原建筑主人；缺 structure 时只给能给的", () => {
+      expect(field(describeObject({ ...ruin, user: "u1" }, users, 1100), "structureOwner")).toBeUndefined();
+      const bare = describeObject({ _id: "r2", type: "ruin", x: 1, y: 1, destroyTime: 1000 }, users, 1100);
+      expect(bare.fields.map((f) => f.key)).toEqual(["type", "position", "destroyed"]);
     });
   });
 

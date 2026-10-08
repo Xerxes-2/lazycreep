@@ -25,10 +25,16 @@ export type DetailKey =
   | "decay"
   | "cooldown"
   | "died"
-  | "deathCause"
-  | "lived"
+  | "lifeLeft"
   | "saying"
-  | "creepId";
+  | "creepId"
+  | "destroyed"
+  | "structureType"
+  | "structureHitsMax"
+  | "structureOwner"
+  | "structureId";
+
+type AddField = (key: DetailKey, value: string | undefined, text?: DetailField["text"]) => void;
 
 export interface DetailField {
   readonly key: DetailKey;
@@ -83,11 +89,10 @@ const KNOWN = new Set([
   "creepTicksToLive",
   "creepBody",
   "creepSaying",
+  // 废墟
+  "destroyTime",
+  "structure",
 ]);
-
-/** creep 的寿命（CREEP_LIFE_TIME）；带 CLAIM 部件的是 CREEP_CLAIM_LIFE_TIME */
-const CREEP_LIFE_TIME = 1500;
-const CREEP_CLAIM_LIFE_TIME = 600;
 
 const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
 
@@ -169,40 +174,43 @@ function storeSummary(obj: RoomObject): string | undefined {
   return capacity ? `${content} / ${capacity}` : content;
 }
 
-/**
- * 墓碑（死去的 creep）：死于几 Tick 前、推断死因、活了多久、最后说的话。
- * 推断：死时剩余寿命为 1（官方老死那一 Tick 留下的值）算寿终，否则是提前死亡（被杀、自杀或被回收，墓碑分不出）。
- * 寿命按 body 有无 CLAIM 取 600 或 1500；活了多久 = 寿命 − 死时剩余寿命（孵化期间不计）。
- */
-function tombstoneFields(
-  obj: RoomObject,
-  body: readonly BodyCell[],
-  gameTime: number | undefined,
-  add: (key: DetailKey, value: string | undefined, text?: DetailField["text"]) => void,
-) {
+/** 发生在几 Tick 前（Tick 未知时只给发生的 Tick） */
+function happened(time: number, gameTime: number | undefined): Pick<DetailField, "value" | "text"> {
+  return gameTime !== undefined
+    ? { value: `${gameTime - time} (${time})`, text: { key: "ago", params: { ago: gameTime - time, tick: time } } }
+    : { value: String(time), text: { key: "at", params: { tick: time } } };
+}
+
+/** 墓碑（死去的 creep）：死于几 Tick 前、死前剩余寿命、最后说的话、原 creep id；名字与生前 body 在通用字段里 */
+function tombstoneFields(obj: RoomObject, gameTime: number | undefined, add: AddField) {
   const deathTime = obj["deathTime"];
   if (isNum(deathTime)) {
-    const ago = gameTime !== undefined ? gameTime - deathTime : undefined;
-    add(
-      "died",
-      ago !== undefined ? `${ago} (${deathTime})` : String(deathTime),
-      ago !== undefined ? { key: "diedAgo", params: { ago, tick: deathTime } } : { key: "diedAt", params: { tick: deathTime } },
-    );
+    const { value, text } = happened(deathTime, gameTime);
+    add("died", value, text);
   }
-  const left = obj["creepTicksToLive"];
-  if (isNum(left)) {
-    add("deathCause", left <= 1 ? "aged" : "early", left <= 1 ? { key: "aged" } : { key: "early", params: { left } });
-    if (body.length > 0) {
-      const lifetime = body.some((cell) => cell.type === "claim") ? CREEP_CLAIM_LIFE_TIME : CREEP_LIFE_TIME;
-      add("lived", `${Math.max(0, lifetime - left)} / ${lifetime}`);
-    }
-  }
+  add("lifeLeft", isNum(obj["creepTicksToLive"]) ? String(obj["creepTicksToLive"]) : undefined);
   const saying = obj["creepSaying"];
   if (typeof saying === "string") add("saying", saying);
   else if (typeof saying === "object" && saying !== null && typeof (saying as Record<string, unknown>)["message"] === "string") {
     add("saying", (saying as Record<string, unknown>)["message"] as string);
   }
   add("creepId", typeof obj["creepId"] === "string" ? obj["creepId"] : undefined);
+}
+
+/** 废墟（被毁的建筑）：毁于几 Tick 前、原建筑的类型、血量上限与 id；废墟没有主人时用原建筑的主人 */
+function ruinFields(obj: RoomObject, users: Readonly<Record<string, RoomUser>>, gameTime: number | undefined, add: AddField) {
+  const destroyTime = obj["destroyTime"];
+  if (isNum(destroyTime)) {
+    const { value, text } = happened(destroyTime, gameTime);
+    add("destroyed", value, text);
+  }
+  const structure = obj["structure"];
+  if (typeof structure !== "object" || structure === null) return;
+  const s = structure as Record<string, unknown>;
+  add("structureType", typeof s["type"] === "string" ? s["type"] : undefined);
+  add("structureHitsMax", isNum(s["hitsMax"]) ? String(s["hitsMax"]) : undefined);
+  if (typeof obj["user"] !== "string" && typeof s["user"] === "string") add("structureOwner", users[s["user"]]?.username ?? s["user"]);
+  add("structureId", typeof s["id"] === "string" ? s["id"] : undefined);
 }
 
 function rawText(value: unknown): string {
@@ -220,7 +228,7 @@ export function describeObject(
   gameTime: number | undefined,
 ): ObjectDetails {
   const fields: DetailField[] = [];
-  const add = (key: DetailKey, value: string | undefined, text?: DetailField["text"]) => {
+  const add: AddField = (key, value, text) => {
     if (value !== undefined && value !== "") fields.push({ key, value, ...(text ? { text } : {}) });
   };
   const until = (time: unknown) => (isNum(time) && gameTime !== undefined ? String(time - gameTime) : undefined);
@@ -253,7 +261,8 @@ export function describeObject(
   add("decay", until(obj["nextDecayTime"] ?? obj["decayTime"]));
   const cooldown = until(obj["cooldownTime"]);
   add("cooldown", cooldown !== undefined && Number(cooldown) > 0 ? cooldown : undefined);
-  tombstoneFields(obj, body, gameTime, add);
+  tombstoneFields(obj, gameTime, add);
+  ruinFields(obj, users, gameTime, add);
 
   const raw = Object.entries(obj)
     .filter(([key]) => !KNOWN.has(key))

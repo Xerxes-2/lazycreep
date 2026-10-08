@@ -312,7 +312,7 @@ describe("Room View 交互", () => {
       expect(listed()).toContain("6a9d95c951150f63501b522f");
     });
 
-    it("墓碑：死于几 Tick 前、推断死因、生前 body 网格", async () => {
+    it("墓碑：死于几 Tick 前、死前剩余寿命、生前 body 网格", async () => {
       mount();
       await openRoom("W13S28");
       // (21,14)：道路、creep 与一个老死的 worker 的墓碑
@@ -321,8 +321,7 @@ describe("Room View 交互", () => {
       await settle(() => expect(field("[data-field=type]").textContent).toBe("tombstone"));
       expect(field("[data-field=name]").textContent).toBe("worker-1023405-Spawn2");
       expect(field("[data-field=died]").textContent).toBe("185 Tick 前（Tick 1025053）");
-      expect(field("[data-field=deathCause]").textContent).toBe("寿终");
-      expect(field("[data-field=lived]").textContent).toBe("1499 / 1500");
+      expect(field("[data-field=lifeLeft]").textContent).toBe("1");
       expect(field("[data-field=body]").querySelectorAll(".body-grid__cell")).toHaveLength(50);
     });
 
