@@ -72,13 +72,6 @@ export const energyCapacity = (obj: RoomObject) => {
 /** 有主人时的主人色（官方 playerColor） */
 export const ownerTint = (obj: RoomObject, ctx: PaintContext) => ctx.ownerColor(obj["user"]);
 
-/**
- * 徽章位：官方 userBadge 在没有徽章图时画纯色圆。徽章图由徽章票接入；在那之前用主人色，
- * 没有主人时用官方默认的 0x222222。
- */
-export function badgeSpot(obj: RoomObject, ctx: PaintContext, radius: number, layer: number): PrimitiveDraft {
-  return circle(obj, "badge", radius, obj["user"] === undefined ? 0x222222 : ownerTint(obj, ctx), layer);
-}
 
 // ---- 官方 Graphics 的弧、扇形、椭圆（Scene 没有这些图元，用折线 / 多边形逼近） ----
 

@@ -21,9 +21,11 @@ import { ROOM_OBJECT_PAINTERS } from "./room-painters.ts";
 import { withSeasonArt } from "./season-official-painters.ts";
 import { CONNECTED_PAINTERS } from "./official-terrain.ts";
 import type { RoomObject } from "./room-state.ts";
-import { ENERGY, badgeSpot, circle, energyCapacity, energyStore, officialSprite, ownerTint, u, zLayer } from "./official-sprite.ts";
+import { ENERGY, circle, energyCapacity, energyStore, officialSprite, ownerTint, u, zLayer } from "./official-sprite.ts";
 import { OFFICIAL_STRUCTURE_PAINTERS, controllerProgress } from "./official-structures.ts";
 import { OFFICIAL_WORLD_PAINTERS } from "./official-world-objects.ts";
+import { OFFICIAL_CREEP_PAINTERS } from "./official-creeps.ts"; // #48
+import { ownerBadge } from "./owner-badge.ts"; // #48
 
 export { officialSprite, type SpriteOptions } from "./official-sprite.ts";
 
@@ -35,7 +37,7 @@ const spawn: ObjectPainter = (obj, ctx) => {
   const prims: PrimitiveDraft[] = [
     circle(obj, "body", 70, 0xcccccc, layer),
     circle(obj, "inner", 59, 0x181818, layer),
-    badgeSpot(obj, ctx, 38, layer),
+    ...ownerBadge(obj, ctx, { radius: 38, layer }),
   ];
   if (scale > 0) prims.push(circle(obj, "energy", 38 * Math.min(1, scale), ENERGY, layer));
   return prims;
@@ -158,7 +160,7 @@ const controller: ObjectPainter = (obj, ctx) => {
   for (let i = 0; i < level; i++) {
     prims.push(officialSprite(obj, `level${i + 1}`, "controller-level", { width: 100, anchorY: 1, rotation: (i * 2 * Math.PI) / 8, layer }));
   }
-  prims.push(badgeSpot(obj, ctx, 37, layer));
+  prims.push(...ownerBadge(obj, ctx, { radius: 37, layer }));
   prims.push(...controllerProgress(obj, layer)); // #45
   prims.push({ part: "ring", kind: "circle", layer, x, y, radius: u(40), stroke: { color: 0x080808, width: u(10) } });
   return prims;
@@ -201,6 +203,7 @@ export const OFFICIAL_PAINTERS: ObjectPainters = {
   source,
   ...OFFICIAL_STRUCTURE_PAINTERS, ...OFFICIAL_WORLD_PAINTERS, // #45
   ...CONNECTED_PAINTERS, // #46
+  ...OFFICIAL_CREEP_PAINTERS, // #48
 };
 
 const OFFICIAL_OBJECT_PAINTERS: ObjectPainters = withSeasonArt({ ...ROOM_OBJECT_PAINTERS, ...OFFICIAL_PAINTERS });

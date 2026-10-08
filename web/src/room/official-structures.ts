@@ -7,9 +7,9 @@ import type { Color } from "../scene/scene.ts";
 import type { ObjectPainter, ObjectPainters, PrimitiveDraft } from "./room-paint.ts";
 import { center, num } from "./room-paint.ts";
 import type { RoomObject } from "./room-state.ts";
+import { ownerBadge } from "./owner-badge.ts"; // #48
 import {
   ENERGY,
-  badgeSpot,
   capacityOf,
   circle,
   clamp01,
@@ -218,7 +218,7 @@ const powerSpawn: ObjectPainter = (obj, ctx) => {
     { part: "outer", kind: "circle", layer, x, y, radius: 0.75, fill: 0x222222, stroke: { color: 0xcccccc, width: 0.07 } },
     { part: "ring", kind: "circle", layer, x, y, radius: 0.68, fill: 0x222222, stroke: { color: POWER, width: 0.1 } },
     circle(obj, "inner", 59, 0x181818, layer),
-    badgeSpot(obj, ctx, 38, layer),
+    ...ownerBadge(obj, ctx, { radius: 38, layer }),
   ];
   const arc = progressArc(obj, "power", 50, powerFraction, POWER, 10, layer);
   if (arc) prims.push(arc);

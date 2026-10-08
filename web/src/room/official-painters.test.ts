@@ -114,9 +114,8 @@ describe("官方画风：染色按我方 / 盟友 / 陌生人", () => {
 });
 
 describe("官方画风：没有映射的类型退回几何画法", () => {
-  it("creep、未知类型与几何画风输出相同", () => {
+  it("未知类型与几何画风输出相同", () => {
     const objects = {
-      creep: { type: "creep", x: 2, y: 2, user: "foe1", hits: 50, hitsMax: 100 },
       odd: { type: "scoreCollector", x: 3, y: 3 },
     };
     const view = { ...official, zoom: BAR_MIN_ZOOM + 1 };

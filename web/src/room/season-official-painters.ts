@@ -15,6 +15,7 @@ import { ROOM_OBJECT_PAINTERS } from "./room-painters.ts";
 import { LAYER, center, num, storeFraction, tileBar, type ObjectPainter, type ObjectPainters, type PaintContext, type PrimitiveDraft } from "./room-paint.ts";
 import type { RoomObject } from "./room-state.ts";
 import { THORIUM } from "./season-painters.ts";
+import { ownerBadge } from "./owner-badge.ts"; // #48
 
 const THORIUM_TYPE = "T";
 
@@ -46,11 +47,7 @@ const reactor =
     const edge = sprite(obj, ctx, "edge", "reactor", "reactor-edge", LAYER.structure);
     if (!core || !edge) return fallback(obj, ctx);
     const prims: PrimitiveDraft[] = [core, edge];
-    if (obj["user"] !== undefined) {
-      const { x, y } = center(obj);
-      // 徽章位：与 #42 的 spawn / controller 一样先用主人色圆占位
-      prims.push({ part: "badge", kind: "circle", layer: LAYER.structure, x, y, radius: 0.29, fill: ctx.ownerColor(obj["user"]) });
-    }
+    prims.push(...ownerBadge(obj, ctx, { radius: 29, layer: LAYER.structure })); // #48
     const fraction = storeFraction(obj);
     if (fraction !== undefined) prims.push(tileBar(obj, "store", fraction, THORIUM, ctx));
     return prims;
