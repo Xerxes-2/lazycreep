@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Scene } from "./scene.ts";
 import { attachGestures, type GestureHandlers } from "./pointer-gestures.ts";
-import { clampCamera, fromViewport, nextPick, pickObjects, screenToWorld, toViewport, zoomAround } from "./scene-camera.ts";
+import { clampCamera, fromViewport, pickObjects, screenToWorld, toViewport, zoomAround } from "./scene-camera.ts";
 
 describe("相机与视口换算", () => {
   it("相机居中：世界中心落在画布中心，span 格铺满短边", () => {
@@ -57,16 +57,6 @@ describe("点选", () => {
     expect(pickObjects(scene, 3.5, 0.5)).toEqual(["w", "c", "r"]);
     expect(pickObjects(scene, 9.5, 9.5)).toEqual(["s"]);
     expect(pickObjects(scene, 20.5, 0.5)).toEqual([]);
-  });
-
-  it("重复点同一处在重叠的对象间轮换", () => {
-    const ids = pickObjects(scene, 3.5, 0.5);
-    expect(nextPick(ids, undefined)).toBe("w");
-    expect(nextPick(ids, "w")).toBe("c");
-    expect(nextPick(ids, "c")).toBe("r");
-    expect(nextPick(ids, "r")).toBe("w");
-    expect(nextPick(ids, "s")).toBe("w");
-    expect(nextPick([], "w")).toBeUndefined();
   });
 });
 

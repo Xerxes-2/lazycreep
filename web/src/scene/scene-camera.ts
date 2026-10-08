@@ -89,10 +89,3 @@ export function pickObjects(scene: Scene, x: number, y: number): string[] {
   }
   return [...lowest].sort((a, b) => b[1] - a[1]).map(([id]) => id);
 }
-
-/** 同一处重复点选时在重叠对象间轮换；没有对象时为 undefined（收起详情）。 */
-export function nextPick(ids: readonly string[], current: string | undefined): string | undefined {
-  if (ids.length === 0) return undefined;
-  const index = current === undefined ? -1 : ids.indexOf(current);
-  return ids[(index + 1) % ids.length];
-}

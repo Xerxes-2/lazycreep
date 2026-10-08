@@ -358,4 +358,7 @@ export const en: Partial<Record<MessageKey, string>> = {
 
   "badge.mapLayer": "Badges",
   "badge.of": "{name}'s badge",
+
+  // #60
+  "pickList.label": "Choose an object",
 };

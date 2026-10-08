@@ -154,6 +154,8 @@ describe("Room View 的 Sidebar 区块与左侧按钮列（#26）", () => {
 
     await settle(() => expect(lastScene().primitives.some((p) => p.key === `${CREEP}/base`)).toBe(true));
     tapObject(CREEP);
+    // 这个 creep 站在道路上：从同格选择列表里选它（#60）
+    await settle(() => q<HTMLElement>(`[data-testid=pick-list] [data-object-id="${CREEP}"]`)!.click());
     await settle(() => expect(sectionBody("room.selected").hidden).toBe(false));
     expect(q("[data-section='room.selected'] [data-testid=room-details]")).not.toBeNull();
     expect(q("[data-section='room.selected'] .details-section__hint")).toBeNull();

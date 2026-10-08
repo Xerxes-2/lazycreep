@@ -1,5 +1,6 @@
 /**
  * #12：Room View 的交互——点选与详情、缩放平移与视口持久化、相邻房间切换。
+ * #60：同格多个对象时弹出选择列表。
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createSignal } from "solid-js";
@@ -18,7 +19,10 @@ const bundle = fixtureBundle(
   Object.values(import.meta.glob<unknown>("../../../fixtures/season/*.json", { eager: true, import: "default" })),
 );
 
+/** 录制数据里站在道路上（23,14）的 creep：点它的格子会弹出选择列表 */
 const CREEP = "6ac66da2ff77778f44a644e4";
+/** (15,8)：container、道路、rampart 与一个 creep 叠在一格 */
+const STACK = { x: 15, y: 8, creep: "6ac676b4216890e711f593b5", container: "6a9d18caf728787708186631", road: "6a9d3c78b6204f2174d10827", rampart: "6a9d469a0b7353c8bbe31ae4" };
 
 let container: HTMLDivElement;
 let dispose: (() => void) | undefined;
@@ -120,6 +124,21 @@ function screenOf(id: string): [number, number] {
   return [base.x * vp.scale + vp.x, base.y * vp.scale + vp.y];
 }
 
+/** 格子 (x, y) 中心的屏幕坐标 */
+function cellScreen(x: number, y: number): [number, number] {
+  const vp = lastViewport();
+  return [(x + 0.5) * vp.scale + vp.x, (y + 0.5) * vp.scale + vp.y];
+}
+
+const pickList = () => container.querySelector<HTMLElement>("[data-testid=pick-list]");
+const listed = () => [...pickList()!.querySelectorAll<HTMLElement>("[role=option]")].map((row) => row.dataset.objectId);
+
+/** 等选择列表弹出后点其中一行 */
+async function pickFrom(id: string) {
+  await settle(() => expect(pickList()).not.toBeNull());
+  pickList()!.querySelector<HTMLElement>(`[data-object-id="${id}"]`)!.click();
+}
+
 function wheel(deltaY: number, x = 300, y = 300) {
   canvas.dispatchEvent(new WheelEvent("wheel", { deltaY, clientX: x, clientY: y, cancelable: true }));
 }
@@ -153,8 +172,11 @@ describe("Room View 交互", () => {
     await openRoom("W13S28");
     expect(container.querySelector("[data-testid=room-details]")).toBeNull();
 
+    // creep 站在道路上：先弹列表，选 creep
     tap(...screenOf(CREEP), pointerType);
+    await pickFrom(CREEP);
     await settle(() => expect(container.querySelector("[data-testid=room-details]")).not.toBeNull());
+    expect(pickList()).toBeNull();
     expect(field("[data-field=type]").textContent).toBe("creep");
     expect(field("[data-field=owner]").textContent).toBe("Xerxes_2");
     expect(field("[data-body-summary]").textContent).toMatch(/^\d+[A-Z]+( \d+[A-Z]+)*$/);
@@ -175,6 +197,7 @@ describe("Room View 交互", () => {
     mount(mountEl);
     await openRoom("W13S28");
     tap(...screenOf(CREEP), "mouse");
+    await pickFrom(CREEP);
     await settle(() => expect(mountEl.querySelector("[data-testid=room-details]")).not.toBeNull());
     expect(container.querySelector(".room-view [data-testid=room-details]")).toBeNull();
     expect(mountEl.querySelector("[data-field=type]")!.textContent).toBe("creep");
@@ -205,6 +228,7 @@ describe("Room View 交互", () => {
     mount();
     await openRoom("W13S28");
     tap(...screenOf(CREEP), "mouse");
+    await pickFrom(CREEP);
     await settle(() => field("[data-action=close-details]").click());
     await settle(() => expect(container.querySelector("[data-testid=room-details]")).toBeNull());
   });
@@ -240,5 +264,95 @@ describe("Room View 交互", () => {
     await settle(() => expect(lastViewport().scale).toBeLessThan(zoomed.scale));
     watch("W13S28");
     await settle(() => expect(lastViewport()).toEqual(zoomed));
+  });
+
+  describe("同格选择列表（#60）", () => {
+    it.each(["mouse", "touch"])("%s：两个以上对象时弹列表，creep → 建筑 → 道路 / rampart；选一行即选中并关闭", async (pointerType) => {
+      mount();
+      await openRoom("W13S28");
+      tap(...cellScreen(STACK.x, STACK.y), pointerType);
+      await settle(() => expect(pickList()).not.toBeNull());
+      expect(listed()).toEqual([STACK.creep, STACK.container, STACK.rampart, STACK.road]);
+      // 选择前不改变选中
+      expect(container.querySelector("[data-testid=room-details]")).toBeNull();
+      const rows = pickList()!.querySelectorAll("[role=option]");
+      expect(rows[0]!.textContent).toContain("anchor-1024412-Spawn2");
+      expect(rows[0]!.textContent).toContain("Xerxes_2");
+      expect(rows[1]!.textContent).toContain("container");
+
+      pickList()!.querySelector<HTMLElement>(`[data-object-id="${STACK.container}"]`)!.click();
+      await settle(() => expect(field("[data-field=type]").textContent).toBe("container"));
+      expect(pickList()).toBeNull();
+      expect(lastScene().primitives.some((p) => p.key === `${STACK.container}/selected`)).toBe(true);
+    });
+
+    it("只有一个对象时直接选中，不弹列表", async () => {
+      mount();
+      await openRoom("W13S28");
+      // (18,4) 只有一个 source
+      tap(...cellScreen(18, 4), "touch");
+      await settle(() => expect(field("[data-field=type]").textContent).toBe("source"));
+      expect(pickList()).toBeNull();
+    });
+
+    it("键盘：列表获得焦点，上下移动，回车确认", async () => {
+      mount();
+      await openRoom("W13S28");
+      tap(...cellScreen(STACK.x, STACK.y), "mouse");
+      await settle(() => expect(pickList()).not.toBeNull());
+      const list = pickList()!;
+      expect(document.activeElement).toBe(list);
+      const key = (k: string) => list.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true }));
+      expect(list.querySelector("[aria-selected=true]")!.getAttribute("data-object-id")).toBe(STACK.creep);
+      key("ArrowDown");
+      key("ArrowDown");
+      key("ArrowUp");
+      expect(list.querySelector("[aria-selected=true]")!.getAttribute("data-object-id")).toBe(STACK.container);
+      key("ArrowUp");
+      key("ArrowUp");
+      expect(list.querySelector("[aria-selected=true]")!.getAttribute("data-object-id")).toBe(STACK.road);
+      key("Enter");
+      await settle(() => expect(field("[data-field=type]").textContent).toBe("road"));
+      expect(pickList()).toBeNull();
+    });
+
+    it("Esc、点列表外、平移、缩放都关闭列表，且不改变选中", async () => {
+      mount();
+      await openRoom("W13S28");
+      const open = async () => {
+        tap(...cellScreen(STACK.x, STACK.y), "mouse");
+        await settle(() => expect(pickList()).not.toBeNull());
+      };
+
+      await open();
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+      await settle(() => expect(pickList()).toBeNull());
+
+      await open();
+      document.body.dispatchEvent(new PointerEvent("pointerdown", { pointerId: 2, bubbles: true }));
+      await settle(() => expect(pickList()).toBeNull());
+
+      await open();
+      wheel(-100);
+      await settle(() => expect(pickList()).toBeNull());
+
+      await open();
+      for (const [type, x] of [["pointerdown", 100], ["pointermove", 150], ["pointerup", 150]] as const) {
+        canvas.dispatchEvent(new PointerEvent(type, { pointerId: 1, clientX: x, clientY: 100, pointerType: "touch", button: 0, bubbles: true }));
+      }
+      await settle(() => expect(pickList()).toBeNull());
+
+      expect(container.querySelector("[data-testid=room-details]")).toBeNull();
+    });
+
+    it("点空格子清除选中并不弹列表", async () => {
+      mount();
+      await openRoom("W13S28");
+      tap(...cellScreen(18, 4), "mouse");
+      await settle(() => expect(container.querySelector("[data-testid=room-details]")).not.toBeNull());
+      tap(1, 1, "mouse");
+      await settle(() => expect(container.querySelector("[data-testid=room-details]")).toBeNull());
+      expect(pickList()).toBeNull();
+    });
   });
 });

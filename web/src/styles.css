@@ -1046,6 +1046,67 @@ body {
   -webkit-user-select: none;
 }
 
+/* 同格选择列表（#60）：浮在画布上点击处旁边，位置由脚本夹在画布之内 */
+.pick-list {
+  position: absolute;
+  z-index: 5;
+  max-width: 100%;
+  max-height: 100%;
+  overflow-y: auto;
+  margin: 0;
+  padding: var(--space-2) 0;
+  list-style: none;
+  font-size: var(--fs-body);
+  color: var(--color-primary);
+  background: var(--surface-card);
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-m);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.25);
+  outline: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.pick-list__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 32px;
+  padding: var(--space-2) var(--space-4);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.pick-list__item[aria-selected="true"] {
+  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+}
+
+.pick-list__mark {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.pick-list__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pick-list__owner {
+  margin-left: auto;
+  padding-left: var(--space-3);
+  color: var(--color-secondary);
+  font-size: var(--fs-small);
+}
+
+/* 触屏：行高够手指点 */
+@media (pointer: coarse) {
+  .pick-list__item {
+    min-height: 44px;
+  }
+}
+
 /* 窄屏：详情是贴底的卡片 */
 .room-details {
   position: fixed;

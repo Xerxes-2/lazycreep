@@ -356,6 +356,9 @@ export const zhCN = {
 
   "badge.mapLayer": "徽章",
   "badge.of": "{name} 的徽章",
+
+  // #60
+  "pickList.label": "选择对象",
 } as const satisfies Record<string, string>;
 
 export type MessageKey = keyof typeof zhCN;

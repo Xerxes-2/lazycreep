@@ -24,6 +24,9 @@ import { cameraKey } from "./room-camera-store.ts";
 import { RoomDetailsPanel, createRoomControls } from "./room-controls.tsx";
 import { ROOM_SIZE, buildRoomScene } from "./room-scene.ts";
 import { nextFacings, type Facings } from "./movement-tween.ts";
+import { PickList } from "./PickList.tsx";
+import { pickEntries } from "./pick-list.ts";
+import { ownerColorRule } from "./room-detail-rules.ts";
 import { reduceLiveTick, type RoomState } from "./room-state.ts";
 import type { HistoryCache } from "../replay/history-cache.ts";
 import { createReplayController } from "../replay/replay-controller.ts";
@@ -323,6 +326,16 @@ export function RoomView(props: RoomViewProps) {
 
   createEffect(() => props.onShownState?.(shownState()));
 
+  /** 同格选择列表的条目（#60）：随画面上的房间状态更新，主人颜色与画面同一条规则 */
+  const pickList = createMemo(() => {
+    const request = controls.pick();
+    const state = shownState();
+    if (!request || !state) return undefined;
+    const ownerColor = ownerColorRule(props.theme ?? DEFAULT_THEME, state.users, { me: me(), allies: props.allies });
+    const entries = pickEntries(request.ids, state.objects, state.users, ownerColor);
+    return entries.length > 0 ? { request, entries } : undefined;
+  });
+
   const [enterError, setEnterError] = createSignal<unknown>();
   createEffect(on(target, () => setEnterError(undefined)));
   /** 左侧按钮列的“进入 Replay”：从 Live 当前 Tick（未知时问服务器）开始 */
@@ -447,6 +460,20 @@ export function RoomView(props: RoomViewProps) {
             onEnterReplay={target() && !replay.active() ? enterReplay : undefined}
             onZoom={controls.zoomBy}
           />
+          <Show when={pickList()?.request} keyed>
+            {(request) => (
+              <PickList
+                entries={pickList()?.entries ?? []}
+                anchor={request}
+                frame={canvasSize()}
+                onPick={(id) => {
+                  controls.closePick();
+                  controls.select(id);
+                }}
+                onClose={controls.closePick}
+              />
+            )}
+          </Show>
         </div>
         <Show when={target() && replay.snapshot()}>
           {(snapshot) => (

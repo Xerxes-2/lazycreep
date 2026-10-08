@@ -10,7 +10,6 @@ import type { Scene } from "../scene/scene.ts";
 import {
   clampCamera,
   fromViewport,
-  nextPick,
   panBy,
   pickObjects,
   screenToWorld,
@@ -42,11 +41,21 @@ export interface RoomControlsOptions {
   readonly world: CanvasSize;
 }
 
+/** 同格多个对象时弹出的选择列表（#60）：点选结果（自上而下）与点击处（画布 CSS 像素） */
+export interface PickRequest {
+  readonly ids: readonly string[];
+  readonly x: number;
+  readonly y: number;
+}
+
 export interface RoomControls {
   /** 画布上 1 格对应的像素数 */
   readonly zoom: Accessor<number>;
   readonly selectedId: Accessor<string | undefined>;
   select(id: string | undefined): void;
+  /** 打开着的同格选择列表（#60）；平移、缩放、换房间都会关掉它 */
+  readonly pick: Accessor<PickRequest | undefined>;
+  closePick(): void;
   /** 以画布中心为基点缩放（左侧按钮列，#26）；factor > 1 放大 */
   zoomBy(factor: number): void;
 }
@@ -56,10 +65,12 @@ export function createRoomControls(options: RoomControlsOptions): RoomControls {
   const fitted: Camera = { cx: world.width / 2, cy: world.height / 2, span: Math.max(world.width, world.height) };
   const [camera, setCamera] = createSignal<Camera>(fitted);
   const [selectedId, setSelectedId] = createSignal<string>();
+  const [pick, setPick] = createSignal<PickRequest>();
 
   createEffect(
     on(options.cameraKey, (key) => {
       setSelectedId(undefined);
+      setPick(undefined);
       setCamera((key && loadCamera(options.storage, key)) || fitted);
     }),
   );
@@ -76,6 +87,7 @@ export function createRoomControls(options: RoomControlsOptions): RoomControls {
   });
 
   const update = (next: ReturnType<typeof viewport>) => {
+    setPick(undefined);
     const { width, height } = options.size();
     setCamera(clampCamera(fromViewport(next, width, height), world));
   };
@@ -95,9 +107,12 @@ export function createRoomControls(options: RoomControlsOptions): RoomControls {
         const scene = options.scene();
         if (!scene) return;
         const point = screenToWorld(viewport(), x, y);
-        // 按格子选：点在格子里任意位置都算点中格子上的对象
+        // 按格子选：点在格子里任意位置都算点中格子上的对象（移动补间期间也按逻辑格子，#57）
         const ids = pickObjects(scene, Math.floor(point.x) + 0.5, Math.floor(point.y) + 0.5);
-        setSelectedId((current) => nextPick(ids, current));
+        // 一个对象直接选中，空格子清除选中；两个以上弹出列表，由用户挑（#60）
+        if (ids.length >= 2) return setPick({ ids, x, y });
+        setPick(undefined);
+        setSelectedId(ids[0]);
       },
     });
     onCleanup(detach);
@@ -107,6 +122,8 @@ export function createRoomControls(options: RoomControlsOptions): RoomControls {
     zoom,
     selectedId,
     select: setSelectedId,
+    pick,
+    closePick: () => setPick(undefined),
     zoomBy(factor) {
       const { width, height } = options.size();
       update(zoomAround(viewport(), width / 2, height / 2, factor));

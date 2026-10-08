@@ -167,3 +167,17 @@ describe("宽屏 Sidebar 宽度让 Main View 接近正方形（房间与世界�
     expect(rule(".top-bar")).toMatch(/min-height\s*:\s*calc\(\s*var\(--top-bar-height\)\s*-\s*1px\s*\)/);
   });
 });
+
+describe("同格选择列表套用同一套层级（#60）", () => {
+  it("卡片底色与分隔线，正文字号；主人名是次要小字", () => {
+    const list = rule(".pick-list");
+    expect(list).toMatch(/background:\s*var\(--surface-card\)/);
+    expect(list).toMatch(/border:[^;]*var\(--divider\)/);
+    expect(list).toMatch(/font-size:\s*var\(--fs-body\)/);
+    usesTokens(list);
+    const owner = rule(".pick-list__owner");
+    expect(owner).toMatch(/color:\s*var\(--color-secondary\)/);
+    expect(owner).toMatch(/font-size:\s*var\(--fs-small\)/);
+    usesTokens(owner);
+  });
+});
