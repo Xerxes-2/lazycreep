@@ -31,9 +31,9 @@ describe("几何画风：录制房间的 Scene 输出不变", () => {
     const anyCreep = Object.keys(state.objects).find((id) => state.objects[id]?.["type"] === "creep");
     const owner = Object.values(state.objects).find((o) => typeof o["user"] === "string")?.["user"] as string | undefined;
     const views: Record<string, RoomSceneView> = {
-      default: { theme: DEFAULT_THEME },
-      near: { theme: DEFAULT_THEME, zoom: 40, me: owner, selectedId: anyCreep, allies: new Set(["someone"]) },
-      plain: { theme: DEFAULT_THEME, zoom: 40, me: owner, display: { say: false, visual: false, bars: false, names: false, lighting: false } },
+      default: { artStyle: "geometric", theme: DEFAULT_THEME },
+      near: { artStyle: "geometric", theme: DEFAULT_THEME, zoom: 40, me: owner, selectedId: anyCreep, allies: new Set(["someone"]) },
+      plain: { artStyle: "geometric", theme: DEFAULT_THEME, zoom: 40, me: owner, display: { say: false, visual: false, bars: false, names: false, lighting: false } },
     };
     const scenes = Object.fromEntries(
       Object.entries(views).map(([name, view]) => [name, buildRoomScene({ state, terrain }, { ...view, artStyle: "geometric" } as RoomSceneView)]),

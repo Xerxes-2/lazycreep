@@ -21,7 +21,7 @@ const HYDROGEN_MINERAL = { _id: "6a8cae989a27bdd9986d34dc", type: "mineral", den
 
 function scene(objects: Record<string, Record<string, unknown>>): Scene {
   const state = roomStateFrom({ objects, users: { [REACTOR.user]: { _id: REACTOR.user, username: "volotsyouga" } } });
-  return buildRoomScene({ state }, { theme: DEFAULT_THEME, me: REACTOR.user });
+  return buildRoomScene({ state }, { artStyle: "geometric", theme: DEFAULT_THEME, me: REACTOR.user });
 }
 
 const of = (s: Scene, id: string) => s.primitives.filter((p) => p.objectId === id);

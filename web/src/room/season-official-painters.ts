@@ -10,9 +10,7 @@
  * 这几类有本地增强（储量条、徽章、数量缩放），保留专用画法；其余 metadata 里出现的新类型走
  * {@link seasonMetadataPainter} 的通用画法。
  */
-import type { ArtStyle } from "../art/art-style.ts";
-import { seasonArtFor, type SeasonArt } from "../art/season-art.ts";
-import type { Source } from "../source/source.ts";
+import type { SeasonArt } from "../art/season-art.ts";
 import { ROOM_OBJECT_PAINTERS } from "./room-painters.ts";
 import { LAYER, center, num, storeFraction, tileBar, type ObjectPainter, type ObjectPainters, type PaintContext, type PrimitiveDraft } from "./room-paint.ts";
 import type { RoomObject } from "./room-state.ts";
@@ -119,12 +117,4 @@ export function seasonMetadataPainter(objectType: string, art: SeasonArt | undef
       },
     ];
   };
-}
-
-/**
- * Room View 用：官方画风下这个 Source 当前可用的赛季贴图（在响应式上下文里读，预检完成时 Scene 重建一次）；
- * 几何画风不取版本信息、不预检。
- */
-export function seasonArtOf(source: Source | undefined, style: ArtStyle | undefined): SeasonArt | undefined {
-  return source && style === "official" ? seasonArtFor(source)() : undefined;
 }

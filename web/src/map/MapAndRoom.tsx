@@ -60,8 +60,8 @@ export interface MapAndRoomProps {
   readonly narrow?: Accessor<boolean>;
   /** Scene 调色板与着色规则（#5），同时作用于地图与 Room View；默认 DEFAULT_THEME */
   readonly theme?: Theme | undefined;
-  /** Art Style（#42）：Room View 的对象画法 */
-  readonly artStyle?: ArtStyle | undefined;
+  /** Art Style：Room View 的画法（必须给出；默认值只在设置里，DEFAULT_ART_STYLE） */
+  readonly artStyle: ArtStyle;
   /** Main View 底部的 Console Panel */
   readonly bottom?: JSX.Element;
 }

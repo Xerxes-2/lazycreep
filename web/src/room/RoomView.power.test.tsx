@@ -62,7 +62,7 @@ function mount() {
   dispose = render(
     () => (
       <I18nProvider>
-        <RoomView
+        <RoomView artStyle="geometric"
           settings={createSettings(localStorage)}
           sourceFor={() => room.source}
           visibility={visibility}

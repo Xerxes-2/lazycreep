@@ -37,7 +37,7 @@ describe("buildRoomScene：按玩家着色", () => {
     c: { _id: "c", type: "creep", x: 3, y: 1, user: "st1" },
     d: { _id: "d", type: "creep", x: 4, y: 1, user: "st2" },
   });
-  const view: RoomSceneView = { theme, me: "me1", allies: new Set(["friend"]) };
+  const view: RoomSceneView = { artStyle: "geometric", theme, me: "me1", allies: new Set(["friend"]) };
 
   it("我方、盟友、陌生人三类颜色互不相同", () => {
     const scene = buildRoomScene({ state: creeps }, view);
@@ -52,17 +52,17 @@ describe("buildRoomScene：按玩家着色", () => {
   it("不同陌生人按玩家区分，同一玩家颜色稳定", () => {
     const scene = buildRoomScene({ state: creeps }, view);
     expect(creepFill(scene, "c")).not.toBe(creepFill(scene, "d"));
-    const again = buildRoomScene({ state: creeps }, { theme, me: "me1" });
+    const again = buildRoomScene({ state: creeps }, { artStyle: "geometric", theme, me: "me1" });
     expect(creepFill(again, "c")).toBe(creepFill(scene, "c"));
   });
 
   it("盟友集合默认为空：盟友当陌生人画", () => {
-    const scene = buildRoomScene({ state: creeps }, { theme, me: "me1" });
+    const scene = buildRoomScene({ state: creeps }, { artStyle: "geometric", theme, me: "me1" });
     expect(theme.strangers).toContain(creepFill(scene, "b"));
   });
 
   it("盟友名单按用户名匹配，不分大小写", () => {
-    const scene = buildRoomScene({ state: creeps }, { theme, me: "me1", allies: new Set(["FRIEND"]) });
+    const scene = buildRoomScene({ state: creeps }, { artStyle: "geometric", theme, me: "me1", allies: new Set(["FRIEND"]) });
     expect(creepFill(scene, "b")).toBe(theme.ally);
   });
 
@@ -92,7 +92,7 @@ describe("buildRoomScene：血条与资源条按缩放显隐", () => {
     r: { _id: "r", type: "road", x: 9, y: 9, hits: 3300, hitsMax: 5000 },
   });
   const bars = (scene: Scene, id: string) => ofObject(scene, id).filter((p) => p.kind === "bar");
-  const near = (zoom: number) => buildRoomScene({ state }, { theme, me: "me1", zoom });
+  const near = (zoom: number) => buildRoomScene({ state }, { artStyle: "geometric", theme, me: "me1", zoom });
 
   it("阈值以上：creep 有血条与能量条，受损建筑有血条与资源条", () => {
     const scene = near(BAR_MIN_ZOOM);
@@ -125,7 +125,7 @@ describe("buildRoomScene：血条与资源条按缩放显隐", () => {
   });
 
   it("阈值以下，选中对象的进度条仍然显示", () => {
-    const scene = buildRoomScene({ state }, { theme, zoom: 1, selectedId: "c" });
+    const scene = buildRoomScene({ state }, { artStyle: "geometric", theme, zoom: 1, selectedId: "c" });
     expect(bars(scene, "c")).toHaveLength(2);
     expect(bars(scene, "s")).toEqual([]);
   });
@@ -138,7 +138,7 @@ describe("buildRoomScene：选中态", () => {
   });
 
   it("选中对象多一个高亮框，盖在对象之上、框住它的格子", () => {
-    const scene = buildRoomScene({ state }, { theme, selectedId: "c" });
+    const scene = buildRoomScene({ state }, { artStyle: "geometric", theme, selectedId: "c" });
     const highlight = part(scene, "c", "selected");
     expect(highlight).toMatchObject({ kind: "rect", stroke: { color: theme.selection } });
     if (highlight?.kind !== "rect") throw new Error("高亮应为矩形");
@@ -152,9 +152,9 @@ describe("buildRoomScene：选中态", () => {
   });
 
   it("没有选中或选中的对象不在房间里时没有高亮", () => {
-    expect(buildRoomScene({ state }, { theme }).primitives.some((p) => p.key.endsWith("/selected"))).toBe(false);
+    expect(buildRoomScene({ state }, { artStyle: "geometric", theme }).primitives.some((p) => p.key.endsWith("/selected"))).toBe(false);
     expect(
-      buildRoomScene({ state }, { theme, selectedId: "gone" }).primitives.some((p) => p.key.endsWith("/selected")),
+      buildRoomScene({ state }, { artStyle: "geometric", theme, selectedId: "gone" }).primitives.some((p) => p.key.endsWith("/selected")),
     ).toBe(false);
   });
 });
@@ -166,7 +166,7 @@ describe("buildRoomScene：同时有血条与资源条时顺序固定", () => {
     box: { _id: "box", type: "container", x: 5, y: 5, hits: 100_000, hitsMax: 250_000, store: { energy: 1000 }, storeCapacity: 2000 },
     hauler: { _id: "hauler", type: "creep", x: 7, y: 5, user: "me1", hits: 300, hitsMax: 500, body: [{ type: "carry", hits: 100 }, { type: "move", hits: 100 }], store: { energy: 25 }, storeCapacity: 50 },
   });
-  const scene = buildRoomScene({ state }, { theme, me: "me1", zoom: BAR_MIN_ZOOM + 10 });
+  const scene = buildRoomScene({ state }, { artStyle: "geometric", theme, me: "me1", zoom: BAR_MIN_ZOOM + 10 });
   const barY = (id: string, name: string) => {
     const p = part(scene, id, name);
     if (p?.kind !== "bar") throw new Error(`${id}/${name} 不是进度条：${JSON.stringify(p)}`);
@@ -188,7 +188,7 @@ describe("buildRoomScene：同时有血条与资源条时顺序固定", () => {
   });
 
   it("显示选项关掉血条后，资源条落到血条原来的位置", () => {
-    const noHits = buildRoomScene({ state }, { theme, me: "me1", zoom: BAR_MIN_ZOOM + 10, display: { say: true, visual: true, bars: false, names: true, lighting: true } });
+    const noHits = buildRoomScene({ state }, { artStyle: "geometric", theme, me: "me1", zoom: BAR_MIN_ZOOM + 10, display: { say: true, visual: true, bars: false, names: true, lighting: true } });
     for (const id of ["box", "hauler"]) {
       expect(part(noHits, id, "hits")).toBeUndefined();
       const store = part(noHits, id, "store");

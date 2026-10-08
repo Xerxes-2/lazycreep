@@ -31,7 +31,7 @@ const OBJECTS = {
 };
 
 function scene(view: Partial<RoomSceneView>): Scene {
-  return buildRoomScene({ state: roomStateFrom({ objects: OBJECTS, users }) }, { theme, me: "me1", ...view });
+  return buildRoomScene({ state: roomStateFrom({ objects: OBJECTS, users }) }, { artStyle: "geometric", theme, me: "me1", ...view });
 }
 
 const images = (s: Scene, id: string) =>

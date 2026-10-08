@@ -26,7 +26,7 @@ const state = {
 };
 
 /** 足够大，血条与玩家名都按缩放显示 */
-const near: RoomSceneView = { theme: DEFAULT_THEME, zoom: 40 };
+const near: RoomSceneView = { artStyle: "geometric", theme: DEFAULT_THEME, zoom: 40 };
 
 const build = (view: RoomSceneView): Scene => buildRoomScene({ state }, view);
 const visuals = (scene: Scene) => scene.primitives.filter((p) => p.layer === LAYER.visual);
@@ -48,7 +48,7 @@ describe("显示选项 → Room View 的 Scene", () => {
   });
 
   it("玩家名与血条一样，缩小到看不清时只给选中对象画", () => {
-    const far = { theme: DEFAULT_THEME, zoom: 4 };
+    const far = { artStyle: "geometric", theme: DEFAULT_THEME, zoom: 4 } as const;
     expect(nameLabels(build(far))).toEqual([]);
     expect(nameLabels(build({ ...far, selectedId: "c1" }))).toHaveLength(1);
   });

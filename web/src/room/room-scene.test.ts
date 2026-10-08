@@ -10,7 +10,7 @@ const bundle = fixtureBundle(
   Object.values(import.meta.glob<unknown>("../../../fixtures/season/*.json", { eager: true, import: "default" })),
 );
 
-const view = { theme: DEFAULT_THEME };
+const view = { artStyle: "geometric", theme: DEFAULT_THEME } as const;
 
 function stateWith(objects: Record<string, Record<string, unknown>>): RoomState {
   return roomStateFrom({ objects, users: { me: { _id: "me", username: "me" } } });

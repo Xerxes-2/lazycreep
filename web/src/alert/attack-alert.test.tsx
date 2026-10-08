@@ -69,7 +69,7 @@ function mount(
   dispose = render(
     () => (
       <I18nProvider>
-        <MapAndRoom
+        <MapAndRoom artStyle="geometric"
           settings={settings}
           sourceFor={() => {
             const created = new FixtureSource(bundle, { speed: Infinity });
@@ -184,7 +184,7 @@ describe("Attack Alert 接入", () => {
     dispose = render(
       () => (
         <I18nProvider>
-          <MapAndRoom
+          <MapAndRoom artStyle="geometric"
             settings={settings}
             sourceFor={() => new FixtureSource(bundle, { speed: Infinity })}
             createView={fakeView}

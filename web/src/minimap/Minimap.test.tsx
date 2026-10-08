@@ -67,7 +67,7 @@ function mount() {
   dispose = render(
     () => (
       <I18nProvider>
-        <MapAndRoom
+        <MapAndRoom artStyle="geometric"
           settings={settings}
           shell={(shell = createShellState(localStorage, settings))}
           sourceFor={recordedSource}

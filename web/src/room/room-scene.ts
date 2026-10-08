@@ -14,10 +14,7 @@ import { DEFAULT_ROOM_DISPLAY, type RoomDisplay } from "./display-options.ts";
 import { nameLabel } from "./name-labels.ts";
 import type { ArtStyle } from "../art/art-style.ts";
 import type { SeasonArt } from "../art/season-art.ts";
-import { paintersFor } from "./official-painters.ts";
-import { officialRoomLayers } from "./official-terrain.ts";
-import { officialLighting } from "./official-lighting.ts"; // #49
-import { seasonMetadataPainter } from "./season-official-painters.ts";
+import { ROOM_ART } from "./room-art.ts";
 
 export { LAYER, ROOM_OBJECT_PAINTERS };
 export type { ObjectPainter, ObjectPainters, PaintContext, PrimitiveDraft };
@@ -40,8 +37,8 @@ export interface RoomSceneView {
   readonly allies?: ReadonlySet<string> | undefined;
   /** 显示选项（#26）；默认全开 */
   readonly display?: RoomDisplay | undefined;
-  /** Art Style（#42）：选对象画法映射表；默认几何 */
-  readonly artStyle?: ArtStyle | undefined;
+  /** Art Style：选画法策略（room-art.ts）。必须给出——默认值只有设置（DEFAULT_ART_STYLE）一处 */
+  readonly artStyle: ArtStyle;
   /** 已确认可用的赛季贴图（#47），官方画风下用 */
   readonly seasonArt?: SeasonArt | undefined;
 }
@@ -75,43 +72,14 @@ const placeholder: ObjectPainter = (obj, ctx) => {
   ];
 };
 
-/** 地形：墙与沼泽按行合并成矩形，平原不画。 */
-function terrainPrimitives(terrain: Terrain, theme: Theme): Primitive[] {
-  const prims: Primitive[] = [];
-  const kindAt = (x: number, y: number) => {
-    const code = Number(terrain.encoded[y * ROOM_SIZE + x] ?? 0);
-    return code & 1 ? "wall" : code & 2 ? "swamp" : undefined;
-  };
-  for (let y = 0; y < ROOM_SIZE; y++) {
-    let x = 0;
-    while (x < ROOM_SIZE) {
-      const kind = kindAt(x, y);
-      let end = x + 1;
-      while (end < ROOM_SIZE && kindAt(end, y) === kind) end++;
-      if (kind) {
-        prims.push({
-          key: `terrain/${y}/${x}`,
-          kind: "rect",
-          layer: LAYER.terrain,
-          x,
-          y,
-          width: end - x,
-          height: 1,
-          fill: kind === "wall" ? theme.terrainWall : theme.terrainSwamp,
-        });
-      }
-      x = end;
-    }
-  }
-  return prims;
-}
-
 export function buildRoomScene(
   room: RoomSceneInput,
   view: RoomSceneView,
-  painters: ObjectPainters = paintersFor(view.artStyle ?? "geometric"),
+  painters?: ObjectPainters,
 ): Scene {
   const { theme } = view;
+  const art = ROOM_ART[view.artStyle];
+  const table = painters ?? art.painters;
   const display = view.display ?? DEFAULT_ROOM_DISPLAY;
   const ctx: PaintContext = {
     theme,
@@ -123,15 +91,12 @@ export function buildRoomScene(
     ...(view.seasonArt ? { seasonArt: view.seasonArt } : {}),
   };
 
-  const primitives: Primitive[] =
-    view.artStyle === "official" ? officialRoomLayers(room.state, room.terrain, ctx) : room.terrain ? terrainPrimitives(room.terrain, theme) : [];
+  const primitives: Primitive[] = art.roomLayers(room.state, room.terrain, ctx);
   for (const [id, obj] of Object.entries(room.state.objects)) {
     if (num(obj, "x") === undefined || num(obj, "y") === undefined) continue;
     const type = obj["type"];
     const paint =
-      (typeof type === "string" &&
-        ((Object.hasOwn(painters, type) && painters[type]) ||
-          (view.artStyle === "official" ? seasonMetadataPainter(type, view.seasonArt) : undefined))) ||
+      (typeof type === "string" && ((Object.hasOwn(table, type) && table[type]) || art.extraPainter(type, view.seasonArt))) ||
       placeholder;
     const painted = paint(obj, ctx);
     const drafts = [...painted, ...extraBars(obj, painted, ctx)];
@@ -146,7 +111,7 @@ export function buildRoomScene(
       primitives.push({ ...draft, key: `${id}/${part}`, objectId: id } as Primitive);
     }
   }
-  if (view.artStyle === "official" && display.lighting) primitives.push(...officialLighting(room.state)); // #49
+  if (display.lighting) primitives.push(...art.lighting(room.state));
   if (display.visual) primitives.push(...roomVisualPrimitives(room.state.visual));
   // 稳定排序：同层按出现顺序
   primitives.sort((a, b) => a.layer - b.layer);

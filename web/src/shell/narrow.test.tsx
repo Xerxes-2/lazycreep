@@ -275,7 +275,7 @@ describe("窄屏：点选对象切到选中对象标签（#29）", () => {
     dispose = render(
       () => (
         <I18nProvider>
-          <MapAndRoom
+          <MapAndRoom artStyle="geometric"
             settings={settings}
             shell={(shell = createShellState(localStorage, settings, narrow))}
             sourceFor={() => new FixtureSource(bundle, { speed: Infinity })}

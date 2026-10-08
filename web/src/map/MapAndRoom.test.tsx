@@ -47,7 +47,7 @@ function mount(narrow = false) {
   dispose = render(
     () => (
       <I18nProvider>
-        <MapAndRoom
+        <MapAndRoom artStyle="geometric"
           settings={settings}
           shell={(shell = createShellState(localStorage, settings))}
           sourceFor={() => new FixtureSource(bundle, { speed: Infinity })}
@@ -165,7 +165,7 @@ describe("World Map 与 Room View", () => {
     dispose = render(
       () => (
         <I18nProvider>
-          <MapAndRoom
+          <MapAndRoom artStyle="geometric"
             settings={settings}
             sourceFor={() => new FixtureSource(bundle, { speed: Infinity })}
             createView={fakeView}
@@ -218,7 +218,7 @@ describe("World Map 与 Room View", () => {
     dispose = render(
       () => (
         <I18nProvider>
-          <MapAndRoom
+          <MapAndRoom artStyle="geometric"
             settings={settings}
             sourceFor={() => {
               leases++;

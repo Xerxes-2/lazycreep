@@ -6,19 +6,16 @@
  *
  * 新增一种对象的官方画法：在 {@link OFFICIAL_PAINTERS} 里加一个条目，用 officialSprite 摆贴图
  * （尺寸、锚点用官方的 100 单位 = 1 格），官方 `tint: { $calc: 'playerColor' }` 的部件传
- * `tint: ctx.ownerColor(obj.user)`。没有条目的类型由 {@link paintersFor} 退回几何画法。
+ * `tint: ctx.ownerColor(obj.user)`。没有条目的类型退回几何画法（组合见 room-art.ts）。
  *
  * 染色：官方 metadata 里按主人染色（playerColor）的部件是 extension-border50/100/200、storage-border、
  * tower-base、link-border、lab、terminal-border、factory-border、nuker-border、extractor、flag 的贴图，
  * 以及 constructionSite、creep 身体环、observer 用 playerColor 画的图形；spawn 与 controller 中心是
  * 主人徽章（徽章缺失时是纯色圆）。我们的 playerColor 是 ownerColorRule（我方 / 盟友 / 陌生人）。
  */
-import type { ArtStyle } from "../art/art-style.ts";
 import { type OfficialSvgName } from "../art/official-art.ts";
 import type { Color } from "../scene/scene.ts";
 import { center, num, type ObjectPainter, type ObjectPainters, type PrimitiveDraft } from "./room-paint.ts";
-import { ROOM_OBJECT_PAINTERS } from "./room-painters.ts";
-import { withSeasonArt } from "./season-official-painters.ts";
 import { CONNECTED_PAINTERS } from "./official-terrain.ts";
 import type { RoomObject } from "./room-state.ts";
 import { ENERGY, circle, energyCapacity, energyStore, officialSprite, ownerTint, u, zLayer } from "./official-sprite.ts";
@@ -205,10 +202,3 @@ export const OFFICIAL_PAINTERS: ObjectPainters = {
   ...CONNECTED_PAINTERS, // #46
   ...OFFICIAL_CREEP_PAINTERS, // #48
 };
-
-const OFFICIAL_OBJECT_PAINTERS: ObjectPainters = withSeasonArt({ ...ROOM_OBJECT_PAINTERS, ...OFFICIAL_PAINTERS });
-
-/** Art Style 对应的对象画法映射表 */
-export function paintersFor(style: ArtStyle): ObjectPainters {
-  return style === "official" ? OFFICIAL_OBJECT_PAINTERS : ROOM_OBJECT_PAINTERS;
-}

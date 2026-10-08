@@ -38,7 +38,7 @@ function mount() {
   dispose = render(
     () => (
       <I18nProvider>
-        <RoomView
+        <RoomView artStyle="geometric"
           settings={createSettings(localStorage)}
           sourceFor={() => {
             const source = new FixtureSource(bundle, { speed: Infinity });
