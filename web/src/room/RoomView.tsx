@@ -284,6 +284,7 @@ export function RoomView(props: RoomViewProps) {
     },
     storage: props.cameraStorage ?? browserStorage(),
     scene: () => scene(),
+    objects: () => shownState()?.objects,
     world: { width: ROOM_SIZE, height: ROOM_SIZE },
   });
 

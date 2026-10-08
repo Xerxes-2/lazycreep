@@ -37,6 +37,8 @@ export interface RoomControlsOptions {
   readonly storage: KeyValueStorage | undefined;
   /** 点选时查询的 Scene（不追踪） */
   readonly scene: Accessor<Scene | undefined>;
+  /** 画面上的对象（不追踪）：点选只认站在被点格子上的对象 */
+  readonly objects: Accessor<Readonly<Record<string, RoomObject>> | undefined>;
   /** 世界尺寸（格） */
   readonly world: CanvasSize;
 }
@@ -108,7 +110,10 @@ export function createRoomControls(options: RoomControlsOptions): RoomControls {
         if (!scene) return;
         const point = screenToWorld(viewport(), x, y);
         // 按格子选：点在格子里任意位置都算点中格子上的对象（移动补间期间也按逻辑格子，#57）
-        const ids = pickObjects(scene, Math.floor(point.x) + 0.5, Math.floor(point.y) + 0.5);
+        const cx = Math.floor(point.x), cy = Math.floor(point.y);
+        // 只认站在这一格上的对象：官方贴图常比一格大（tower 底座 2 格宽），图元覆盖到相邻格不算点中
+        const objects = options.objects() ?? {};
+        const ids = pickObjects(scene, cx + 0.5, cy + 0.5).filter((id) => objects[id]?.["x"] === cx && objects[id]?.["y"] === cy);
         // 一个对象直接选中，空格子清除选中；两个以上弹出列表，由用户挑（#60）
         if (ids.length >= 2) return setPick({ ids, x, y });
         setPick(undefined);

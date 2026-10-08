@@ -295,6 +295,23 @@ describe("Room View 交互", () => {
       expect(pickList()).toBeNull();
     });
 
+    it("只认站在这一格上的对象：贴图比一格大的 tower 不会从相邻格被点中", async () => {
+      mount();
+      await openRoom("W13S28");
+      // (15,13) 是 tower，底座贴图 2 格宽；右边 (16,13) 只有道路
+      tap(...cellScreen(16, 13), "mouse");
+      await settle(() => expect(field("[data-field=type]").textContent).toBe("road"));
+      expect(pickList()).toBeNull();
+      // (9,7) 是 tower，左边 (8,7) 什么都没有
+      tap(...cellScreen(8, 7), "mouse");
+      await settle(() => expect(container.querySelector("[data-testid=room-details]")).toBeNull());
+      // 点 tower 本格照常：它和 rampart 叠在一格，弹列表
+      tap(...cellScreen(15, 13), "mouse");
+      await settle(() => expect(pickList()).not.toBeNull());
+      expect(listed()).toHaveLength(2);
+      expect(listed()).toContain("6a9d95c951150f63501b522f");
+    });
+
     it("键盘：列表获得焦点，上下移动，回车确认", async () => {
       mount();
       await openRoom("W13S28");
