@@ -807,61 +807,185 @@ body {
   cursor: grab;
 }
 
-/* PvP Overview（#3） */
-.pvp-overview h2 {
-  font-size: 1.25rem;
+/* PvP Overview（#3）：在 260px 的 Sidebar 里每个房间一张卡片（#39），不出现横向滚动 */
+.pvp-overview {
+  min-width: 0;
 }
 
-.pvp-overview__bar {
+/* 分段控件（#39）：单行、按钮平分宽度 */
+.segmented {
+  display: flex;
+  flex-wrap: nowrap;
+  min-width: 0;
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-m);
+  overflow: hidden;
+}
+
+.segmented button {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 30px;
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-left: 1px solid var(--divider);
+  background: transparent;
+  font: inherit;
+  font-size: var(--fs-small);
+  font-variant-numeric: var(--font-numeric);
+  color: var(--color-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.segmented button:first-child {
+  border-left: 0;
+}
+
+.segmented button[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+  font-weight: var(--weight-strong);
+  color: var(--color-primary);
+}
+
+/* Shard 分组标题：名字是标题，当前 Tick 是次要文字 */
+.pvp-overview__shard-title {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0 var(--space-3);
 }
 
-.pvp-overview__bar button[aria-pressed="true"] {
-  font-weight: 600;
-  outline: 2px solid var(--fg);
-}
-
-.pvp-overview__shard h3 {
-  font-size: 1rem;
-  margin-bottom: 4px;
+.pvp-overview__shard-time {
+  font-weight: var(--weight-regular);
+  font-variant-numeric: var(--font-numeric);
 }
 
 .pvp-overview__rooms {
-  width: 100%;
-  border-collapse: collapse;
-  font-variant-numeric: tabular-nums;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.pvp-overview__rooms th,
-.pvp-overview__rooms td {
-  text-align: left;
-  padding: 4px 8px 4px 0;
+/* 一张卡片：首行房间名 + 所有者 | 相对 Tick；其下参战者 | 图标按钮；卡片之间一条分隔线 */
+.pvp-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "head ago"
+    "people actions";
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--divider);
 }
 
-.pvp-overview button {
-  min-height: 36px;
+.pvp-card__head {
+  grid-area: head;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.pvp-card__room {
+  flex: none;
+  font-weight: var(--weight-strong);
+  color: var(--color-primary);
+}
+
+.pvp-card__owner {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-small);
+  color: var(--color-secondary);
+}
+
+.pvp-card__ago {
+  grid-area: ago;
+  align-self: baseline;
+  white-space: nowrap;
+  font-size: var(--fs-small);
+  font-variant-numeric: var(--font-numeric);
+  color: var(--color-secondary);
+}
+
+.pvp-card__combatants {
+  grid-area: people;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-small);
+  color: var(--color-secondary);
+  overflow-wrap: anywhere;
+}
+
+.pvp-card__combatants li {
+  padding: var(--space-1) 0;
+}
+
+.pvp-card__actions {
+  grid-area: actions;
+  align-self: start;
+  display: flex;
+  gap: var(--space-2);
+}
+
+/* 图标按钮（#39）：无文字，名字在 aria-label 与 title 里 */
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-m);
+  background: transparent;
+  color: var(--color-secondary);
+  cursor: pointer;
+}
+
+.icon-button:hover,
+.icon-button:focus-visible {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.shell[data-layout="narrow"] .icon-button {
+  width: 44px;
+  height: 44px;
 }
 
 .pvp-overview__nukes {
-  padding-left: 1.25rem;
+  margin: 0;
+  padding-left: var(--space-5);
+  font-size: var(--fs-small);
 }
 
-/* #34 参战者：每个房间下一行，玩家依次排开 */
-.pvp-overview__combatants td {
-  padding-top: 0;
-  font-size: 0.9em;
+.pvp-overview__nukes li {
+  padding: var(--space-1) 0;
 }
 
-.pvp-overview__player {
-  display: inline-block;
-  margin-right: 12px;
+.pvp-overview__nukes button {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: var(--weight-strong);
+  color: var(--color-accent);
+  cursor: pointer;
 }
 
+/* #34 参战者：盟友用强调色 */
 .pvp-overview__player[data-ally] {
-  color: var(--accent);
+  color: var(--color-accent);
 }
 
 [data-action="back-to-map"] {

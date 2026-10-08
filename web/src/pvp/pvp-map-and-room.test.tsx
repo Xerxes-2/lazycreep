@@ -62,7 +62,7 @@ function mount(narrow = false, token = "token") {
 const settle = (assertion: () => void) => vi.waitFor(assertion, { timeout: 3000, interval: 5 });
 const hotspots = () => (mapScene?.primitives ?? []).filter((p) => p.key.startsWith("pvp:")).map((p) => p.key);
 const slot = (view: string) => container.querySelector<HTMLElement>(`.main-view [data-view="${view}"]`)!;
-const row = (room: string) => container.querySelector<HTMLElement>(`.pvp-overview tr[data-room="${room}"]`);
+const row = (room: string) => container.querySelector<HTMLElement>(`.pvp-overview [data-room="${room}"]`);
 const combatants = (room: string) => container.querySelector<HTMLElement>(`.pvp-overview [data-combatants="${room}"]`);
 
 describe("PvP Overview 接入 World Map 与 Room View", () => {

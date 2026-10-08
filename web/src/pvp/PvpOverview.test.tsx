@@ -4,6 +4,7 @@ import { I18nProvider } from "../i18n";
 import { manualVisibility } from "../power/visibility.ts";
 import { FixtureSource, fixtureBundle } from "../source/fixture-source.ts";
 import type { Source } from "../source/source.ts";
+import type { CombatantFeed } from "./combatant-feed.ts";
 import { createPvpFeed } from "./pvp-feed.ts";
 import { PvpOverview } from "./PvpOverview.tsx";
 
@@ -17,7 +18,10 @@ const season = fixtureBundle(
 let container: HTMLDivElement;
 let dispose: (() => void) | undefined;
 
-function mount(source: Source, options: { visibility?: ReturnType<typeof manualVisibility>; pollMs?: number } = {}) {
+function mount(
+  source: Source,
+  options: { visibility?: ReturnType<typeof manualVisibility>; pollMs?: number; combatants?: CombatantFeed } = {},
+) {
   const opened: { shard: string; room: string }[] = [];
   const replays: { shard: string; room: string; tick: number }[] = [];
   dispose = render(() => {
@@ -28,7 +32,12 @@ function mount(source: Source, options: { visibility?: ReturnType<typeof manualV
     });
     return (
       <I18nProvider>
-        <PvpOverview feed={feed} onOpenRoom={(t) => opened.push(t)} onReplay={(t) => replays.push(t)} />
+        <PvpOverview
+          feed={feed}
+          onOpenRoom={(t) => opened.push(t)}
+          onReplay={(t) => replays.push(t)}
+          {...(options.combatants ? { combatants: options.combatants } : {})}
+        />
       </I18nProvider>
     );
   }, container);
@@ -38,7 +47,7 @@ function mount(source: Source, options: { visibility?: ReturnType<typeof manualV
 const settle = (assertion: () => void) => vi.waitFor(assertion, { timeout: 3000, interval: 5 });
 const shards = () => [...container.querySelectorAll<HTMLElement>("[data-shard]")].map((s) => s.dataset["shard"]);
 const rooms = (shard: string) =>
-  [...container.querySelectorAll<HTMLElement>(`[data-shard="${shard}"] tr[data-room]`)].map((r) => r.dataset["room"]);
+  [...container.querySelectorAll<HTMLElement>(`[data-shard="${shard}"] [data-room]`)].map((r) => r.dataset["room"]);
 const windowButton = (ticks: number) => container.querySelector<HTMLButtonElement>(`button[data-window="${ticks}"]`)!;
 
 beforeEach(() => {
@@ -60,7 +69,7 @@ describe("PvP Overview", () => {
     await settle(() => expect(shards()).toEqual(["shard0", "shard1", "shard2", "shard3", "shardX"]));
     // 默认时间窗 100
     expect(rooms("shard3")).toEqual(["W17S41", "W21S12", "E52N33", "W1S38"]);
-    const owner = container.querySelector('[data-shard="shard3"] tr[data-room="W17S41"] [data-owner]')!;
+    const owner = container.querySelector('[data-shard="shard3"] [data-room="W17S41"] [data-owner]')!;
     expect(owner.textContent).toBe("未知");
   });
 
@@ -95,7 +104,7 @@ describe("PvP Overview", () => {
   it("点房间进入 Room View；“回看”从最后战斗 Tick 往前 50 Tick 打开 Replay", async () => {
     const { opened, replays } = mount(new FixtureSource(season));
     await settle(() => expect(rooms("shardSeason").length).toBeGreaterThan(0));
-    const row = container.querySelector<HTMLElement>('tr[data-room="W17N21"]')!;
+    const row = container.querySelector<HTMLElement>('[data-room="W17N21"]')!;
     row.querySelector<HTMLButtonElement>("[data-action=open-room]")!.click();
     expect(opened).toEqual([{ shard: "shardSeason", room: "W17N21" }]);
     row.querySelector<HTMLButtonElement>("[data-action=replay-battle]")!.click();
@@ -125,5 +134,65 @@ describe("PvP Overview", () => {
     await settle(() => expect(container.querySelector("[role=alert]")).not.toBeNull());
     await settle(() => expect(container.querySelector("[role=alert]")).toBeNull());
     expect(rooms("shardSeason").length).toBeGreaterThan(0);
+  });
+
+  describe("卡片布局（#39，适配 260px 的 Sidebar）", () => {
+    const players: CombatantFeed = {
+      of: (_shard, room) =>
+        room === "W17N21"
+          ? {
+              kind: "ready",
+              players: [
+                { id: "a", username: "Alice", gcl: 12, objects: 30, ally: true },
+                { id: "b", username: "Bob", gcl: 7, objects: 4, ally: false },
+              ],
+            }
+          : { kind: "needsToken" },
+    };
+
+    it("不用表格；每个房间一张卡片：房间名、所有者、相对 Tick（完整 Tick 在提示里）、参战者每人一行、两个有名字的图标按钮", async () => {
+      mount(new FixtureSource(season), { combatants: players });
+      await settle(() => expect(rooms("shardSeason").length).toBeGreaterThan(0));
+      expect(container.querySelector("table")).toBeNull();
+
+      const card = container.querySelector<HTMLElement>('[data-shard="shardSeason"] [data-room="W17N21"]')!;
+      expect(card.matches("li.pvp-card")).toBe(true);
+      expect(card.querySelector(".pvp-card__room")!.textContent).toBe("W17N21");
+      expect(card.querySelector("[data-owner]")).not.toBeNull();
+      const ago = card.querySelector<HTMLElement>(".pvp-card__ago")!;
+      expect(ago.textContent).toMatch(/^\d+ Tick 前$/);
+      expect(ago.title).toContain("1025186");
+
+      const lines = [...card.querySelectorAll<HTMLElement>("[data-combatants] [data-player]")];
+      expect(lines.map((l) => l.textContent)).toEqual(["Alice · GCL 12 · 30 个物体 · 盟友", "Bob · GCL 7 · 4 个物体"]);
+      expect(lines.every((l) => l.tagName === "LI")).toBe(true);
+      expect(lines[0]!.hasAttribute("data-ally")).toBe(true);
+
+      const open = card.querySelector<HTMLButtonElement>("button[data-action=open-room]")!;
+      const replay = card.querySelector<HTMLButtonElement>("button[data-action=replay-battle]")!;
+      for (const button of [open, replay]) {
+        expect(button.querySelector("svg")).not.toBeNull();
+        expect(button.textContent!.trim()).toBe("");
+        expect(button.title).toBe(button.getAttribute("aria-label"));
+      }
+      expect(open.getAttribute("aria-label")).toBe("进入房间 W17N21");
+      expect(replay.getAttribute("aria-label")).toBe("回看 W17N21 的战斗");
+    });
+
+    it("Shard 分组标题与“当前 Tick”分开：Tick 是次要文字", async () => {
+      mount(new FixtureSource(season));
+      await settle(() => expect(shards()).toEqual(["shardSeason"]));
+      const title = container.querySelector<HTMLElement>('[data-shard="shardSeason"] h3')!;
+      expect(title.querySelector(".pvp-overview__shard-name")!.textContent).toBe("shardSeason");
+      expect(title.querySelector(".pvp-overview__shard-time.settings__muted")!.textContent).toMatch(/^当前 Tick \d+$/);
+    });
+
+    it("时间窗是单行分段控件：组里只有三个按钮", async () => {
+      mount(new FixtureSource(season));
+      const bar = container.querySelector<HTMLElement>(".pvp-overview__bar")!;
+      expect(bar.classList.contains("segmented")).toBe(true);
+      expect([...bar.children].map((c) => c.tagName)).toEqual(["BUTTON", "BUTTON", "BUTTON"]);
+      expect(bar.getAttribute("aria-label")).toBe("时间窗");
+    });
   });
 });

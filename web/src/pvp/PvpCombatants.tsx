@@ -1,5 +1,5 @@
 /**
- * PvP Overview 每个房间的参战者一行（#34）：名字、GCL、物体数（roomMap2 位置点，含建筑），盟友有标记。
+ * PvP Overview 每个房间的参战者（#34），每人一行（#39）：名字、GCL、物体数（roomMap2 位置点，含建筑），盟友有标记。
  * 数据来自 combatant-feed.ts；sectionCombatants 把它接到 Sidebar Section 的上下文上。
  */
 import { For, Match, Switch } from "solid-js";
@@ -32,24 +32,25 @@ export function sectionCombatants(
   });
 }
 
+/** 参战者列表的条目（#39：每人一行，放在卡片的 <ul data-combatants> 里） */
 export function PvpCombatants(props: { readonly state: RoomCombatants }) {
   const { t } = useI18n();
   return (
     <Switch>
       <Match when={props.state.kind === "needsToken"}>
-        <span class="settings__muted">{t("pvpCombatants.needsToken")}</span>
+        <li class="settings__muted">{t("pvpCombatants.needsToken")}</li>
       </Match>
       <Match when={props.state.kind === "unwatched"}>
-        <span class="settings__muted">{t("pvpCombatants.unwatched")}</span>
+        <li class="settings__muted">{t("pvpCombatants.unwatched")}</li>
       </Match>
       <Match when={props.state.kind === "waiting"}>
-        <span class="settings__muted">{t("pvpCombatants.waiting")}</span>
+        <li class="settings__muted">{t("pvpCombatants.waiting")}</li>
       </Match>
       <Match when={props.state.kind === "ready" && props.state.players}>
         {(players) => (
-          <For each={players()} fallback={<span class="settings__muted">{t("pvpCombatants.none")}</span>}>
+          <For each={players()} fallback={<li class="settings__muted">{t("pvpCombatants.none")}</li>}>
             {(player) => (
-              <span
+              <li
                 class="pvp-overview__player"
                 data-player={player.id}
                 data-objects={player.objects}
@@ -59,7 +60,7 @@ export function PvpCombatants(props: { readonly state: RoomCombatants }) {
                 {player.gcl === undefined ? "" : ` · ${t("pvpCombatants.gcl", { level: player.gcl })}`}
                 {` · ${t("pvpCombatants.objects", { count: player.objects })}`}
                 {player.ally ? ` · ${t("pvpCombatants.ally")}` : ""}
-              </span>
+              </li>
             )}
           </For>
         )}

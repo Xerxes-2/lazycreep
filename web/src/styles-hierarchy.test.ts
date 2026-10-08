@@ -90,3 +90,39 @@ describe("Sidebar 的通用层级套用变量（#39）", () => {
     expect(rule(".settings__error")).toMatch(/color:\s*var\(--color-danger\)/);
   });
 });
+
+describe("PvP 卡片适配 260px 的 Sidebar（#39）", () => {
+  /** 选择器含 pvp 的全部规则体 */
+  const pvpRules = [...styles.matchAll(/(?:^|\n)([^{}\n]*pvp[^{}\n]*)\{([^}]*)\}/g)].map((m) => ({ selector: m[1]!.trim(), body: m[2]! }));
+
+  it("没有横向滚动、没有超出 Sidebar 的固定宽度，不再有表格规则", () => {
+    expect(pvpRules.length).toBeGreaterThan(0);
+    for (const { selector, body } of pvpRules) {
+      expect(body, selector).not.toMatch(/overflow(-x)?:\s*(auto|scroll)/);
+      for (const m of body.matchAll(/(?:^|[;\s])(?:min-)?width:\s*(\d+)px/g)) expect(Number(m[1]), selector).toBeLessThanOrEqual(240);
+      expect(selector).not.toMatch(/\b(table|th|td|tr)\b/);
+    }
+  });
+
+  it("卡片是两列网格，文字列可收缩；所有者省略号截断，参战者长名字可断行", () => {
+    const card = rule(".pvp-card");
+    expect(card).toMatch(/display:\s*grid/);
+    expect(card).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)\s+auto/);
+    expect(card).toMatch(/border(-top|-bottom)?:[^;]*var\(--divider\)/);
+    const owner = rule(".pvp-card__owner");
+    expect(owner).toMatch(/text-overflow:\s*ellipsis/);
+    expect(owner).toMatch(/overflow:\s*hidden/);
+    expect(owner).toMatch(/white-space:\s*nowrap/);
+    expect(rule(".pvp-card__combatants")).toMatch(/overflow-wrap:\s*anywhere/);
+    expect(rule(".pvp-card__ago")).toMatch(/white-space:\s*nowrap/);
+  });
+
+  it("时间窗是单行分段控件：不换行，按钮平分宽度且可收缩", () => {
+    const bar = rule(".segmented");
+    expect(bar).toMatch(/display:\s*flex/);
+    expect(bar).toMatch(/flex-wrap:\s*nowrap/);
+    const button = rule(".segmented button");
+    expect(button).toMatch(/flex:\s*1/);
+    expect(button).toMatch(/min-width:\s*0/);
+  });
+});
