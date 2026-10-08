@@ -15,10 +15,25 @@ export interface RoomInfoSectionProps {
   /** Room View 此刻显示的房间状态 */
   readonly roomState: Accessor<RoomState | undefined>;
   readonly ownership: Accessor<OwnershipHub>;
+  /** 区块此刻是否在屏幕上；只在显示时补查 */
+  readonly shown: Accessor<boolean>;
+  /** 能否查 map-stats（需要 token） */
+  readonly canLookup: Accessor<boolean>;
 }
 
 export function RoomInfoSection(props: RoomInfoSectionProps) {
   const { t, locale } = useI18n();
+
+  // 新手区与重生区只有 map-stats 有：区块显示时为当前房间认领一次补查（与地图共用额度），
+  // 不必等 World Map 或 Minimap 碰巧取到；隐藏或换房间时释放
+  // 只随房间变化（Replay 的 Tick 变化不重新认领）
+  const shard = createMemo(() => props.location().shard ?? "");
+  const room = createMemo(() => props.location().room);
+  createEffect(() => {
+    const current = room();
+    if (current === undefined || !props.shown() || !props.canLookup()) return;
+    onCleanup(props.ownership().wantRooms([{ shard: shard(), room: current }]));
+  });
 
   // OwnershipHub 不是信号：取到新结果时重新读
   const [revision, setRevision] = createSignal(0);

@@ -15,6 +15,10 @@ import { createSettings } from "../settings/settings.ts";
 import { createShellState, type ShellState } from "../shell/shell-state.ts";
 import { FixtureSource, fixtureBundle } from "../source/fixture-source.ts";
 import { LAYER } from "./room-scene.ts";
+import { createSignal } from "solid-js";
+import { createOwnershipHub, type OwnershipHub } from "../map/ownership-hub.ts";
+import type { ShellLocation } from "../shell/shell-state.ts";
+import { RoomInfoSection } from "./RoomSidebarSections.tsx";
 
 /** vitest 不处理 CSS，直接读源文件 */
 const styles = readFileSync(join(import.meta.dirname, "../styles.css"), "utf8");
@@ -242,5 +246,70 @@ describe("Room View 的 Sidebar 区块与左侧按钮列（#26）", () => {
     expect(rule(".room-view__stage")).toMatch(/position:\s*relative/);
     // Console Panel 与 Main View 在同一列里各占高度，不浮在 Main View 上
     expect(rule(".console-panel")).not.toMatch(/position:\s*(absolute|fixed)/);
+  });
+});
+
+describe("房间信息区块自己补查当前房间的 map-stats（#26）", () => {
+  const FUTURE = Date.UTC(2099, 0, 1);
+
+  it("区块显示时（不靠 World Map 或 Minimap）向 OwnershipHub 认领当前房间，新手区 / 重生区照样显示；隐藏或换房间时释放", async () => {
+    const fetched: string[][] = [];
+    const hub = createOwnershipHub({
+      fetch: async (shard, rooms) => {
+        fetched.push([...rooms]);
+        return {
+          shard,
+          gameTime: 1,
+          users: {},
+          rooms: Object.fromEntries(rooms.map((room) => [room, { status: "normal", novice: FUTURE, respawnArea: FUTURE }])),
+        };
+      },
+    });
+    /** 此刻有效的认领（`shard/room`） */
+    const claims = new Set<string[]>();
+    const ownership: OwnershipHub = {
+      ...hub,
+      wantRooms(rooms) {
+        const claim = rooms.map((r) => `${r.shard}/${r.room}`);
+        claims.add(claim);
+        const off = hub.wantRooms(rooms);
+        return () => {
+          claims.delete(claim);
+          off();
+        };
+      },
+    };
+    const [location, setLocation] = createSignal<ShellLocation>({ view: "room", shard: "shardSeason", room: "W13S28", replay: undefined });
+    const [shown, setShown] = createSignal(true);
+    const host = document.createElement("div");
+    document.body.append(host);
+    const stop = render(
+      () => (
+        <I18nProvider>
+          <RoomInfoSection
+            location={location}
+            roomState={() => undefined}
+            ownership={() => ownership}
+            shown={shown}
+            canLookup={() => true}
+          />
+        </I18nProvider>
+      ),
+      host,
+    );
+    const field = (key: string) => host.querySelector(`[data-info="${key}"]`)?.textContent;
+
+    expect([...claims]).toEqual([["shardSeason/W13S28"]]);
+    await settle(() => expect(field("novice")).toMatch(/^至 /));
+    expect(field("respawnArea")).toMatch(/^至 /);
+    expect(fetched.some((rooms) => rooms.includes("W13S28"))).toBe(true);
+
+    setLocation({ view: "room", shard: "shardSeason", room: "W12S28", replay: undefined });
+    expect([...claims]).toEqual([["shardSeason/W12S28"]]);
+    setShown(false);
+    expect([...claims]).toEqual([]);
+    stop();
+    host.remove();
+    hub.dispose();
   });
 });

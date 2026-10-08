@@ -1,5 +1,6 @@
 /**
- * 房间信息区块（#26）的数据：合并当前房间状态（控制器）与 OwnershipHub 已取到的 map-stats，不另发请求。
+ * 房间信息区块（#26）的数据：合并当前房间状态（控制器）与 OwnershipHub 已取到的 map-stats（纯函数，不发请求；
+ * 区块显示时自己经 OwnershipHub.wantRooms 补查当前房间）。
  * 控制器给出的字段（所有者、RCL、安全模式、签名）优先；新手区与重生区只有 map-stats 有。
  */
 import type { MapStats, RoomUser } from "../source/source.ts";

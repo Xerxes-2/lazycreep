@@ -94,8 +94,14 @@ export const SIDEBAR_SECTIONS: Readonly<Record<MainViewMode, readonly SidebarSec
     {
       id: "room.info",
       title: "roomSidebar.info.title",
-      render: (ctx) => (
-        <RoomInfoSection location={ctx.shell.location} roomState={ctx.roomState} ownership={ctx.ownership} />
+      render: (ctx, { shown }) => (
+        <RoomInfoSection
+          location={ctx.shell.location}
+          roomState={ctx.roomState}
+          ownership={ctx.ownership}
+          shown={shown}
+          canLookup={() => !!ctx.settings.token()}
+        />
       ),
     },
     { id: "room.minimap", title: "minimap.title", render: (ctx, { shown }) => <Minimap ctx={ctx} shown={shown} /> },
