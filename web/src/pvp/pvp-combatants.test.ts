@@ -30,18 +30,18 @@ describe("GCL 等级（引擎公式 floor((点数 / 1e6) ^ (1 / 2.4)) + 1）", (
 });
 
 describe("参战玩家（roomMap2 一帧）", () => {
-  it("每个玩家的名字、GCL 等级与单位数，单位多的在前", async () => {
+  it("每个玩家的名字、GCL 等级与物体数（位置点数），物体多的在前", async () => {
     const players = await profiles([VOLOTSYOUGA, DUMP_TABLE]);
     expect(combatantsFrom(e13n21, (id) => players.get(id), new Set())).toEqual([
-      { id: VOLOTSYOUGA, username: "volotsyouga", gcl: 8, units: 2, ally: false },
-      { id: DUMP_TABLE, username: "dump_table", gcl: 6, units: 1, ally: false },
+      { id: VOLOTSYOUGA, username: "volotsyouga", gcl: 8, objects: 2, ally: false },
+      { id: DUMP_TABLE, username: "dump_table", gcl: 6, objects: 1, ally: false },
     ]);
   });
 
-  it("地形 / 道路类键与 NPC（Invader、Source Keeper）不算参战玩家；资料未到时只有 id 与单位数", () => {
+  it("地形 / 道路类键与 NPC（Invader、Source Keeper）不算参战玩家；资料未到时只有 id 与物体数", () => {
     const frame = { ...e13n21, "2": [[10, 10], [11, 11]] as [number, number][], "3": [[5, 5]] as [number, number][] };
     expect(combatantsFrom(frame, () => undefined, new Set()).map((c) => c.id)).toEqual([VOLOTSYOUGA, DUMP_TABLE]);
-    expect(combatantsFrom(frame, () => undefined, new Set())[1]).toEqual({ id: DUMP_TABLE, units: 1, ally: false });
+    expect(combatantsFrom(frame, () => undefined, new Set())[1]).toEqual({ id: DUMP_TABLE, objects: 1, ally: false });
   });
 
   it("Ally List 里的玩家（不分大小写）标为盟友", async () => {

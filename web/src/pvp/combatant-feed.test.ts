@@ -96,7 +96,7 @@ describe("参战者订阅", () => {
     expect(subs.rooms()).toHaveLength(16);
   });
 
-  it("收到帧后给出参战玩家（名字、GCL、单位数、盟友），每个玩家只查一次资料", async () => {
+  it("收到帧后给出参战玩家（名字、GCL、物体数、盟友），每个玩家只查一次资料", async () => {
     const { feed, getPlayer } = setup({ allies: ["DUMP_TABLE"] });
     await settle(() => {
       const state = feed.of("shardSeason", "E13N21");

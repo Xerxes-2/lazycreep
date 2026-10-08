@@ -137,9 +137,9 @@ export const zhCN = {
   "pvpCombatants.needsToken": "参战者：需要 token",
   "pvpCombatants.unwatched": "参战者：超出订阅上限，未读取",
   "pvpCombatants.waiting": "正在读取参战者…",
-  "pvpCombatants.none": "房间里没有玩家单位",
+  "pvpCombatants.none": "房间里没有玩家的物体",
   "pvpCombatants.gcl": "GCL {level}",
-  "pvpCombatants.units": "{count} 个单位",
+  "pvpCombatants.objects": "{count} 个物体",
   "pvpCombatants.ally": "盟友",
 
   "mapInfo.allies.title": "Ally List",

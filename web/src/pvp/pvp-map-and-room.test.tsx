@@ -150,7 +150,7 @@ describe("PvP Overview 接入 World Map 与 Room View", () => {
     });
     afterEach(() => vi.restoreAllMocks());
 
-    it("每个 PvP 房间列出参战玩家：名字、GCL 与单位数", async () => {
+    it("每个 PvP 房间列出参战玩家：名字、GCL 与物体数（roomMap2 位置点，含建筑）", async () => {
       mount();
       await settle(() => {
         const text = combatants("E13N21")?.textContent ?? "";
@@ -160,7 +160,8 @@ describe("PvP Overview 接入 World Map 与 Room View", () => {
         expect(text).toContain("GCL 6");
       });
       const player = combatants("E13N21")!.querySelector<HTMLElement>('[data-player="685da7c42df7a30011653e6a"]')!;
-      expect(player.dataset["units"]).toBe("1");
+      expect(player.dataset["objects"]).toBe("1");
+      expect(player.textContent).toMatch(/1 (objects|个物体)/);
     });
 
     it("折叠 PvP 区块时退订全部参战者的 roomMap2，展开后重新订阅", async () => {

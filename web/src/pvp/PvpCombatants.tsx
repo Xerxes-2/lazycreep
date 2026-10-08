@@ -1,5 +1,5 @@
 /**
- * PvP Overview 每个房间的参战者一行（#34）：名字、GCL、单位数，盟友有标记。
+ * PvP Overview 每个房间的参战者一行（#34）：名字、GCL、物体数（roomMap2 位置点，含建筑），盟友有标记。
  * 数据来自 combatant-feed.ts；sectionCombatants 把它接到 Sidebar Section 的上下文上。
  */
 import { For, Match, Switch } from "solid-js";
@@ -49,12 +49,12 @@ export function PvpCombatants(props: { readonly state: RoomCombatants }) {
               <span
                 class="pvp-overview__player"
                 data-player={player.id}
-                data-units={player.units}
+                data-objects={player.objects}
                 data-ally={player.ally ? "" : undefined}
               >
                 {player.username ?? player.id}
                 {player.gcl === undefined ? "" : ` · ${t("pvpCombatants.gcl", { level: player.gcl })}`}
-                {` · ${t("pvpCombatants.units", { count: player.units })}`}
+                {` · ${t("pvpCombatants.objects", { count: player.objects })}`}
                 {player.ally ? ` · ${t("pvpCombatants.ally")}` : ""}
               </span>
             )}

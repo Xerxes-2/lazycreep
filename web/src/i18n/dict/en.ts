@@ -139,9 +139,9 @@ export const en: Partial<Record<MessageKey, string>> = {
   "pvpCombatants.needsToken": "Combatants: token required",
   "pvpCombatants.unwatched": "Combatants: over the subscription limit, not read",
   "pvpCombatants.waiting": "Reading combatants…",
-  "pvpCombatants.none": "No player units in the room",
+  "pvpCombatants.none": "No player objects in the room",
   "pvpCombatants.gcl": "GCL {level}",
-  "pvpCombatants.units": "{count} units",
+  "pvpCombatants.objects": "{count} objects",
   "pvpCombatants.ally": "ally",
 
   "mapInfo.allies.title": "Ally List",
