@@ -28,6 +28,7 @@ import { roomMapHubFor } from "../source/room-map-hub.ts";
 import { createWorldMapLink } from "./world-map-link.ts";
 import type { SceneView, SceneViewOptions } from "../scene/pixi-scene-view.ts";
 import type { Theme } from "../scene/theme.ts";
+import type { ArtStyle } from "../art/art-style.ts";
 import type { SourceFactory } from "../settings/SettingsPage.tsx";
 import type { Settings } from "../settings/settings.ts";
 import { browserStorage } from "../storage/local-store.ts";
@@ -57,6 +58,8 @@ export interface MapAndRoomProps {
   readonly narrow?: Accessor<boolean>;
   /** Scene 调色板与着色规则（#5），同时作用于地图与 Room View；默认 DEFAULT_THEME */
   readonly theme?: Theme | undefined;
+  /** Art Style（#42）：Room View 的对象画法 */
+  readonly artStyle?: ArtStyle | undefined;
   /** Main View 底部的 Console Panel */
   readonly bottom?: JSX.Element;
 }
@@ -171,6 +174,7 @@ export function MapAndRoom(props: MapAndRoomProps) {
               }}
               onBack={() => shell.navigate({ view: "map" })}
               display={display.display()}
+              artStyle={props.artStyle}
               onShownState={setRoomState}
               onEnterReplay={(target, tick) => shell.navigate(replayAt(target, tick, true))}
             />

@@ -5,19 +5,12 @@
  * - 不用 Pixi 的 Application 与自动 ticker；只在 Scene 变化、尺寸 / 视口变化
  *   或显式 requestRender() 时安排一帧，同一帧内多次请求合并成一次 render
  */
-import {
-  Container,
-  Graphics,
-  ImageSource,
-  Sprite,
-  Text,
-  Texture,
-  Ticker,
-  autoDetectRenderer,
-  type Renderer,
-} from "pixi.js";
+import { Container, Graphics, Sprite, Text, Texture, Ticker, autoDetectRenderer, type Renderer } from "pixi.js";
 import { withPixelImages } from "./pixel-textures.ts";
 import type { ImagePrimitive, Primitive, Scene, Stroke } from "./scene.ts";
+import { defaultTextures, svgPixelsPerUnit, type SvgRasterCache, type TextureLoader } from "./texture-sources.ts";
+
+export type { TextureLoader };
 
 /** 世界坐标到画布 CSS 像素：screen = world * scale + (x, y) */
 export interface Viewport {
@@ -39,39 +32,17 @@ export interface SceneViewOptions {
   readonly renderer?: SceneRenderer;
   /** 安排一帧，默认 requestAnimationFrame */
   readonly schedule?: (frame: () => void) => void;
-  /** image 图元的纹理加载与卸载，默认 fetch + createImageBitmap；像素图（pixel-image.ts）总是就地解码，不经它 */
+  /**
+   * image 图元的纹理加载与卸载；默认见 texture-sources.ts 的 defaultTextures（SVG 栅格化、位图按需加载）。
+   * 像素图（pixel-image.ts）总是就地解码，不经它
+   */
   readonly textures?: TextureLoader;
+  /** 默认纹理加载用的 SVG 栅格化缓存；默认全页共享的一份 */
+  readonly svgRasters?: SvgRasterCache;
   /** 没有图元在用的纹理最多留多少张，超出时先卸载最早闲置的；默认 512 */
   readonly textureCacheSize?: number;
 }
 
-export interface TextureLoader {
-  load(url: string): Promise<Texture>;
-  unload(url: string): void;
-}
-
-/**
- * 默认的纹理加载：fetch → createImageBitmap → Texture，每个视图各一份。
- * 不用 Pixi 的 Assets：实测它在本适配层下（全局 ticker 已停）的加载永远不完成。
- */
-function fetchTextures(): TextureLoader {
-  const loaded = new Map<string, Texture>();
-  return {
-    async load(url) {
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`${url}：HTTP ${response.status}`);
-      const bitmap = await createImageBitmap(await response.blob());
-      const texture = new Texture({ source: new ImageSource({ resource: bitmap }) });
-      loaded.set(url, texture);
-      return texture;
-    },
-    unload(url) {
-      const texture = loaded.get(url);
-      loaded.delete(url);
-      texture?.destroy(true);
-    },
-  };
-}
 
 export interface SceneView {
   readonly canvas: HTMLCanvasElement;
@@ -119,8 +90,14 @@ function createTextureCache(loader: TextureLoader, limit: number, onLoaded: () =
   const paint = (sprite: Sprite, p: ImagePrimitive, texture: Texture | undefined) => {
     sprite.texture = texture ?? Texture.EMPTY;
     sprite.visible = texture !== undefined;
-    sprite.position.set(p.x, p.y);
+    // 锚点放在旋转中心：未旋转时与“左上角在 (x, y)”的摆法完全一样
+    const pivotX = p.pivotX ?? p.x + p.width / 2;
+    const pivotY = p.pivotY ?? p.y + p.height / 2;
+    sprite.anchor.set(p.width ? (pivotX - p.x) / p.width : 0, p.height ? (pivotY - p.y) / p.height : 0);
+    sprite.position.set(pivotX, pivotY);
     sprite.setSize(p.width, p.height);
+    sprite.rotation = p.rotation ?? 0;
+    sprite.tint = p.tint ?? 0xffffff;
     sprite.alpha = p.alpha ?? 1;
     sprite.blendMode = p.blend ?? "normal";
   };
@@ -135,12 +112,13 @@ function createTextureCache(loader: TextureLoader, limit: number, onLoaded: () =
     }
   };
 
-  const slotFor = (url: string): Slot => {
+  const slotFor = (p: ImagePrimitive): Slot => {
+    const url = p.url;
     const existing = slots.get(url);
     if (existing) return existing;
     const slot: Slot = { texture: undefined, users: new Map() };
     slots.set(url, slot);
-    loader.load(url).then(
+    loader.load(url, { width: p.width, height: p.height }).then(
       (texture) => {
         if (closed || slots.get(url) !== slot) {
           // 加载期间已被淘汰或视图已销毁
@@ -162,7 +140,7 @@ function createTextureCache(loader: TextureLoader, limit: number, onLoaded: () =
     /** 让 sprite 显示 p；url 变了就换纹理。 */
     attach(sprite: Sprite, p: ImagePrimitive, previous?: ImagePrimitive) {
       if (previous && previous.url !== p.url) this.detach(sprite, previous.url);
-      const slot = slotFor(p.url);
+      const slot = slotFor(p);
       idle.delete(p.url);
       slot.users.set(sprite, p);
       paint(sprite, p, slot.texture);
@@ -348,7 +326,13 @@ export async function createSceneView(options: SceneViewOptions): Promise<SceneV
   };
 
   const textures = createTextureCache(
-    withPixelImages(options.textures ?? fetchTextures()),
+    withPixelImages(
+      options.textures ??
+        defaultTextures({
+          ...(options.svgRasters ? { svg: options.svgRasters } : {}),
+          pixelsPerUnit: svgPixelsPerUnit(options.resolution ?? globalThis.devicePixelRatio ?? 1),
+        }),
+    ),
     options.textureCacheSize ?? 512,
     () => requestRender(),
   );

@@ -95,3 +95,23 @@ describe("生产构建不包含录制回放", () => {
     expect(precached.filter(fromFixture)).toEqual([]);
   });
 });
+
+describe("官方美术随构建产物发布（#42）", () => {
+  const artDir = join(here, "public/official-art");
+  const svgs = readdirSync(artDir).filter((f) => f.endsWith(".svg"));
+
+  it("117 个官方 SVG 与 LICENSE、来源说明都在产物里", () => {
+    expect(svgs).toHaveLength(117);
+    for (const svg of svgs) expect(files).toContain(`official-art/${svg}`);
+    expect(files).toContain("official-art/LICENSE.txt");
+    expect(files).toContain("official-art/SOURCE.txt");
+    expect(readFileSync(join(outDir, "official-art/LICENSE.txt"), "utf8")).toMatch(/Artem Chivchalov/);
+  });
+
+  it("官方 SVG 与 LICENSE 都在 PWA 预缓存清单里", () => {
+    const sw = readFileSync(join(outDir, "sw.js"), "utf8");
+    const precached = new Set([...sw.matchAll(/url:"([^"]+)"/g)].map((m) => m[1]!));
+    for (const svg of svgs) expect(precached.has(`official-art/${svg}`), svg).toBe(true);
+    expect(precached.has("official-art/LICENSE.txt")).toBe(true);
+  });
+});

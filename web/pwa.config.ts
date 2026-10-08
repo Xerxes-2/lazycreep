@@ -31,7 +31,8 @@ export const pwaOptions = {
     ],
   },
   workbox: {
-    globPatterns: ["**/*.{js,css,html,svg,png,ico,woff2,webmanifest}"],
+    // 官方美术（#42）：SVG 由上一条覆盖，随附的 ISC LICENSE 与来源说明也一并预缓存
+    globPatterns: ["**/*.{js,css,html,svg,png,ico,woff2,webmanifest}", "official-art/*.txt"],
     navigateFallback: "index.html",
     navigateFallbackDenylist: [GATEWAY_PATHS],
     runtimeCaching: [],

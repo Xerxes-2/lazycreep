@@ -12,6 +12,8 @@ import type { RoomState } from "./room-state.ts";
 import { roomVisualPrimitives } from "./room-visual.ts";
 import { DEFAULT_ROOM_DISPLAY, type RoomDisplay } from "./display-options.ts";
 import { nameLabel } from "./name-labels.ts";
+import type { ArtStyle } from "../art/art-style.ts";
+import { paintersFor } from "./official-painters.ts";
 
 export { LAYER, ROOM_OBJECT_PAINTERS };
 export type { ObjectPainter, ObjectPainters, PaintContext, PrimitiveDraft };
@@ -34,6 +36,8 @@ export interface RoomSceneView {
   readonly allies?: ReadonlySet<string> | undefined;
   /** 显示选项（#26）；默认全开 */
   readonly display?: RoomDisplay | undefined;
+  /** Art Style（#42）：选对象画法映射表；默认几何 */
+  readonly artStyle?: ArtStyle | undefined;
 }
 
 /** 未知类型：洋红虚框 + 类型名 */
@@ -99,7 +103,7 @@ function terrainPrimitives(terrain: Terrain, theme: Theme): Primitive[] {
 export function buildRoomScene(
   room: RoomSceneInput,
   view: RoomSceneView,
-  painters: ObjectPainters = ROOM_OBJECT_PAINTERS,
+  painters: ObjectPainters = paintersFor(view.artStyle ?? "geometric"),
 ): Scene {
   const { theme } = view;
   const display = view.display ?? DEFAULT_ROOM_DISPLAY;

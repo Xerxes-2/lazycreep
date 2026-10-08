@@ -352,4 +352,9 @@ export const en: Partial<Record<MessageKey, string>> = {
   "roomSidebar.tools": "Room tools",
   "roomSidebar.zoomIn": "Zoom in",
   "roomSidebar.zoomOut": "Zoom out",
+
+  "art.style.title": "Art style",
+  "art.style.official": "Official",
+  "art.style.geometric": "Geometric",
+  "art.style.hint": "How Room View draws room objects. Official uses the official client's art; geometric is lighter.",
 };

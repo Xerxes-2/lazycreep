@@ -1,0 +1,8 @@
+Official Screeps room art (SVG), redistributed under the ISC license in LICENSE.txt.
+
+Source: https://github.com/screeps/renderer
+Commit: a2db4a76bb8f4c70e0c2a9e3b7d22a35a8c6b504 (2026-08-21)
+Path:   metadata/images/*.svg (all 117 SVG files, unmodified)
+
+PNG textures from the same directory are not bundled here.
+"Screeps" is a trademark of its owner and is not covered by the ISC license.

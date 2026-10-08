@@ -350,6 +350,11 @@ export const zhCN = {
   "roomSidebar.tools": "房间工具",
   "roomSidebar.zoomIn": "放大",
   "roomSidebar.zoomOut": "缩小",
+
+  "art.style.title": "画风",
+  "art.style.official": "官方",
+  "art.style.geometric": "几何",
+  "art.style.hint": "Room View 画房间对象的方式。官方画风使用官方客户端的贴图；几何画风更轻。",
 } as const satisfies Record<string, string>;
 
 export type MessageKey = keyof typeof zhCN;

@@ -9,6 +9,7 @@ import { autoDetectRenderer, Texture } from "pixi.js";
 import type { ImagePrimitive, Scene } from "./scene.ts";
 import { createSceneView, type SceneRenderer, type SceneView } from "./pixi-scene-view.ts";
 import { encodePixelImage } from "./pixel-image.ts";
+import { SVG_MAX_ZOOM, createSvgRasterCache, type SvgRasterCache } from "./texture-sources.ts";
 
 function fake2dContext(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
   const noop = () => undefined;
@@ -283,6 +284,102 @@ describe("Pixi 适配层", () => {
         await textures.resolve("/t/c.png");
         // 闲置的 a、b 超出上限 1：最早闲置的 b 被卸载
         expect(textures.unloads).toEqual(["/t/b.png"]);
+      });
+    });
+
+    describe("SVG 贴图（#42）", () => {
+      const imageScene = (...primitives: Scene["primitives"]): Scene => ({ ...scene, primitives });
+      const tile = (key: string, url: string): Scene["primitives"][number] => ({ key, kind: "image", layer: 0, x: 0, y: 0, width: 1, height: 1, url });
+      const sprite = (key: string, x: number, extra: Partial<Extract<Scene["primitives"][number], { kind: "image" }>> = {}) =>
+        ({ key, kind: "image", layer: 20, x, y: 0, width: 2, height: 2, url: "/official-art/storage.svg", ...extra }) as const;
+
+      /** 记录栅格化调用的假栅格化：立即给出一块画布 */
+      function countingRasterizer() {
+        const calls: [string, number, number][] = [];
+        const rasterize = async (url: string, width: number, height: number) => {
+          calls.push([url, width, height]);
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          return canvas;
+        };
+        return { calls, cache: createSvgRasterCache(rasterize) };
+      }
+
+      async function svgView(cache: SvgRasterCache, cacheSize?: number) {
+        const frames = manualFrames();
+        const renderer = await canvasRenderer();
+        const render = vi.spyOn(renderer, "render");
+        const view = await createSceneView({
+          width: 400,
+          height: 300,
+          resolution: 3,
+          renderer,
+          schedule: frames.schedule,
+          svgRasters: cache,
+          ...(cacheSize === undefined ? {} : { textureCacheSize: cacheSize }),
+        });
+        views.push(view);
+        const settleFrames = async () => {
+          await vi.waitFor(() => expect(frames.pending).toBeGreaterThan(0));
+          frames.flush();
+        };
+        return { view, frames, render, settleFrames };
+      }
+
+      it("同一贴图在多帧、多对象、缩放变化、多个视图下只栅格化一次；尺寸按最大缩放 × 像素比（上限 2）", async () => {
+        const { calls, cache } = countingRasterizer();
+        const { view, frames, render, settleFrames } = await svgView(cache);
+
+        view.show(imageScene(sprite("a", 0), sprite("b", 3, { rotation: Math.PI / 4, tint: 0xff0000, alpha: 0.5 })));
+        frames.flush();
+        // 纹理就绪后再画一帧
+        await settleFrames();
+        expect(render).toHaveBeenCalledTimes(2);
+
+        // 新 Tick：对象移动、换染色；缩放变化
+        view.show(imageScene(sprite("a", 1), sprite("b", 4, { tint: 0x00ff00 }), sprite("c", 8)));
+        view.setViewport({ x: 0, y: 0, scale: 40 });
+        frames.flush();
+        view.setViewport({ x: 0, y: 0, scale: 2 });
+        frames.flush();
+
+        // 另一个视图共用同一份栅格化缓存
+        const other = await svgView(cache);
+        other.view.show(imageScene(sprite("z", 0)));
+        other.frames.flush();
+        await other.settleFrames();
+
+        expect(calls).toEqual([["/official-art/storage.svg", 2 * SVG_MAX_ZOOM * 2, 2 * SVG_MAX_ZOOM * 2]]);
+      });
+
+      it("纹理被淘汰后再用到时重新上传，但不重新栅格化", async () => {
+        const { calls, cache } = countingRasterizer();
+        const { view, frames, settleFrames } = await svgView(cache, 0);
+        view.show(imageScene(sprite("a", 0)));
+        frames.flush();
+        await settleFrames();
+        view.show(imageScene(tile("t", "/t/x.png")));
+        frames.flush();
+        view.show(imageScene(sprite("a", 0)));
+        frames.flush();
+        await settleFrames();
+        expect(calls).toHaveLength(1);
+      });
+
+      it("栅格化失败不抛错；之后再请求会重试", async () => {
+        let fail = true;
+        let count = 0;
+        const cache = createSvgRasterCache(async () => {
+          count++;
+          if (fail) throw new Error("bad svg");
+          return document.createElement("canvas");
+        });
+        await expect(cache.get("/x.svg", 1, 1)).rejects.toThrow();
+        fail = false;
+        await expect(cache.get("/x.svg", 1, 1)).resolves.toBeInstanceOf(HTMLCanvasElement);
+        await cache.get("/x.svg", 1, 1);
+        expect(count).toBe(2);
       });
     });
 

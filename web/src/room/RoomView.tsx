@@ -30,6 +30,7 @@ import { sharedHistoryCache } from "../replay/replay-settings.ts";
 import type { ShortcutCommands } from "../customize/keybindings.ts";
 import { registerRoomShortcuts } from "../customize/room-shortcuts.ts";
 import type { RoomDisplay } from "./display-options.ts";
+import type { ArtStyle } from "../art/art-style.ts";
 import { RoomToolbar } from "./RoomToolbar.tsx";
 import { replayAt, replayTick, type RoomRequest, type RoomTarget } from "../shell/shell-state.ts";
 
@@ -84,6 +85,8 @@ export interface RoomViewProps {
   readonly shortcuts?: ShortcutCommands | undefined;
   /** 显示选项（#26）；默认全开 */
   readonly display?: RoomDisplay | undefined;
+  /** Art Style（#42）；默认几何 */
+  readonly artStyle?: ArtStyle | undefined;
   /** 画面上的房间状态变化时回报（#26：房间信息区块） */
   readonly onShownState?: ((state: RoomState | undefined) => void) | undefined;
   /** 给了就由它进入 Replay（外壳经 navigate 打开 `#/replay?…`，#26）；不给时 Room View 自己打开 */
@@ -284,6 +287,7 @@ export function RoomView(props: RoomViewProps) {
         me: me(),
         allies: props.allies,
         display: props.display,
+        artStyle: props.artStyle,
       },
     );
   });

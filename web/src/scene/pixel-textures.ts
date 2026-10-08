@@ -9,9 +9,9 @@ import type { TextureLoader } from "./pixi-scene-view.ts";
 export function withPixelImages(loader: TextureLoader): TextureLoader {
   const made = new Map<string, Texture>();
   return {
-    load(url) {
+    load(url, size) {
       const pixels = decodePixelImage(url);
-      if (!pixels) return loader.load(url);
+      if (!pixels) return loader.load(url, size);
       const source = new BufferImageSource({
         resource: pixels.rgba,
         width: pixels.width,
