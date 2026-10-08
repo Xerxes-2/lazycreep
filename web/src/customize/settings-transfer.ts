@@ -23,6 +23,7 @@ import { ROOM_DISPLAY_STORAGE } from "../room/display-options.ts";
 import { CONNECTION_STORAGE } from "../settings/settings.ts";
 import { MAIN_VIEW_STORAGE, SHELL_STORAGE } from "../shell/shell-state.ts";
 import type { StoredKey, StoredKind } from "../storage/local-store.ts";
+import { STATIC_CACHE_STORAGE } from "../source/static-cache.ts";
 import { COLOR_SCHEME_STORAGE } from "./color-scheme.ts";
 import { KEYBINDINGS_STORAGE } from "./keybindings.ts";
 import { UI_THEME_STORAGE } from "./ui-theme.ts";
@@ -48,6 +49,7 @@ export const STORED_KEYS: readonly StoredKey[] = [
   /** 不导出的运行状态 */
   ALERT_MEMORY_STORAGE,
   MAIN_VIEW_STORAGE,
+  STATIC_CACHE_STORAGE,
 ];
 
 const EXPORTED = STORED_KEYS.filter((s) => s.role === "settings");
