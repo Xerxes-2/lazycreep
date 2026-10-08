@@ -18,6 +18,7 @@ import type { SourceFactory } from "../settings/SettingsPage.tsx";
 import { isRecord, readJson, writeJson, type KeyValueStorage, type StoredKey } from "../storage/local-store.ts";
 import { rendererFromStored } from "./season-renderer.ts";
 import { sharedTime } from "./shared-time.ts";
+import { createDecorationCache } from "./decoration-cache.ts";
 import { createTerrainCache } from "./terrain-cache.ts";
 import type { ServerVersion, ShardInfo, Source, WorldSize } from "./source.ts";
 
@@ -120,7 +121,7 @@ function serverStore(storage: KeyValueStorage | undefined, serverId: string) {
   };
 }
 
-/** 包装一个 Source：getShards / getWorldSize / getVersion / getTerrain 走缓存，getTime 去重（#38），其余原样转发 */
+/** 包装一个 Source：getShards / getWorldSize / getVersion / getTerrain / getRoomDecorations 走缓存，getTime 去重（#38），其余原样转发 */
 export function withStaticCache(source: Source, options: StaticCacheOptions): Source {
   const now = options.now ?? Date.now;
   const store = serverStore(options.storage, source.server.id);
@@ -197,6 +198,14 @@ export function withStaticCache(source: Source, options: StaticCacheOptions): So
     fetch: (shard, room) => source.getTerrain(shard, room),
   });
 
+  /** 房间装饰：一天核对一次，失败时给“没有装饰”（decoration-cache.ts） */
+  const getRoomDecorations = createDecorationCache({
+    storage: options.storage,
+    serverId: source.server.id,
+    now,
+    fetch: (shard, room) => source.getRoomDecorations(shard, room),
+  });
+
   /** 当前时间不持久化，只在途去重与短窗口复用（#38，shared-time.ts） */
   const getTime = sharedTime((shard) => source.getTime(shard), now);
 
@@ -204,6 +213,7 @@ export function withStaticCache(source: Source, options: StaticCacheOptions): So
     get(target, prop) {
       if (prop === "getShards") return getShards;
       if (prop === "getTerrain") return getTerrain;
+      if (prop === "getRoomDecorations") return getRoomDecorations;
       if (prop === "getTime") return getTime;
       if (prop === "getVersion") return getVersion;
       if (prop === "getWorldSize") return getWorldSize;

@@ -45,4 +45,29 @@ describe("预加载", () => {
     await preloadNeighbors(source, "shardSeason", "W13S28", () => alive);
     expect(requested).toEqual(["W13S27"]);
   });
+
+  it("同时取邻居的装饰（#61）；装饰失败、Source 没有这个方法都静默", async () => {
+    const requested: string[] = [];
+    const source = {
+      getWorldSize: async () => SIZE,
+      getTerrain: async (_shard: string, room: string) => {
+        requested.push(`terrain ${room}`);
+        return { shard: "shardSeason", room, encoded: "" };
+      },
+      getRoomDecorations: async (_shard: string, room: string) => {
+        requested.push(`decorations ${room}`);
+        if (room === "W14S28") throw new Error("down");
+        return { objects: [] };
+      },
+    } as unknown as Source;
+    await preloadNeighbors(source, "shardSeason", "W13S28", () => true);
+    expect(requested.filter((r) => r.startsWith("decorations"))).toEqual([
+      "decorations W13S27",
+      "decorations W14S28",
+      "decorations W12S28",
+      "decorations W13S29",
+    ]);
+    const old = { getWorldSize: async () => SIZE, getTerrain: async () => ({}) } as unknown as Source;
+    await expect(preloadNeighbors(old, "shardSeason", "W13S28", () => true)).resolves.toBeUndefined();
+  });
 });

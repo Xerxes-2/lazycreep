@@ -1,9 +1,11 @@
 /**
- * Room View 预加载四个邻居房间的地形：切到相邻房间时地形立即出现（每次请求约 1.4 秒）。
+ * Room View 预加载四个邻居房间的地形与装饰（#61）：切到相邻房间时地形立即出现（每次请求约 1.4 秒）。
  * 只预加载地形——房间对象来自实时订阅，订阅房间是重量级操作，不提前做。
- * 走 Source 的地形缓存（source/terrain-cache.ts），每个房间每赛季只请求一次，不多耗 room-terrain 的限额。
+ * 走 Source 的地形缓存（source/terrain-cache.ts），每个房间每赛季只请求一次，不多耗 room-terrain 的限额；
+ * 装饰走装饰缓存（source/decoration-cache.ts），一天一次。
  */
 import { minimapCells } from "../minimap/minimap-scene.ts";
+import { NO_DECORATIONS, type RoomDecorations } from "../source/room-decorations.ts";
 import type { Source, WorldSize } from "../source/source.ts";
 
 /** 上、左、右、下（3×3 格里的位置）的相邻房间；世界边缘外的不算 */
@@ -25,9 +27,21 @@ export async function preloadNeighbors(source: Source, shard: string, room: stri
     const size = await source.getWorldSize(shard);
     for (const neighbor of neighborRooms(room, size)) {
       if (!alive()) return;
-      await source.getTerrain(shard, neighbor).catch(() => undefined);
+      await Promise.all([
+        source.getTerrain(shard, neighbor).catch(() => undefined),
+        roomDecorations(source, shard, neighbor),
+      ]);
     }
   } catch {
     // 取不到世界尺寸等：不预加载
+  }
+}
+
+/** 房间的装饰；失败（含 Source 没有这个方法）时为“没有装饰”，从不拒绝 */
+export async function roomDecorations(source: Source, shard: string, room: string): Promise<RoomDecorations> {
+  try {
+    return await source.getRoomDecorations(shard, room);
+  } catch {
+    return NO_DECORATIONS;
   }
 }
