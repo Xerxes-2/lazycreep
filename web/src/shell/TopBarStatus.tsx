@@ -86,7 +86,8 @@ export function TopBarStatus(props: TopBarStatusProps) {
     const off = pollWhileVisible(
       page,
       async () => {
-        const time = await src.getTime(current);
+        // 只并入在途请求、不拿已到达的复用结果：Tick 速度要真实的到达时刻（#38）
+        const time = await src.getTime(current, { maxAgeMs: 0 });
         if (!alive) return;
         rate.record(time);
         setTick(time);

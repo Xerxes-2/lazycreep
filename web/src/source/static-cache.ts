@@ -17,6 +17,7 @@
 import type { SourceFactory } from "../settings/SettingsPage.tsx";
 import { isRecord, readJson, writeJson, type KeyValueStorage, type StoredKey } from "../storage/local-store.ts";
 import { rendererFromStored } from "./season-renderer.ts";
+import { sharedTime } from "./shared-time.ts";
 import type { ServerVersion, ShardInfo, Source, WorldSize } from "./source.ts";
 
 /** 每个 Server 一个键：`msc.staticCache.<server id>` */
@@ -114,7 +115,7 @@ function serverStore(storage: KeyValueStorage | undefined, serverId: string) {
   };
 }
 
-/** 包装一个 Source：getShards / getWorldSize / getVersion 走缓存，其余原样转发 */
+/** 包装一个 Source：getShards / getWorldSize / getVersion 走缓存，getTime 去重（#38），其余原样转发 */
 export function withStaticCache(source: Source, options: StaticCacheOptions): Source {
   const now = options.now ?? Date.now;
   const store = serverStore(options.storage, source.server.id);
@@ -183,9 +184,13 @@ export function withStaticCache(source: Source, options: StaticCacheOptions): So
       (entry) => store.update((stored) => ({ ...stored, version: entry })),
     );
 
+  /** 当前时间不持久化，只在途去重与短窗口复用（#38，shared-time.ts） */
+  const getTime = sharedTime((shard) => source.getTime(shard), now);
+
   return new Proxy(source, {
     get(target, prop) {
       if (prop === "getShards") return getShards;
+      if (prop === "getTime") return getTime;
       if (prop === "getVersion") return getVersion;
       if (prop === "getWorldSize") return getWorldSize;
       const value: unknown = Reflect.get(target, prop, target);
