@@ -1,4 +1,6 @@
 :root {
+  /* Top Bar 的高度（含下边框）；Sidebar 宽度按它算出 Main View 的高度 */
+  --top-bar-height: 45px;
   color-scheme: light dark;
   --bg: #f6f7f9;
   --fg: #1b1f24;
@@ -107,7 +109,7 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 44px;
+  min-height: calc(var(--top-bar-height) - 1px);
   padding: 4px 8px;
   border-bottom: 1px solid color-mix(in srgb, var(--muted) 40%, transparent);
   overflow-x: auto;
@@ -251,10 +253,14 @@ body {
   white-space: nowrap;
 }
 
-/* Sidebar（#24）：固定宽度，挤压 Main View */
+/*
+ * Sidebar（#24）：挤压 Main View。宽度取“视口宽 − Main View 高”，让 Main View 接近正方形
+ * （房间与世界都是 1:1），多出的横向空间给 Sidebar；夹在 260px 与 640px 之间。
+ */
 .sidebar {
-  flex: 0 0 260px;
-  width: 260px;
+  --sidebar-width: clamp(260px, calc(100vw - (100dvh - var(--top-bar-height))), 640px);
+  flex: 0 0 var(--sidebar-width);
+  width: var(--sidebar-width);
   min-height: 0;
   overflow-y: auto;
   border-left: 1px solid color-mix(in srgb, var(--muted) 40%, transparent);
@@ -787,7 +793,7 @@ body {
   cursor: grab;
 }
 
-/* PvP Overview（#3）：在 260px 的 Sidebar 里每个房间一张卡片（#39），不出现横向滚动 */
+/* PvP Overview（#3）：Sidebar 最窄 260px 时也不出现横向滚动，每个房间一张卡片（#39） */
 .pvp-overview {
   min-width: 0;
 }

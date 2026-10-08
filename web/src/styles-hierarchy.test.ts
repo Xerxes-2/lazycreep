@@ -154,3 +154,16 @@ describe("PvP 卡片适配 260px 的 Sidebar（#39）", () => {
     expect(button).toMatch(/min-width:\s*0/);
   });
 });
+
+describe("宽屏 Sidebar 宽度让 Main View 接近正方形（房间与世界都是 1:1）", () => {
+  const sidebar = rule(".sidebar");
+  it("宽度 = 视口宽 − Main View 高（视口高 − Top Bar），夹在 260px 与 640px 之间", () => {
+    expect(sidebar).toMatch(/--sidebar-width\s*:\s*clamp\(\s*260px\s*,\s*calc\(\s*100vw\s*-\s*\(\s*100dvh\s*-\s*var\(--top-bar-height\)\s*\)\s*\)\s*,\s*640px\s*\)/);
+    expect(sidebar).toMatch(/flex\s*:\s*0 0 var\(--sidebar-width\)/);
+    expect(sidebar).toMatch(/width\s*:\s*var\(--sidebar-width\)/);
+  });
+  it("Top Bar 高度由同一个变量决定", () => {
+    expect(styles).toMatch(/--top-bar-height\s*:\s*45px/);
+    expect(rule(".top-bar")).toMatch(/min-height\s*:\s*calc\(\s*var\(--top-bar-height\)\s*-\s*1px\s*\)/);
+  });
+});
