@@ -216,9 +216,12 @@ function ruinFields(obj: RoomObject, users: Readonly<Record<string, RoomUser>>, 
   add("structureId", typeof s["id"] === "string" ? s["id"] : undefined);
 }
 
-/** 赛季 reactor：连续运转了多少 Tick（当前 Tick − launchTime；没在运转时 launchTime 为 null） */
+/**
+ * 赛季 reactor：连续运转了多少 Tick（当前 Tick − launchTime）。没在运转时 launchTime 为 null，
+ * 经房间流合并后（null 表示删除属性）干脆没有这个字段，两者都算未运转。
+ */
 function reactorFields(obj: RoomObject, gameTime: number | undefined, add: AddField) {
-  if (obj["type"] !== "reactor" || !("launchTime" in obj)) return;
+  if (obj["type"] !== "reactor") return;
   const launchTime = obj["launchTime"];
   if (!isNum(launchTime)) {
     add("streak", "idle", { key: "idle" });

@@ -192,6 +192,9 @@ describe("对象详情", () => {
     it("没在运转（launchTime 为 null）：显示未运转", () => {
       const d = describeObject({ ...reactor, launchTime: null, store: { T: 0 } }, users, 1041831);
       expect(text(d, "streak")).toEqual({ key: "idle" });
+      // 房间流合并后 null 的字段被删掉：没有 launchTime 也是未运转
+      const { launchTime: _, ...merged } = reactor;
+      expect(text(describeObject(merged, users, 1041831), "streak")).toEqual({ key: "idle" });
     });
   });
 
