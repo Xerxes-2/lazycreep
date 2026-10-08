@@ -107,7 +107,6 @@ export const en: Partial<Record<MessageKey, string>> = {
   "roomDetails.field.cooldown": "Cooldown (ticks)",
 
   "worldMap.title": "World Map",
-  "worldMap.shard": "Shard",
   "worldMap.hint": "Scroll or pinch to zoom, drag to pan; zoom in and tap a room to open it.",
   "worldMap.loading": "Loading map…",
   "worldMap.noToken": "Enter a token to show room ownership.",

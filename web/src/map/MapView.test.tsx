@@ -240,14 +240,13 @@ describe("World Map 页面", () => {
     expect(opened).toEqual([{ shard: "shardSeason", room: "W13S28" }]);
   });
 
-  it("切换 Shard 写进设置", async () => {
-    const settings = mount();
-    await settle(() => expect(container.querySelector("select[name=world-map-shard] option")).not.toBeNull());
-    const select = container.querySelector<HTMLSelectElement>("select[name=world-map-shard]")!;
-    expect(select.value).toBe("shardSeason");
-    select.value = "shardSeason";
-    select.dispatchEvent(new Event("change", { bubbles: true }));
-    expect(settings.shard()).toBe("shardSeason");
+  it("画布上方不再有 Shard 下拉框（Shard 由 Top Bar 切换）；操作提示放进画布的 title（#39）", async () => {
+    mount();
+    await settle(() => expect(shown.length).toBeGreaterThan(0));
+    const map = container.querySelector(".world-map")!;
+    expect(map.querySelector("select")).toBeNull();
+    expect(map.querySelector(".world-map__bar")).toBeNull();
+    expect(map.querySelector<HTMLElement>(".world-map__canvas")!.title).toContain("缩放");
   });
 
   describe("房间名搜索（输入框与提示在 Sidebar，见 world-map-sections.test.tsx）", () => {

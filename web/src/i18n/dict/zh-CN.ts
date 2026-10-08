@@ -105,7 +105,6 @@ export const zhCN = {
   "roomDetails.field.cooldown": "冷却（Tick）",
 
   "worldMap.title": "世界地图",
-  "worldMap.shard": "Shard",
   "worldMap.hint": "滚轮或双指缩放，拖动平移；放大后点房间进入房间视图。",
   "worldMap.loading": "正在加载地图…",
   "worldMap.noToken": "填写 token 后才能显示所有权。",
