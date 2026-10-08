@@ -1,16 +1,20 @@
 /**
- * #45：玩家建筑的官方画法（terminal、link、lab、factory、nuker、observer、power spawn、extractor、container）。
+ * 玩家建筑的官方画法（spawn、extension、storage、tower、controller、source，terminal、link、lab、factory、
+ * nuker、observer、power spawn、extractor、container）。
  * 照 screeps/renderer `metadata/src/objects/<类型>.metadata.js`（commit 见 public/official-art/SOURCE.txt）改写；
  * lighting 图层（glow）、补间与闪烁都不做，闪烁的部件取一个静态透明度。并入 official-painters.ts 的映射表。
  */
+import type { OfficialSvgName } from "../art/official-art.ts";
 import type { Color } from "../scene/scene.ts";
 import type { ObjectPainter, ObjectPainters, PrimitiveDraft } from "./room-paint.ts";
 import { center, num } from "./room-paint.ts";
 import type { RoomObject } from "./room-state.ts";
-import { ownerBadge } from "./owner-badge.ts"; // #48
+import { ownerBadge } from "./owner-badge.ts";
 import {
   ENERGY,
   capacityOf,
+  energyCapacity,
+  energyStore,
   circle,
   clamp01,
   ellipsePoints,
@@ -21,6 +25,7 @@ import {
   progressPie,
   storeAmounts,
   storeTotal,
+  u,
   zLayer,
 } from "./official-sprite.ts";
 
@@ -229,7 +234,178 @@ const powerSpawn: ObjectPainter = (obj, ctx) => {
 // ---- extractor（extractor.metadata.js：主人色贴图；冷却时的旋转不做） ----
 const extractor: ObjectPainter = (obj, ctx) => [officialSprite(obj, "body", "extractor", { width: 200, tint: ownerTint(obj, ctx), layer: zLayer(0) })];
 
+// ---- spawn（spawn.metadata.js：三个同心圆 + 徽章 + 按能量缩放的能量圈；没有贴图） ----
+const spawn: ObjectPainter = (obj, ctx) => {
+  const layer = zLayer(8);
+  const cap = energyCapacity(obj);
+  const scale = cap ? energyStore(obj) / cap : 0;
+  const prims: PrimitiveDraft[] = [
+    circle(obj, "body", 70, 0xcccccc, layer),
+    circle(obj, "inner", 59, 0x181818, layer),
+    ...ownerBadge(obj, ctx, { radius: 38, layer }),
+  ];
+  if (scale > 0) prims.push(circle(obj, "energy", 38 * Math.min(1, scale), ENERGY, layer));
+  return prims;
+};
+
+// ---- extension（extension.metadata.js） ----
+const EXTENSION_SIZE = { small: 68, medium: 80, large: 100 };
+const extension: ObjectPainter = (obj, ctx) => {
+  const layer = zLayer(7);
+  const cap = energyCapacity(obj);
+  const size = cap !== undefined && cap >= 200 ? EXTENSION_SIZE.large : cap !== undefined && cap >= 100 ? EXTENSION_SIZE.medium : EXTENSION_SIZE.small;
+  const border: OfficialSvgName | undefined =
+    cap === undefined || cap < 100 ? "extension-border50" : cap === 100 ? "extension-border100" : cap === 200 ? "extension-border200" : undefined;
+  const prims: PrimitiveDraft[] = [];
+  if (border) prims.push(officialSprite(obj, "border", border, { width: 100, tint: ownerTint(obj, ctx), layer }));
+  prims.push(officialSprite(obj, "body", "extension", { width: size, layer }));
+  const scale = cap ? Math.min(1, energyStore(obj) / cap) : 0;
+  if (scale > 0) prims.push(circle(obj, "energy", size * 0.32 * scale, ENERGY, layer));
+  return prims;
+};
+
+// ---- storage（storage.metadata.js：边框 + 主体 + 从下往上的资源柱） ----
+const STORAGE_CAPACITY = 1_000_000;
+const STORAGE_BAR = { width: 110, height: 140 };
+const storage: ObjectPainter = (obj, ctx) => {
+  const layer = zLayer(7);
+  const { x, y } = center(obj);
+  const store = (typeof obj["store"] === "object" && obj["store"] !== null ? obj["store"] : {}) as Record<string, unknown>;
+  const amount = (key: string) => (typeof store[key] === "number" ? (store[key] as number) : 0);
+  let total = 0;
+  for (const v of Object.values(store)) if (typeof v === "number") total += v;
+  const max = Math.max(num(obj, "storeCapacity") || STORAGE_CAPACITY, total);
+  const bar = (part: string, value: number, fill: Color): PrimitiveDraft => {
+    const height = u(value * STORAGE_BAR.height) / max;
+    return {
+      part,
+      kind: "rect",
+      layer,
+      x: x - u(STORAGE_BAR.width) / 2,
+      y: y + u(STORAGE_BAR.height) / 2 - height,
+      width: u(STORAGE_BAR.width),
+      height,
+      fill,
+    };
+  };
+  const prims: PrimitiveDraft[] = [
+    officialSprite(obj, "border", "storage-border", { width: 200, tint: ownerTint(obj, ctx), layer }),
+    officialSprite(obj, "body", "storage", { width: 200, layer }),
+  ];
+  const energy = amount("energy");
+  const power = amount("power");
+  if (energy + power < total) prims.push(bar("other", total, 0xffffff));
+  if (power > 0) prims.push(bar("power", power + energy, 0xf41f33));
+  if (energy > 0) prims.push(bar("energy", energy, ENERGY));
+  return prims;
+};
+
+// ---- tower（tower.metadata.js：染色底座 + 炮塔 + 炮塔上的能量条） ----
+const TOWER_ENERGY_HEIGHT = 66.7;
+const isNpc = (user: unknown) => user === "2" || user === "3";
+
+/** 官方 mathHelper.calculateAngle：炮塔从 (x0, y0) 指向自己时的旋转 */
+function calculateAngle(x0: number, y0: number, x: number, y: number): number {
+  let angle = Math.atan2(y - y0, x - x0) + Math.PI / 2;
+  if (angle > Math.PI) angle -= 2 * Math.PI;
+  else if (angle < -Math.PI) angle += 2 * Math.PI;
+  return angle;
+}
+
+function shotTarget(obj: RoomObject): { x: number; y: number } | undefined {
+  const log = obj["actionLog"];
+  if (typeof log !== "object" || log === null) return undefined;
+  for (const key of ["attack", "heal", "repair"]) {
+    const target = (log as Record<string, unknown>)[key];
+    if (typeof target === "object" && target !== null) {
+      const { x, y } = target as Record<string, unknown>;
+      if (typeof x === "number" && typeof y === "number") return { x, y };
+    }
+  }
+  return undefined;
+}
+
+const tower: ObjectPainter = (obj, ctx) => {
+  const layer = zLayer(13);
+  const npc = isNpc(obj["user"]);
+  const shot = shotTarget(obj);
+  const rotation = shot ? calculateAngle(shot.x, shot.y, num(obj, "x") ?? 0, num(obj, "y") ?? 0) : 0;
+  const prims: PrimitiveDraft[] = [
+    officialSprite(obj, "base", "tower-base", { width: 200, tint: ownerTint(obj, ctx), layer }),
+    officialSprite(obj, "turret", npc ? "tower-rotatable-npc" : "tower-rotatable", { width: 115, anchorY: 32 / 115, rotation, layer }),
+  ];
+  const cap = energyCapacity(obj);
+  const height = cap ? Math.min(TOWER_ENERGY_HEIGHT, (TOWER_ENERGY_HEIGHT * energyStore(obj)) / cap) / 100 : 0;
+  if (!npc && height > 0) {
+    // 炮塔局部坐标里的 (-45, 0, 90, h)，随炮塔绕塔中心旋转
+    const { x, y } = center(obj);
+    const cos = Math.cos(rotation);
+    const sin = Math.sin(rotation);
+    const corners = [
+      [-0.45, 0],
+      [0.45, 0],
+      [0.45, height],
+      [-0.45, height],
+    ] as const;
+    const points = corners.flatMap(([dx, dy]) => [x + dx * cos - dy * sin, y + dx * sin + dy * cos]);
+    prims.push({ part: "energy", kind: "polygon", layer, points, fill: ENERGY });
+  }
+  return prims;
+};
+
+// ---- controller（controller.metadata.js：黑色底座 + 等级刻度 + 徽章 + 升级进度扇形 + 外圈） ----
+const controller: ObjectPainter = (obj, ctx) => {
+  const layer = zLayer(4);
+  const level = Math.max(0, Math.min(8, num(obj, "level") ?? 0));
+  const { x, y } = center(obj);
+  const prims: PrimitiveDraft[] = [
+    { part: "halo", kind: "circle", layer, x, y, radius: u(92), fill: 0xffffff, alpha: 0.05 },
+    officialSprite(obj, "body", "controller", { width: 200, tint: 0x000000, layer }),
+  ];
+  for (let i = 0; i < level; i++) {
+    prims.push(officialSprite(obj, `level${i + 1}`, "controller-level", { width: 100, anchorY: 1, rotation: (i * 2 * Math.PI) / 8, layer }));
+  }
+  prims.push(...ownerBadge(obj, ctx, { radius: 37, layer }));
+  prims.push(...controllerProgress(obj, layer));
+  prims.push({ part: "ring", kind: "circle", layer, x, y, radius: u(40), stroke: { color: 0x080808, width: u(10) } });
+  return prims;
+};
+
+// ---- source（source.metadata.js：描边方块 + 按能量缩放的能量方块；没有贴图） ----
+const source: ObjectPainter = (obj) => {
+  const layer = zLayer(2);
+  const { x, y } = center(obj);
+  const capacity = num(obj, "energyCapacity") ?? 0;
+  const size = capacity > 0 ? (60 * (num(obj, "energy") ?? 0)) / capacity : 0;
+  const prims: PrimitiveDraft[] = [
+    {
+      part: "body",
+      kind: "rect",
+      layer,
+      x: x - 0.2,
+      y: y - 0.2,
+      width: 0.4,
+      height: 0.4,
+      radius: 0.15,
+      fill: 0x111111,
+      stroke: { color: 0x595026, width: 0.15 },
+    },
+  ];
+  if (size > 0) {
+    const s = u(size);
+    prims.push({ part: "energy", kind: "rect", layer, x: x - s / 2, y: y - s / 2, width: s, height: s, radius: Math.min(0.15, s / 2), fill: ENERGY });
+  }
+  return prims;
+};
+
+/** 建筑类的官方画法（并入 official-painters.ts 的映射表） */
 export const OFFICIAL_STRUCTURE_PAINTERS: ObjectPainters = {
+  spawn,
+  extension,
+  storage,
+  tower,
+  controller,
+  source,
   container,
   terminal,
   link,
@@ -241,7 +417,7 @@ export const OFFICIAL_STRUCTURE_PAINTERS: ObjectPainters = {
   extractor,
 };
 
-// ---- controller 的升级进度（controller.metadata.js 的 siteProgress：徽章上的白色扇形；画法本身在 official-painters.ts） ----
+// ---- controller 的升级进度（controller.metadata.js 的 siteProgress：徽章上的白色扇形） ----
 /** 官方 constants.CONTROLLER_LEVELS：升到下一级所需的进度；8 级没有 */
 const CONTROLLER_LEVELS: Readonly<Record<number, number>> = { 1: 200, 2: 45_000, 3: 135_000, 4: 405_000, 5: 1_215_000, 6: 3_645_000, 7: 10_935_000 };
 export function controllerProgress(obj: RoomObject, layer: number): PrimitiveDraft[] {
