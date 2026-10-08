@@ -197,3 +197,13 @@ const powerCreep: ObjectPainter = (obj, ctx) => {
 };
 
 export const OFFICIAL_CREEP_PAINTERS: ObjectPainters = { creep, powerCreep };
+
+/**
+ * 部件类型 → 颜色，供对象详情的部件网格（#59）复用身体环的同一张表；环里不画的 tough、carry
+ * 取官方对象面板的颜色（官方 app.css `.bodypart.type-tough` #fff、`.type-carry` #777）。
+ */
+export const BODY_PART_COLORS: Readonly<Record<string, Color>> = {
+  ...Object.fromEntries(Object.entries(BODY_COLORS).map(([type, spec]) => [type, spec.color])),
+  tough: 0xffffff,
+  carry: 0x777777,
+};

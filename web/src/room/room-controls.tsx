@@ -2,7 +2,7 @@
  * Room View 的交互（#12）：画布手势（缩放、平移、点选）、每个房间的视口持久化、
  * 详情卡。RoomView 只负责把这些接到数据流上。
  */
-import { createEffect, createSignal, For, on, onCleanup, Show, type Accessor } from "solid-js";
+import { createEffect, createSignal, For, Index, on, onCleanup, Show, type Accessor } from "solid-js";
 import { useI18n, type MessageKey } from "../i18n";
 import { attachGestures } from "../scene/pointer-gestures.ts";
 import type { SceneView } from "../scene/pixi-scene-view.ts";
@@ -21,6 +21,7 @@ import {
 import type { RoomUser } from "../source/source.ts";
 import type { KeyValueStorage } from "../storage/local-store.ts";
 import { loadCamera, saveCamera } from "./room-camera-store.ts";
+import { BodyGrid } from "./BodyGrid.tsx";
 import { describeObject } from "./object-details.ts";
 import type { RoomObject } from "./room-state.ts";
 
@@ -136,14 +137,19 @@ export function RoomDetailsPanel(props: RoomDetailsPanelProps) {
             </button>
           </header>
           <dl class="room-details__fields">
-            <For each={d().fields}>
+            {/* 按位置复用 DOM：每 Tick 重算详情时部件网格不重建，悬停 / 长按的说明不被打断 */}
+            <Index each={d().fields}>
               {(field) => (
                 <>
-                  <dt>{t(`roomDetails.field.${field.key}` as MessageKey)}</dt>
-                  <dd data-field={field.key}>{field.value}</dd>
+                  <dt data-label={field().key}>{t(`roomDetails.field.${field().key}` as MessageKey)}</dt>
+                  <dd data-field={field().key}>
+                    <Show when={field().key === "body" && d().body} fallback={field().value}>
+                      {(cells) => <BodyGrid objectId={d().id} cells={cells()} summary={field().value} />}
+                    </Show>
+                  </dd>
                 </>
               )}
-            </For>
+            </Index>
           </dl>
           <Show when={d().raw.length > 0}>
             <details class="room-details__raw">

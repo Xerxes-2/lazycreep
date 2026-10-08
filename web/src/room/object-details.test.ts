@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeObject, type ObjectDetails } from "./object-details.ts";
+import { bodyCells, bodySummary, describeObject, type ObjectDetails } from "./object-details.ts";
 
 const users = { u1: { _id: "u1", username: "Xerxes_2" } };
 const field = (d: ObjectDetails, key: string) => d.fields.find((f) => f.key === key)?.value;
@@ -38,7 +38,8 @@ describe("对象详情", () => {
     expect(field(d, "position")).toBe("24, 12");
     expect(field(d, "hits")).toBe("250 / 400");
     expect(field(d, "ticksToLive")).toBe("100");
-    expect(field(d, "body")).toBe("work ×2 (XGH2O ×1, 0 HP ×1), carry ×1, move ×1");
+    expect(field(d, "body")).toBe("2W 1C 1M");
+    expect(d.body?.map((c) => c.type)).toEqual(["work", "work", "carry", "move"]);
     expect(field(d, "store")).toBe("energy 30 / 50");
     expect(field(d, "fatigue")).toBe("2");
   });
@@ -87,5 +88,42 @@ describe("对象详情", () => {
     expect(field(source, "hits")).toBeUndefined();
     const mineral = describeObject({ _id: "m", type: "mineral", x: 1, y: 1, mineralType: "O", mineralAmount: 63940 }, users, 1);
     expect(field(mineral, "mineral")).toBe("O 63940");
+  });
+
+  describe("身体部件网格（#59）", () => {
+    it("按 body 顺序给出每格的类型、颜色（与身体环同一张表）、填充比例与强化", () => {
+      const cells = bodyCells([
+        { type: "tough", hits: 100, boost: "XGHO2" },
+        { type: "work", hits: 0 },
+        { type: "move", hits: 37 },
+        { type: "ranged_attack", hits: 100 },
+        { type: "carry", hits: 100 },
+        { type: "heal", hits: 100 },
+        { type: "attack", hits: 100 },
+        { type: "claim", hits: 100 },
+      ]);
+      expect(cells.map((c) => c.type)).toEqual(["tough", "work", "move", "ranged_attack", "carry", "heal", "attack", "claim"]);
+      expect(cells.map((c) => c.color)).toEqual(["#ffffff", "#fde574", "#aab7c5", "#7fa7e5", "#777777", "#56cf5e", "#f72e41", "#b99cfb"]);
+      expect(cells.map((c) => c.fill)).toEqual([1, 0, 0.37, 1, 1, 1, 1, 1]);
+      expect(cells[0]!.boost).toBe("XGHO2");
+      expect(cells[1]!.boost).toBeUndefined();
+      expect(cells[2]!.hits).toBe(37);
+    });
+
+    it("官方 safeBody 的 { \"0\": … } 形式按数字键排序；最多 50 格；不认识的类型用中性色", () => {
+      const keyed = Object.fromEntries(Array.from({ length: 12 }, (_, i) => [String(i), { type: i === 10 ? "carry" : "move", hits: 100 }]));
+      expect(bodyCells(keyed)[10]!.type).toBe("carry");
+      expect(bodyCells(Array.from({ length: 60 }, () => ({ type: "move", hits: 100 })))).toHaveLength(50);
+      expect(bodyCells([{ type: "wings", hits: 120 }])[0]).toMatchObject({ type: "wings", color: "#999999", fill: 1 });
+      expect(bodyCells(undefined)).toEqual([]);
+    });
+
+    it("文字汇总用缩写，按首次出现的顺序计数（含 0 HP 的部件）", () => {
+      const parts = (type: string, n: number) => Array.from({ length: n }, () => ({ type, hits: 100 }));
+      expect(bodySummary(bodyCells([...parts("work", 5), ...parts("carry", 3), ...parts("move", 8)]))).toBe("5W 3C 8M");
+      expect(
+        bodySummary(bodyCells([...parts("tough", 2), ...parts("ranged_attack", 1), ...parts("heal", 4), ...parts("claim", 1), ...parts("attack", 1), ...parts("tough", 1)])),
+      ).toBe("3T 1R 4H 1CL 1A");
+    });
   });
 });

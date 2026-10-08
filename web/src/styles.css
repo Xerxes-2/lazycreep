@@ -1097,6 +1097,56 @@ body {
   color: var(--muted);
 }
 
+/* 身体部件网格（#59）：标签与网格各占整行；照官方对象面板，圆形小格、深色底，每行 10 格 */
+.room-details dt[data-label="body"],
+.room-details dd[data-field="body"] {
+  grid-column: 1 / -1;
+}
+
+.body-grid {
+  display: grid;
+  grid-template-columns: repeat(10, 14px);
+  gap: 5px;
+  width: max-content;
+  padding: var(--space-3);
+  border-radius: var(--radius-m);
+  /* 官方面板的部件底色；部件颜色按深色底设计，不随主题变 */
+  background: #222;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.body-grid__cell {
+  box-sizing: border-box;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--part-color);
+  border-radius: 50%;
+  /* 剩余血量从下往上填充，0 HP 只剩彩色空框 */
+  background: linear-gradient(to top, var(--part-color) var(--part-fill), transparent var(--part-fill));
+  box-shadow: 0 1px 1px rgb(0 0 0 / 0.6);
+}
+
+.body-grid__cell[data-boost] {
+  outline: 2px solid #fff;
+}
+
+.body-grid__cell[data-active] {
+  transform: scale(1.2);
+}
+
+.body-grid__summary {
+  margin-top: var(--space-2);
+  font-variant-numeric: var(--font-numeric);
+}
+
+.body-grid__info {
+  margin: var(--space-1) 0 0;
+  font-size: var(--fs-small);
+  color: var(--color-secondary);
+}
+
 /* 宽屏：详情是画布右侧的侧栏 */
 @media (min-width: 900px) {
   .room-view__stage:has(.room-details) {

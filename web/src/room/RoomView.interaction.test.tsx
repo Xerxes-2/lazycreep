@@ -157,7 +157,8 @@ describe("Room View 交互", () => {
     await settle(() => expect(container.querySelector("[data-testid=room-details]")).not.toBeNull());
     expect(field("[data-field=type]").textContent).toBe("creep");
     expect(field("[data-field=owner]").textContent).toBe("Xerxes_2");
-    expect(field("[data-field=body]").textContent).toContain("work ×");
+    expect(field("[data-body-summary]").textContent).toMatch(/^\d+[A-Z]+( \d+[A-Z]+)*$/);
+    expect(field("[data-field=body]").querySelectorAll(".body-grid__cell").length).toBeGreaterThan(0);
     expect(field("[data-field=ticksToLive]").textContent).toMatch(/^\d+$/);
     expect(field("[data-raw=actionLog]")).toBeDefined();
     expect(lastScene().primitives.some((p) => p.key === `${CREEP}/selected`)).toBe(true);
