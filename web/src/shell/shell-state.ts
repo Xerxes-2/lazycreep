@@ -10,7 +10,8 @@
  * 写 `navigate(to)`。地图点房间、PvP、告警、Minimap、快捷键、Top Bar 按钮都调用 navigate，
  * 不各自 set；URL 路由（url-router.ts，#32）把地址接成 navigate 的来源、把 location 写回地址。
  * Shard 仍存在连接设置里（settings.shard），navigate 代为切换；Replay 随 roomRequest 交给 Room View。
- * Room View 自己换房间（输入框、进出 Replay）时用 reportRoom 回报，location 随之更新。
+ * Room View 自己换房间（输入框、进出 Replay）以及 Replay 的当前 Tick 变化（拖动、单步、播放）时用
+ * reportRoom 回报，location 随之更新；roomRequest 不变，所以不会反过来让 Room View 重开 Replay。
  *
  * 新功能需要新的外壳状态时，在这里加字段（持久化的放进 ShellPrefs 并在 decodePrefs 里校验）。
  */
@@ -25,7 +26,7 @@ export interface RoomTarget {
   readonly room: string;
 }
 
-/** Replay 的起始 Tick；latest 表示它是进入时的 Live Tick（所在 chunk 可能还没生成） */
+/** Replay 的 Tick；latest 表示它是进入时的 Live Tick（所在 chunk 可能还没生成） */
 export interface ReplayAt {
   readonly tick: number;
   readonly latest?: boolean;
@@ -51,7 +52,7 @@ export interface ShellLocation {
   readonly shard: string | undefined;
   /** Room View 所看的房间（Main View 在地图上时也保留） */
   readonly room: string | undefined;
-  /** 在 Replay 中时，Replay 的起始 Tick */
+  /** 在 Replay 中时，Replay 画面上的当前 Tick（Minimap 切房、地址写回都用它） */
   readonly replay: ReplayAt | undefined;
 }
 
@@ -130,7 +131,7 @@ export interface ShellState {
   readonly mainView: Accessor<MainViewMode>;
   /** 每次 navigate 到房间产生的新请求（只给 Room View 用，据此切房间） */
   readonly roomRequest: Accessor<RoomRequest | undefined>;
-  /** Room View 回报它此刻显示的房间与 Replay 起始 Tick（只给 Room View 用） */
+  /** Room View 回报它此刻显示的房间与 Replay 当前 Tick（只给 Room View 用） */
   reportRoom(at: RoomRequest | undefined): void;
 
   // ---- Sidebar（宽屏与窄屏各自一份开合，以下都作用于当前布局的那份） ----

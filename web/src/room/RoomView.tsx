@@ -69,7 +69,10 @@ export interface RoomViewProps {
   readonly open?: OpenRequest | undefined;
   /** 给了就显示“返回地图”按钮（#16） */
   readonly onBack?: (() => void) | undefined;
-  /** 显示的房间或 Replay 变化时回报（外壳状态记录当前位置，#24）；在 Replay 中时带 replay（起始 Tick） */
+  /**
+   * 显示的房间或 Replay 变化时回报（外壳状态记录当前位置，#24）；在 Replay 中时带 replay，其 tick 是
+   * 画面上的当前 Tick（拖动、单步、播放都随之更新；latest 只在仍停在进入时的 Tick 上时保留）
+   */
   readonly onTarget?: ((at: OpenRequest | undefined) => void) | undefined;
   /** 选中对象的详情改画到这个元素里（Sidebar 的选中对象区块，#24）；不给时画在房间旁边 */
   readonly detailsMount?: HTMLElement | undefined;
@@ -166,7 +169,9 @@ export function RoomView(props: RoomViewProps) {
   createEffect(() => {
     const current = target();
     const request = replay.active() ? replay.request() : undefined;
-    props.onTarget?.(current && (request ? replayAt(current, request.tick, request.latest) : current));
+    if (!current || !request) return props.onTarget?.(current);
+    const now = replay.snapshot()?.target ?? request.tick;
+    props.onTarget?.(replayAt(current, now, now === request.tick && request.latest));
   });
 
   registerRoomShortcuts(props.shortcuts, { replay, target, liveTick: () => roomState()?.gameTime });

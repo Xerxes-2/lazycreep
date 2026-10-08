@@ -3,6 +3,7 @@ import { render } from "solid-js/web";
 import { App } from "../App";
 import { FixtureSource, fixtureBundle } from "../source/fixture-source.ts";
 import type { ConnectionState, ServerConfig, Source, Unsubscribe } from "../source/source.ts";
+import type { SceneView, SceneViewOptions } from "../scene/pixi-scene-view.ts";
 
 const bundle = fixtureBundle(
   Object.values(import.meta.glob<unknown>("../../../fixtures/season/*.json", { eager: true, import: "default" })),
@@ -37,11 +38,31 @@ function unauthorized(server: ServerConfig): Source {
   return source;
 }
 
+/** 假画布：Minimap 每个房间格 60 CSS 像素 */
+const CELL = 60;
+async function fakeView(options: SceneViewOptions): Promise<SceneView> {
+  const canvas = document.createElement("canvas");
+  canvas.width = options.width;
+  canvas.height = options.height;
+  return {
+    canvas,
+    viewport: { x: 0, y: 0, scale: CELL },
+    show: () => {},
+    requestRender: () => {},
+    resize: () => {},
+    setViewport: () => {},
+    destroy: () => {},
+  };
+}
+
 /** 刷新：卸载后按当前地址与存储重新挂载整个应用 */
-function mount(sourceFor: (server: ServerConfig) => Source = recorded) {
+function mount(sourceFor: (server: ServerConfig) => Source = recorded, createView?: typeof fakeView) {
   dispose?.();
   container.innerHTML = "";
-  dispose = render(() => <App sourceFor={sourceFor} narrow={() => false} />, container);
+  dispose = render(
+    () => <App sourceFor={sourceFor} narrow={() => false} {...(createView ? { createView } : {})} />,
+    container,
+  );
 }
 
 const q = <T extends Element = HTMLElement>(selector: string) => container.querySelector<T>(selector);
@@ -58,6 +79,26 @@ function input(name: string, value: string) {
   const el = q<HTMLInputElement>(`[name=${name}]`)!;
   el.value = value;
   el.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+/** 拖动 Replay 时间轴：从 10% 处按下、拖到 x（千分比） */
+function dragTimeline(x: number) {
+  const timeline = q("[data-testid=replay-timeline]")!;
+  timeline.getBoundingClientRect = () => ({ left: 0, width: 1000, top: 0, height: 20 }) as DOMRect;
+  for (const [type, at] of [["pointerdown", 100], ["pointermove", (100 + x) / 2], ["pointermove", x], ["pointerup", x]] as const) {
+    const event = new MouseEvent(type, { bubbles: true, cancelable: true, clientX: at, button: 0 });
+    Object.defineProperty(event, "pointerId", { value: 1 });
+    timeline.dispatchEvent(event);
+  }
+}
+
+/** 点 Minimap 的格子（col、row 为 0–2） */
+function tapMinimap(col: number, row: number) {
+  const canvas = q<HTMLCanvasElement>("[data-section='room.minimap'] canvas")!;
+  const point = { clientX: (col + 0.5) * CELL, clientY: (row + 0.5) * CELL };
+  for (const type of ["pointerdown", "pointerup"]) {
+    canvas.dispatchEvent(new PointerEvent(type, { ...point, pointerId: 1, bubbles: true, button: 0 }));
+  }
 }
 
 function watch(room: string) {
@@ -97,6 +138,7 @@ describe("URL 导航（#32）", () => {
     dispose?.();
     dispose = undefined;
     container.remove();
+    vi.restoreAllMocks();
     history.replaceState(null, "", "/");
   });
 
@@ -236,6 +278,42 @@ describe("URL 导航（#32）", () => {
     await settle(() => expect(q("[data-testid=replay-controls]")).toBeNull());
     expect(shownView()).toEqual(["room"]);
     await settle(() => expect(tick()).toBe("1025238"));
+  });
+
+  it("Replay 的当前 Tick 进地址：拖动停下约 500ms 后 replace 写回、不产生历史记录；刷新回到该 Tick；Minimap 切房沿用它", async () => {
+    history.replaceState(null, "", "/#!/season/history/shardSeason/W13S28?t=1024937");
+    mount(recorded, fakeView);
+    await settle(() => expect(q("[data-testid=replay-controls]")).not.toBeNull());
+    await settle(() => expect(tick()).toBe("1024937"));
+    await flush();
+    const before = history.length;
+    // 前面的用例后退过，history.length 可能因截断前进记录而不变：直接数新增记录的调用
+    const push = vi.spyOn(history, "pushState");
+
+    dragTimeline(700);
+    const dragged = tick()!;
+    expect(dragged).not.toBe("1024937");
+    // 还在变化的短时间内不写地址
+    await flush();
+    expect(location.hash).toBe("#!/season/history/shardSeason/W13S28?t=1024937");
+    await settle(() => expect(location.hash).toBe(`#!/season/history/shardSeason/W13S28?t=${dragged}`));
+    expect(history.length).toBe(before);
+    expect(push).not.toHaveBeenCalled();
+
+    // 刷新：回到拖动后的 Tick
+    mount(recorded, fakeView);
+    await settle(() => expect(q("[data-testid=replay-controls]")).not.toBeNull());
+    await settle(() => expect(tick()).toBe(dragged));
+
+    // Minimap 点上方相邻格：新房间的 Replay 用同一个（拖动后的）Tick
+    await settle(() => expect(q("[data-section='room.minimap'] canvas")).not.toBeNull());
+    tapMinimap(1, 0);
+    await settle(() => expect(roomInput()).toBe("W13S27"));
+    await settle(() => expect(tick()).toBe(dragged));
+    await flush();
+    expect(location.hash).toBe(`#!/season/history/shardSeason/W13S27?t=${dragged}`);
+    expect(push).toHaveBeenCalledTimes(1);
+    push.mockRestore();
   });
 
   it("旧的 #/replay?… 链接被转换为新格式并打开 Replay", async () => {

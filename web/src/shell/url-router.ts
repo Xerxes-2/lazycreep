@@ -14,7 +14,9 @@
  *   `settings.selectServer` 与 `shell.navigate`；地址与此刻的位置已一致时什么也不做。
  * - 位置 → 地址：位置变化后在微任务里把最终位置写回地址（同一轮里的中间状态合并成一次），用
  *   pushState / replaceState，二者都不触发 hashchange。由地址引起的导航只 replace（规范化写法）。
- * Replay 的地址只记起始 Tick：拖动时间轴、单步、播放都不改地址，也不产生历史记录。
+ * Replay 的地址记当前 Tick：拖动时间轴、单步、播放时位置里的 Tick 随之变化，但只有 Tick 变了的写回
+ *   用 replaceState，并且等 Tick 停止变化 TICK_SETTLE_MS 后才写（节流），不产生历史记录；
+ *   在这之前若有真正的导航（push）或地址变化，待写的 Tick 作废。
  * 解读地址不依赖认证：Replay 链接在 token 缺失或失效时同样打开（#33）。
  */
 import { batch, createEffect, createSignal, onCleanup, type Accessor } from "solid-js";
@@ -32,6 +34,9 @@ export type Route =
       readonly tick: number;
       readonly latest?: boolean;
     };
+
+/** Replay 的 Tick 停止变化多久后写回地址 */
+export const TICK_SETTLE_MS = 500;
 
 const ROOM_NAME = /^[WE]\d{1,3}[NS]\d{1,3}$/;
 const SHARD_NAME = /^[\w.-]+$/;
@@ -129,6 +134,14 @@ export function routeOf(server: string, at: ShellLocation): Route | undefined {
   return { kind: "history", server, room: at.room, tick: at.replay.tick, ...shard, ...(at.replay.latest ? { latest: true } : {}) };
 }
 
+/** 两个地址是否是同一房间的 Replay、只差 Tick（含 latest） */
+function tickOnly(from: string, to: string): boolean {
+  const a = parseHash(from);
+  const b = parseHash(to);
+  if (a.kind !== "route" || b.kind !== "route" || a.route.kind !== "history" || b.route.kind !== "history") return false;
+  return a.route.server === b.route.server && a.route.shard === b.route.shard && a.route.room === b.route.room;
+}
+
 /** 地址无效时的提示（地址原文） */
 export interface RouteNotice {
   readonly hash: string;
@@ -151,6 +164,12 @@ export function createUrlRouter(shell: ShellState, settings: RouterSettings, win
 
   // ---- 位置 → 地址 ----
   let queued = false;
+  /** 只有 Replay Tick 变了时，等停下再写的定时器 */
+  let settling: ReturnType<typeof setTimeout> | undefined;
+  const cancelSettle = () => {
+    if (settling !== undefined) clearTimeout(settling);
+    settling = undefined;
+  };
   /** 下一次写回用 replace（由地址引起的导航、启动） */
   let replaceNext = true;
   /** 路由最近一次读到或写入的地址 */
@@ -162,7 +181,21 @@ export function createUrlRouter(shell: ShellState, settings: RouterSettings, win
     // 地址已被别处改了（例如刚在地址栏输入），它的 hashchange 还没处理：不能盖掉，等事件来
     if (win.location.hash !== known) return;
     const href = currentHref();
-    if (href === undefined || href === known) return;
+    if (href === undefined || href === known) return cancelSettle();
+    if (!replace && tickOnly(known, href)) {
+      cancelSettle();
+      settling = setTimeout(() => {
+        settling = undefined;
+        if (win.location.hash !== known) return;
+        const settled = currentHref();
+        if (settled !== undefined && settled !== known && tickOnly(known, settled)) write(settled, true);
+      }, TICK_SETTLE_MS);
+      return;
+    }
+    cancelSettle();
+    write(href, replace);
+  };
+  const write = (href: string, replace: boolean) => {
     const url = win.location.pathname + win.location.search + href;
     if (replace) win.history.replaceState(win.history.state, "", url);
     else win.history.pushState(null, "", url);
@@ -190,6 +223,7 @@ export function createUrlRouter(shell: ShellState, settings: RouterSettings, win
     });
   };
   const fromAddress = () => {
+    cancelSettle();
     const hash = win.location.hash;
     known = hash;
     const parsed = parseHash(hash);
@@ -210,6 +244,7 @@ export function createUrlRouter(shell: ShellState, settings: RouterSettings, win
   win.addEventListener("hashchange", fromAddress);
   win.addEventListener("popstate", fromAddress);
   onCleanup(() => {
+    cancelSettle();
     win.removeEventListener("hashchange", fromAddress);
     win.removeEventListener("popstate", fromAddress);
   });
