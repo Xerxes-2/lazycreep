@@ -128,7 +128,6 @@ export const zhCN = {
   "roomDetails.part.claim": "占领（CLAIM）",
 
   "worldMap.title": "世界地图",
-  "worldMap.hint": "滚轮或双指缩放，拖动平移；放大后点房间进入房间视图。",
   "worldMap.loading": "正在加载地图…",
   "worldMap.noToken": "填写 token 后才能显示所有权。",
   "worldMap.ownershipError": "所有权加载失败：{message}",

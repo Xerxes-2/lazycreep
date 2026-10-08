@@ -304,6 +304,8 @@ export function MapView(props: MapViewProps) {
 
   /** 鼠标悬停 / 点按的房间（#28）；所有者随 MapState 更新 */
   const [pointedRoom, setPointedRoom] = createSignal<{ shard: string; room: string }>();
+  /** 鼠标在画布上的位置（CSS 像素）；离开画布或触摸时没有。指针旁标出所指的房间名 */
+  const [hoverAt, setHoverAt] = createSignal<{ x: number; y: number }>();
   const pointAt = (at: { x: number; y: number }) => {
     const cam = camera();
     const state = mapState();
@@ -404,17 +406,22 @@ export function MapView(props: MapViewProps) {
           end: () => {},
           press: setDragging,
         });
-        // 鼠标（与笔）悬停即更新指向房间；触摸没有悬停，靠点按
+        // 鼠标（与笔）悬停即更新指向房间，并在指针旁标出房间名；触摸没有悬停，靠点按
         const hover = (event: PointerEvent) => {
           if (event.pointerType === "touch") return;
           const rect = canvas.getBoundingClientRect();
-          pointAt({ x: event.clientX - rect.left, y: event.clientY - rect.top });
+          const at = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+          pointAt(at);
+          setHoverAt(at);
         };
+        const leave = () => setHoverAt(undefined);
         canvas.addEventListener("pointermove", hover);
+        canvas.addEventListener("pointerleave", leave);
         const detachDrag = detachGestures;
         detachGestures = () => {
           detachDrag();
           canvas.removeEventListener("pointermove", hover);
+          canvas.removeEventListener("pointerleave", leave);
         };
         host.append(canvas);
         setView(made);
@@ -465,7 +472,21 @@ export function MapView(props: MapViewProps) {
           </p>
         )}
       </Show>
-      <div class="world-map__canvas" ref={host} title={t("worldMap.hint")} />
+      {/* 画布由代码插进 host；房间名标签放在旁边一层，免得 Solid 更新 host 的子节点时把画布一起清掉 */}
+      <div class="world-map__canvas">
+        <div class="world-map__surface" ref={host} />
+        <Show when={!dragging() && hoverAt() && pointedRoom()}>
+          {(pointed) => (
+            <span
+              class="world-map__hover-room"
+              data-hover-room={pointed().room}
+              style={{ transform: `translate(${hoverAt()!.x + 12}px, ${hoverAt()!.y + 12}px)` }}
+            >
+              {pointed().room}
+            </span>
+          )}
+        </Show>
+      </div>
     </section>
   );
 }

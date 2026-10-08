@@ -242,13 +242,29 @@ describe("World Map 页面", () => {
     expect(opened).toEqual([{ shard: "shardSeason", room: "W13S28" }]);
   });
 
-  it("画布上方不再有 Shard 下拉框（Shard 由 Top Bar 切换）；操作提示放进画布的 title（#39）", async () => {
+  it("画布上方不再有 Shard 下拉框（Shard 由 Top Bar 切换）；画布没有操作提示", async () => {
     mount();
     await settle(() => expect(shown.length).toBeGreaterThan(0));
     const map = container.querySelector(".world-map")!;
     expect(map.querySelector("select")).toBeNull();
     expect(map.querySelector(".world-map__bar")).toBeNull();
-    expect(map.querySelector<HTMLElement>(".world-map__canvas")!.title).toContain("缩放");
+    expect(map.querySelector<HTMLElement>(".world-map__canvas")!.title).toBe("");
+  });
+
+  it("鼠标悬停时在指针旁标出所指的房间名；离开画布即消失；触摸不显示", async () => {
+    mount();
+    await settle(() => expect(shown.length).toBeGreaterThan(0));
+    const label = () => container.querySelector<HTMLElement>("[data-hover-room]");
+    const at = screenOf(W13S28.x, W13S28.y);
+    canvas.dispatchEvent(new PointerEvent("pointermove", { ...at, pointerId: 1, pointerType: "mouse", bubbles: true }));
+    await settle(() => expect(label()?.textContent).toBe("W13S28"));
+    // 标签出现不能把画布挤掉（画布是代码插进去的）
+    expect(canvas.isConnected).toBe(true);
+    canvas.dispatchEvent(new PointerEvent("pointerleave", { pointerId: 1, pointerType: "mouse" }));
+    await settle(() => expect(label()).toBeNull());
+    canvas.dispatchEvent(new PointerEvent("pointermove", { ...at, pointerId: 2, pointerType: "touch", bubbles: true }));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(label()).toBeNull();
   });
 
   describe("房间名搜索（输入框与提示在 Sidebar，见 world-map-sections.test.tsx）", () => {

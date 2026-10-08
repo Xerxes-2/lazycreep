@@ -763,6 +763,28 @@ body {
   margin-top: 8px;
 }
 
+.world-map__surface {
+  position: absolute;
+  inset: 0;
+}
+
+/* 鼠标所指的房间名，跟着指针（不挡指针事件） */
+.world-map__hover-room {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.4));
+  background: var(--surface-card);
+  color: var(--fg);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
 .world-map__canvas canvas {
   position: absolute;
   inset: 0;
