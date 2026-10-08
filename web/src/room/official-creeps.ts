@@ -5,7 +5,7 @@
  *
  * 朝向（#57）：动画开关打开时，身体（官方 mainContainer 里的一切：部件环、tough、徽章、资源圆）按
  * `ctx.facings` 转到本 Tick 的朝向，有动画时从上一个朝向转过去（移动 0.2td，官方 rotateTo；冲撞 max(td/5, 0.4 秒)，
- * 官方 creepActions）；关闭时总是朝上。受击闪光（#58，{@link hitFlash}）挂在身体上，随整个 creep 位移。
+ * 官方 creepActions）；关闭时总是朝上。受击闪光（#58）另在 action-animation.ts 的 hitFlashes 里画（不参与点选），同样随整个 creep 位移。
  * 移动补间的位移不在这里：buildRoomScene 统一加到对象的所有图元上（movement-tween.ts）。
  *
  * 身体部件环（creepBuildBody）：
@@ -19,7 +19,7 @@
  * 其余白）。NPC（Invader `2`、Source Keeper `3`）只有一张 creep-npc 贴图。
  */
 import type { Color } from "../scene/scene.ts";
-import { hitFlash, turnAnimation } from "./action-animation.ts";
+import { turnAnimation } from "./action-animation.ts";
 import { facingTurnMs } from "./movement-tween.ts";
 import { LAYER, center, num, type ObjectPainter, type ObjectPainters, type PaintContext, type PrimitiveDraft } from "./room-paint.ts";
 import type { RoomObject } from "./room-state.ts";
@@ -166,17 +166,16 @@ function storeCircles(obj: RoomObject, layer: number): PrimitiveDraft[] {
 
 const creep: ObjectPainter = (obj, ctx) => {
   const layer = creepLayer(6);
-  const flash = ctx.animation ? hitFlash(obj, ctx.animation) : [];
-  if (isNpc(obj["user"])) return [...facingBody(obj, ctx, [officialSprite(obj, "body", "creep-npc", { width: 100, layer })]), ...flash];
+  if (isNpc(obj["user"])) return facingBody(obj, ctx, [officialSprite(obj, "body", "creep-npc", { width: 100, layer })]);
   const toughAlive = bodyOf(obj).some((p) => p.type === "tough" && p.hits > 0);
-  return [...facingBody(obj, ctx, [
+  return facingBody(obj, ctx, [
     disc(obj, "base", 50, 0x202020, layer),
     ...bodyRing(obj, layer),
     ...(toughAlive ? [officialSprite(obj, "tough", "tough", { width: 120, layer })] : []),
     disc(obj, "core", 32, 0x000000, layer),
     ...ownerBadge(obj, ctx, { radius: 26, layer, minZoom: true }),
     ...storeCircles(obj, layer),
-  ]), ...flash];
+  ]);
 };
 
 // ---- powerCreep（powerCreep.metadata.js：按职业与等级的贴图 + 偏上的方形徽章） ----
@@ -197,7 +196,6 @@ const powerCreep: ObjectPainter = (obj, ctx) => {
       officialSprite(obj, "body", `${className}-lvl${tier}`, { width: 180, layer, tint: 0xcc3d3e }),
       ...ownerBadge(obj, ctx, { radius: 26, layer, minZoom: true, box: POWER_CLASSES[className] }),
     ]),
-    ...(ctx.animation ? hitFlash(obj, ctx.animation) : []),
   ];
 };
 

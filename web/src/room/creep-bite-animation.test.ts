@@ -15,6 +15,7 @@ import { DEFAULT_ROOM_DISPLAY } from "./display-options.ts";
 import { buildRoomScene, type RoomSceneView } from "./room-scene.ts";
 import { roomStateFrom, type RoomState } from "./room-state.ts";
 import { nextFacings } from "./movement-tween.ts";
+import { pickObjects } from "../scene/scene-camera.ts";
 
 const TD = 2000;
 
@@ -152,22 +153,32 @@ describe("受击闪光（Scene）", () => {
     [{ attacked: { x: 21, y: 21 }, healed: { x: 19, y: 19 } }, 0xffff33],
   ])("%o：creep 身上加色闪光 %i，透明度 0 → 0.5 → 0，0.9td 的 1/4 升、3/4 降", (log, color) => {
     const scene = build(acting(log), idle);
-    const flash = byKey(scene, "c1/hit-flash");
-    expect(flash).toMatchObject({ kind: "image", objectId: "c1", alpha: 0, tint: color, blend: "add" });
+    const flash = byKey(scene, "effect/c1/hit-flash");
+    expect(flash).toMatchObject({ kind: "image", alpha: 0, tint: color, blend: "add" });
+    // 不带 objectId：闪光比格子大（1.28 格），带上就会让相邻格边缘的点选命中这个 creep
+    expect(flash.objectId).toBeUndefined();
     expect(flash.kind === "image" && flash.x + flash.width / 2).toBeCloseTo(20.5);
     expect(flash.kind === "image" && flash.y + flash.height / 2).toBeCloseTo(20.5);
     expect(flash.animation?.tweens).toEqual([{ property: "alpha", from: 0, steps: [{ to: 0.5, duration: 450 }, { duration: 1350 }] }]);
     expect(animationDuration(flash.animation!)).toBe(0.9 * TD);
   });
 
+  it("不参与点选：点相邻格子的边缘不会选中这个 creep", () => {
+    const scene = build(acting({ attacked: { x: 21, y: 21 } }), idle);
+    expect(pickObjects(scene, 20.5, 20.5)).toContain("c1");
+    for (const [x, y] of [[19.9, 20.5], [21.1, 20.5], [20.5, 19.9], [20.5, 21.1]] as const) {
+      expect(pickObjects(scene, x, y)).not.toContain("c1");
+    }
+  });
+
   it("没有被攻击或治疗时没有受击闪光", () => {
     const scene = build(acting({ attacked: null, healed: null }), idle);
-    expect(scene.primitives.some((p) => p.key === "c1/hit-flash")).toBe(false);
+    expect(scene.primitives.some((p) => p.key === "effect/c1/hit-flash")).toBe(false);
   });
 
   it("跟着 creep 移动", () => {
     const scene = build(acting({ attacked: { x: 22, y: 20 } }, { x: 21, y: 20 }), idle);
-    expect(tweensOf(byKey(scene, "c1/hit-flash"), "offsetX")).toEqual([{ property: "offsetX", from: -1, steps: [{ duration: TD, easing: "easeInOutQuad" }] }]);
+    expect(tweensOf(byKey(scene, "effect/c1/hit-flash"), "offsetX")).toEqual([{ property: "offsetX", from: -1, steps: [{ duration: TD, easing: "easeInOutQuad" }] }]);
   });
 });
 
@@ -176,7 +187,7 @@ describe("开关关闭", () => {
     const log = { attack: { x: 21, y: 20 }, harvest: { x: 21, y: 21 }, attacked: { x: 21, y: 20 }, healed: { x: 21, y: 20 } };
     const off = build(acting(log), idle, { ...view, display: { ...DEFAULT_ROOM_DISPLAY, animation: false } });
     expect(off.primitives.filter((p) => p.animation)).toEqual([]);
-    expect(off.primitives.some((p) => p.key === "c1/hit-flash" || p.key.startsWith("action/"))).toBe(false);
+    expect(off.primitives.some((p) => p.key === "effect/c1/hit-flash" || p.key.startsWith("action/"))).toBe(false);
     const quiet = build(acting({}), idle, { ...view, display: { ...DEFAULT_ROOM_DISPLAY, animation: false } });
     expect(off.primitives).toEqual(quiet.primitives);
     expect(build(acting(log), undefined).primitives.filter((p) => p.animation)).toEqual([]);

@@ -19,7 +19,7 @@ import { nameLabel } from "./name-labels.ts";
 import { sayBubble } from "./say-bubbles.ts";
 import type { SeasonArt } from "../art/season-art.ts";
 import { GLOW_GAIN, LIGHTING_LAYER, officialLighting } from "./official-lighting.ts";
-import { actionEffects } from "./action-animation.ts";
+import { actionEffects, hitFlashes } from "./action-animation.ts";
 import { applyObjectMotions, nextFacings, objectMotions, type Facings } from "./movement-tween.ts";
 import { OFFICIAL_PAINTERS } from "./official-painters.ts";
 import { officialRoomLayers } from "./official-terrain.ts";
@@ -136,7 +136,7 @@ export function buildRoomScene(
   if (display.lighting) primitives.push(...officialLighting(room.state, animation));
   if (animation) {
     const lighting = display.lighting ? { layer: LIGHTING_LAYER, gain: GLOW_GAIN } : undefined;
-    primitives.push(...actionEffects(room.state, animation, { lighting }));
+    primitives.push(...actionEffects(room.state, animation, { lighting }), ...hitFlashes(room.state, animation));
   }
   // 整个对象一起动（移动补间等）：统一加到对象的所有图元上，见 movement-tween.ts
   const moved = animation ? applyObjectMotions(primitives, objectMotions(room.state, animation), animation) : primitives;

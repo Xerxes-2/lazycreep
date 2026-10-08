@@ -238,7 +238,21 @@ export const HIT_FLASH_DURATION = 0.9;
  * 0 → 0.5 → 0，0.9td 的 1/4 升、3/4 降。部件名 `hit-flash`；由 creep / powerCreep 的画法放进自己的图元，
  * 所以带 objectId、随整个 creep 位移（移动补间、冲撞）。
  */
-export function hitFlash(obj: RoomObject, anim: AnimationContext): PrimitiveDraft[] {
+/**
+ * 受击闪光：creep / powerCreep 本 Tick 被攻击（红）、被治疗（绿）或两者（黄）。
+ * key 为 `effect/<id>/hit-flash`、不带 objectId：随整个对象位移（movement-tween.ts 认 `effect/` 前缀），
+ * 但不参与点选（闪光 1.28 格见方，带上 objectId 会让相邻格边缘的点选命中这个 creep）。
+ */
+export function hitFlashes(state: RoomState, anim: AnimationContext): Primitive[] {
+  const out: Primitive[] = [];
+  for (const [id, obj] of Object.entries(state.objects)) {
+    if (obj["type"] !== "creep" && obj["type"] !== "powerCreep") continue;
+    for (const { part, ...draft } of hitFlash(obj, anim)) out.push({ ...draft, key: `effect/${id}/${part}` } as Primitive);
+  }
+  return out;
+}
+
+function hitFlash(obj: RoomObject, anim: AnimationContext): PrimitiveDraft[] {
   const log = obj["actionLog"];
   if (typeof log !== "object" || log === null) return [];
   const { attacked, healed } = log as Record<string, unknown>;
@@ -281,7 +295,7 @@ function actingPosition(obj: RoomObject, id: string, anim: AnimationContext): Po
 /**
  * creep 与 powerCreep（官方两者都用 creepActions）：远程攻击、远程治疗、建造、升级、维修的光束与目标闪光，
  * 群体远程攻击的圆环，采集与预定的目标闪光（#58）。冲撞是整个 creep 的位移（movement-tween.ts 的 biteOf），
- * 受击闪光挂在 creep 本体上（{@link hitFlash}）；拆除、攻击控制器、transfer / withdraw 不画。
+ * 受击闪光见 {@link hitFlashes}；拆除、攻击控制器、transfer / withdraw 不画。
  */
 const creep: EffectRule = (obj, anim, options, id) => {
   const out: PrimitiveDraft[] = [];

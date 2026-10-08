@@ -137,10 +137,13 @@ function biteTweens(bite: { readonly dx: number; readonly dy: number }, tickMs: 
   return tweens;
 }
 
-/** 图元属于哪个对象：objectId，或发光的 key（`lighting/<id>/…`，不参与点选、不带 objectId） */
+/**
+ * 图元属于哪个对象：objectId，或跟随对象但不参与点选的 key（不带 objectId）：
+ * 发光 `lighting/<id>/…`、挂在对象上的效果 `effect/<id>/…`（如受击闪光）
+ */
 function motionOwner(p: Primitive): string | undefined {
   if (p.objectId !== undefined) return p.objectId;
-  const match = /^lighting\/([^/]+)\//.exec(p.key);
+  const match = /^(?:lighting|effect)\/([^/]+)\//.exec(p.key);
   return match?.[1];
 }
 
