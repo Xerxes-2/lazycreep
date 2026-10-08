@@ -3,6 +3,7 @@
  * 任何改动让 Room View 的静止画面变了，这里就会变红；有意的改动用 `vitest -u` 更新快照并在提交里说明。
  * 不给赛季贴图（seasonArt）：赛季对象画兜底画法，快照不依赖赛季服的预检。
  */
+import { createHash } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_THEME } from "../scene/theme.ts";
 import { FixtureSource, fixtureBundle } from "../source/fixture-source.ts";
@@ -12,6 +13,16 @@ import { reduceLiveTick, type RoomState } from "./room-state.ts";
 const bundle = fixtureBundle(
   Object.values(import.meta.glob<unknown>("../../../fixtures/season/*.json", { eager: true, import: "default" })),
 );
+
+/** 超过这个长度的 data URL（合成地形、内联 SVG）在快照里换成摘要：内容一变摘要就变，快照仍然锁得住，但不会塞进几十 KB 的单行 */
+const INLINE_URL_MAX = 120;
+
+function snapshotValue(_key: string, value: unknown): unknown {
+  if (typeof value !== "string" || !value.startsWith("data:") || value.length <= INLINE_URL_MAX) return value;
+  const head = value.slice(0, value.search(/[;,]/));
+  const digest = createHash("sha256").update(value).digest("hex").slice(0, 16);
+  return `${head};… ${value.length} chars sha256:${digest}`;
+}
 
 async function finalState(room: string): Promise<RoomState> {
   const source = new FixtureSource(bundle, { speed: Infinity });
@@ -39,7 +50,7 @@ describe("官方画风：录制房间的 Scene 输出不变", () => {
     const scenes = Object.fromEntries(Object.entries(views).map(([name, view]) => [name, buildRoomScene({ state, terrain }, view)]));
     // 一行一个图元，便于看出差异
     const text = Object.entries(scenes)
-      .map(([name, { primitives, ...rest }]) => [`# ${name} ${JSON.stringify(rest)}`, ...primitives.map((p) => JSON.stringify(p))].join("\n"))
+      .map(([name, { primitives, ...rest }]) => [`# ${name} ${JSON.stringify(rest)}`, ...primitives.map((p) => JSON.stringify(p, snapshotValue))].join("\n"))
       .join("\n");
     await expect(text + "\n").toMatchFileSnapshot(`__snapshots__/official-${room}.txt`);
   });
