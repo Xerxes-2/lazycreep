@@ -2,7 +2,8 @@
  * 玩家建筑的官方画法（spawn、extension、storage、tower、controller、source，terminal、link、lab、factory、
  * nuker、observer、power spawn、extractor、container）。
  * 照 screeps/renderer `metadata/src/objects/<类型>.metadata.js`（commit 见 public/official-art/SOURCE.txt）改写；
- * lighting 图层（glow）、补间与闪烁都不做，闪烁的部件取一个静态透明度。并入 official-painters.ts 的映射表。
+ * lighting 图层（glow）与闪烁不做，闪烁的部件取一个静态透明度；有界动画（ADR 0008）只有塔开火时炮塔转向（#55）。
+ * 并入 official-painters.ts 的映射表。
  */
 import type { OfficialSvgName } from "../art/official-art.ts";
 import type { Color } from "../scene/scene.ts";
@@ -10,6 +11,7 @@ import type { ObjectPainter, ObjectPainters, PrimitiveDraft } from "./room-paint
 import { center, num } from "./room-paint.ts";
 import type { RoomObject } from "./room-state.ts";
 import { ownerBadge } from "./owner-badge.ts";
+import { turnAnimation } from "./action-animation.ts";
 import {
   ENERGY,
   capacityOf,
@@ -317,7 +319,11 @@ function calculateAngle(x0: number, y0: number, x: number, y: number): number {
   return angle;
 }
 
-function shotTarget(obj: RoomObject): { x: number; y: number } | undefined {
+/** 炮塔转向目标的时长（官方 RotateTo(rotation, 0.3)，与 Tick 间隔无关） */
+export const TOWER_TURN_MS = 300;
+
+function shotTarget(obj: RoomObject | undefined): { x: number; y: number } | undefined {
+  if (!obj) return undefined;
   const log = obj["actionLog"];
   if (typeof log !== "object" || log === null) return undefined;
   for (const key of ["attack", "heal", "repair"]) {
@@ -334,10 +340,19 @@ const tower: ObjectPainter = (obj, ctx) => {
   const layer = zLayer(13);
   const npc = isNpc(obj["user"]);
   const shot = shotTarget(obj);
-  const rotation = shot ? calculateAngle(shot.x, shot.y, num(obj, "x") ?? 0, num(obj, "y") ?? 0) : 0;
+  const towerRotation = (state: RoomObject | undefined) => {
+    const target = shotTarget(state);
+    return target ? calculateAngle(target.x, target.y, num(obj, "x") ?? 0, num(obj, "y") ?? 0) : 0;
+  };
+  const rotation = towerRotation(obj);
+  // 开火时炮塔从上一个画面的朝向（上个 Tick 的目标，空闲时 0）转向本 Tick 的目标；空闲时不转（不做空闲转动）
+  const previous = ctx.animation?.previous.objects[String(obj["_id"])];
+  const turn =
+    ctx.animation && shot ? turnAnimation(ctx.animation, center(obj), towerRotation(previous) - rotation, TOWER_TURN_MS) : undefined;
+  const turning = turn ? { animation: turn } : {};
   const prims: PrimitiveDraft[] = [
     officialSprite(obj, "base", "tower-base", { width: 200, tint: ownerTint(obj, ctx), layer }),
-    officialSprite(obj, "turret", npc ? "tower-rotatable-npc" : "tower-rotatable", { width: 115, anchorY: 32 / 115, rotation, layer }),
+    { ...officialSprite(obj, "turret", npc ? "tower-rotatable-npc" : "tower-rotatable", { width: 115, anchorY: 32 / 115, rotation, layer }), ...turning },
   ];
   const cap = energyCapacity(obj);
   const local = cap ? Math.min(TOWER_ENERGY_HEIGHT, (TOWER_ENERGY_HEIGHT * energyStore(obj)) / cap) : 0;
@@ -358,7 +373,7 @@ const tower: ObjectPainter = (obj, ctx) => {
       [-halfWidth, bottom],
     ] as const;
     const points = corners.flatMap(([dx, dy]) => [x + dx * cos - dy * sin, y + dx * sin + dy * cos]);
-    prims.push({ part: "energy", kind: "polygon", layer, points, fill: ENERGY });
+    prims.push({ part: "energy", kind: "polygon", layer, points, fill: ENERGY, ...turning });
   }
   return prims;
 };

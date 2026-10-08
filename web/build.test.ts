@@ -159,8 +159,8 @@ describe("官方 PNG 纹理按需加载（#46）", () => {
   const textureDir = join(here, "public/official-art/textures");
   const pngs = readdirSync(textureDir).filter((f) => f.endsWith(".png"));
 
-  it("纹理（地形 4 张与光照的 glow）在产物里，但不在 PWA 预缓存清单里", () => {
-    expect(pngs.sort()).toEqual(["glow.png", "ground-mask.png", "ground.png", "noise1.png", "noise2.png"]);
+  it("纹理（地形 4 张、光照的 glow、动作动画的 flare1 / flare2）在产物里，但不在 PWA 预缓存清单里", () => {
+    expect(pngs.sort()).toEqual(["flare1.png", "flare2.png", "glow.png", "ground-mask.png", "ground.png", "noise1.png", "noise2.png"]);
     const sw = readFileSync(join(outDir, "sw.js"), "utf8");
     const precached = [...sw.matchAll(/url:"([^"]+)"/g)].map((m) => m[1]!);
     for (const png of pngs) {

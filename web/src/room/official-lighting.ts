@@ -13,7 +13,8 @@
  *   与盖在对象上的小 glow（宽 100–250，如有能量的 extension / spawn / tower、有物资的 storage）。
  *   它们在官方里只是让对象本身不被环境光压暗；我们的对象本来就不变暗，再加色只会把对象冲白，所以不做。
  *   于是“有能量才亮”这类条件大多随小 glow 一起消失，只剩 link、lab 的大 glow 仍按物资点亮。
- * - 闪烁、缩放、tower 开火与 spawn 孵化时的闪光都是动画，取静止时的样子。
+ * - 闪烁、缩放与 spawn 孵化时的闪光取静止时的样子（ADR 0008 不做常驻动画）。tower 开火时的 glow 闪光（#55）
+ *   随动画开关：给了 AnimationContext 时，开火的塔的 glow 透明度 0.5 → 1 →（0.1td 升、0.3td 降）回到 0.5。
  * - 关闭光照时官方地形也自带等量的压暗（地面 0x202020，与 0x555555 × 0x808080 相近；沼泽染 0x808080），
  *   对象全亮——与我们“#46 的压暗保留、只去掉 glow”一致，所以开关只决定 glow 图元的有无。
  * - 加色不会像 SCREEN 那样饱和：GLOW_GAIN 按密集基地中心（十几个大 glow 叠加）提亮约 0.2 选定，
@@ -21,7 +22,8 @@
  */
 import { officialTextureUrl } from "../art/official-textures.ts";
 import type { Color, ImagePrimitive, Primitive } from "../scene/scene.ts";
-import { LAYER, center, num } from "./room-paint.ts";
+import { LAYER, center, num, type AnimationContext } from "./room-paint.ts";
+import { TOWER_FLASH, animationOf, pulse, towerShot } from "./action-animation.ts";
 import { energyStore, storeTotal, u } from "./official-sprite.ts";
 import type { RoomObject, RoomState } from "./room-state.ts";
 
@@ -95,7 +97,7 @@ const RULES: Readonly<Record<string, GlowRule>> = {
 };
 
 /** 房间里所有对象的发光图元（buildRoomScene 在光照开启时用）；不带 objectId，不参与点选 */
-export function officialLighting(state: RoomState): Primitive[] {
+export function officialLighting(state: RoomState, animation?: AnimationContext): Primitive[] {
   const url = officialTextureUrl("glow");
   const out: Primitive[] = [];
   for (const [id, obj] of Object.entries(state.objects)) {
@@ -104,9 +106,11 @@ export function officialLighting(state: RoomState): Primitive[] {
     if (num(obj, "x") === undefined || num(obj, "y") === undefined) continue;
     const { x, y } = center(obj);
     let i = 0;
+    const fired = animation !== undefined && type === "tower" && towerShot(obj) !== undefined;
     for (const glow of RULES[type]!(obj, state.gameTime)) {
       if (!glow) continue;
       const size = u(glow.size);
+      const alpha = (glow.alpha ?? 1) * GLOW_GAIN;
       out.push({
         key: `lighting/${id}/${i++}`,
         kind: "image",
@@ -117,8 +121,11 @@ export function officialLighting(state: RoomState): Primitive[] {
         height: size,
         url,
         blend: "add",
-        alpha: (glow.alpha ?? 1) * GLOW_GAIN,
+        alpha,
         ...(glow.tint === undefined ? {} : { tint: glow.tint }),
+        ...(fired && animation
+          ? { animation: animationOf(animation, [pulse("alpha", alpha, GLOW_GAIN, TOWER_FLASH.up * animation.tickMs, TOWER_FLASH.down * animation.tickMs)]) }
+          : {}),
       } satisfies ImagePrimitive);
     }
   }

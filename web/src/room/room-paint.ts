@@ -5,7 +5,7 @@ import type { SeasonArt } from "../art/season-art.ts";
 import type { Color, Primitive } from "../scene/scene.ts";
 import type { Theme } from "../scene/theme.ts";
 import type { RoomUser } from "../source/source.ts";
-import type { RoomObject } from "./room-state.ts";
+import type { RoomObject, RoomState } from "./room-state.ts";
 
 /** Room View 的层级。新画法挑一个已有层级，或在两层之间取值。 */
 export const LAYER = {
@@ -45,6 +45,18 @@ export interface PaintContext {
   ownerColor(user: unknown): Color;
   /** 已确认可用的赛季贴图（#47）；没有时赛季对象用兜底画法（season-painters.ts） */
   readonly seasonArt?: SeasonArt;
+  /** 本 Tick 要播放有界动画时给出（ADR 0008）；没有时画法只画静止画面、不带动画描述 */
+  readonly animation?: AnimationContext;
+}
+
+/** 画法播放动画需要的上下文（action-animation.ts 的构件都收它） */
+export interface AnimationContext {
+  /** 动画的标识（本 Tick 的 gameTime）：放进 PrimitiveAnimation.id，连续两个 Tick 的同样动作也会重播 */
+  readonly tick: number;
+  /** Tick 间隔（毫秒，已取 max(间隔, 100)）；动画时长按它的比例算 */
+  readonly tickMs: number;
+  /** 上一个画出的房间状态（移动补间、炮塔转向的起点） */
+  readonly previous: RoomState;
 }
 
 /** 一种对象类型的画法。对象保证带数值 x、y。 */
