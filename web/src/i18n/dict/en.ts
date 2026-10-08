@@ -237,6 +237,7 @@ export const en: Partial<Record<MessageKey, string>> = {
   "shell.menu.server": "Server and token",
   "shell.sidebar": "Sidebar",
   "shell.sidebar.toggle": "Collapse or expand the Sidebar",
+  "shell.sidebar.resize": "Drag to resize the Sidebar; double-click to restore automatic width",
   "shell.details.hint": "Select an object in the Room View to see its details here.",
   // World Map units layer (#44)
   "worldMapSidebar.layers.units": "Units",

@@ -2,7 +2,7 @@
  * 外壳状态（#24，ADR 0005）：整页唯一的一份，Top Bar、Main View、Sidebar、Menu、Console Panel 都读写它。
  *
  * - Main View 模式（World Map / Room View）：运行状态，存 `msc.mainView`，不进设置导出。
- * - Sidebar 是否收起（宽屏与窄屏底部面板各一份）、各 Sidebar Section 的折叠（按区块 id）、
+ * - Sidebar 是否收起（宽屏与窄屏底部面板各一份）、宽屏 Sidebar 宽度、各 Sidebar Section 的折叠（按区块 id）、
  *   Console Panel 开合与高度：用户设置，存 `msc.shell`，进设置导出。
  * - Menu 当前打开项、Room View 的房间：不持久化。
  *
@@ -78,6 +78,9 @@ export const MAIN_VIEW_STORAGE: StoredKey = { key: "msc.mainView", kind: "json-s
 /** Console Panel 高度（CSS 像素）的范围与默认值 */
 export const CONSOLE_HEIGHT = { min: 120, max: 800, initial: 260 } as const;
 
+/** 宽屏 Sidebar 拖出的宽度（CSS 像素）的范围；没拖过时按视口自动取宽（styles.css） */
+export const SIDEBAR_WIDTH = { min: 260, max: 1200 } as const;
+
 interface ShellPrefs {
   /** 宽屏 Sidebar 是否打开（旧版唯一的开合值沿用这个字段，即迁移为宽屏状态） */
   readonly sidebarOpen: boolean;
@@ -85,13 +88,17 @@ interface ShellPrefs {
   readonly sheetOpen: boolean;
   /** 折叠了的区块 id → true（没出现即展开） */
   readonly collapsed: Readonly<Record<string, true>>;
+  /** 宽屏 Sidebar 宽度；undefined 为自动 */
+  readonly sidebarWidth?: number;
   readonly consoleOpen: boolean;
   readonly consoleHeight: number;
 }
 
 const DEFAULT_PREFS: ShellPrefs = { sidebarOpen: true, sheetOpen: false, collapsed: {}, consoleOpen: false, consoleHeight: CONSOLE_HEIGHT.initial };
 
-const clampHeight = (px: number) => Math.round(Math.min(CONSOLE_HEIGHT.max, Math.max(CONSOLE_HEIGHT.min, px)));
+const clamp = (range: { readonly min: number; readonly max: number }, px: number) => Math.round(Math.min(range.max, Math.max(range.min, px)));
+const clampHeight = (px: number) => clamp(CONSOLE_HEIGHT, px);
+const clampWidth = (px: number) => clamp(SIDEBAR_WIDTH, px);
 
 function decodePrefs(value: unknown): ShellPrefs | undefined {
   if (!isRecord(value)) return undefined;
@@ -100,10 +107,12 @@ function decodePrefs(value: unknown): ShellPrefs | undefined {
     for (const [id, flag] of Object.entries(value["collapsed"])) if (flag === true) collapsed[id] = true;
   }
   const height = value["consoleHeight"];
+  const width = value["sidebarWidth"];
   return {
     sidebarOpen: typeof value["sidebarOpen"] === "boolean" ? value["sidebarOpen"] : DEFAULT_PREFS.sidebarOpen,
     sheetOpen: typeof value["sheetOpen"] === "boolean" ? value["sheetOpen"] : DEFAULT_PREFS.sheetOpen,
     collapsed,
+    ...(typeof width === "number" && Number.isFinite(width) ? { sidebarWidth: clampWidth(width) } : {}),
     consoleOpen: typeof value["consoleOpen"] === "boolean" ? value["consoleOpen"] : DEFAULT_PREFS.consoleOpen,
     consoleHeight: typeof height === "number" && Number.isFinite(height) ? clampHeight(height) : DEFAULT_PREFS.consoleHeight,
   };
@@ -141,6 +150,10 @@ export interface ShellState {
   sectionCollapsed(id: string): boolean;
   setSectionCollapsed(id: string, collapsed: boolean): void;
   toggleSection(id: string): void;
+  /** 宽屏 Sidebar 拖出的宽度；undefined 为自动 */
+  readonly sidebarWidth: Accessor<number | undefined>;
+  /** 设宽度（夹在 SIDEBAR_WIDTH 内）；undefined 恢复自动 */
+  setSidebarWidth(px: number | undefined): void;
 
   // ---- Console Panel ----
   readonly consoleOpen: Accessor<boolean>;
@@ -167,11 +180,11 @@ export function createShellState(
   clearLegacyLayout(storage);
 
   const [prefs, setPrefs] = createSignal<ShellPrefs>(readJson(storage, SHELL_STORAGE.key, decodePrefs, DEFAULT_PREFS));
-  const change = (patch: Partial<ShellPrefs>) => {
-    const next = { ...prefs(), ...patch };
+  const save = (next: ShellPrefs) => {
     setPrefs(next);
     writeJson(storage, SHELL_STORAGE.key, next);
   };
+  const change = (patch: Partial<ShellPrefs>) => save({ ...prefs(), ...patch });
 
   const [mainView, setMainView] = createSignal<MainViewMode>(readJson(storage, MAIN_VIEW_STORAGE.key, decodeMode, "map"));
   const showMainView = (mode: MainViewMode) => {
@@ -240,6 +253,11 @@ export function createShellState(
     sectionCollapsed,
     setSectionCollapsed,
     toggleSection: (id) => setSectionCollapsed(id, !sectionCollapsed(id)),
+    sidebarWidth: () => prefs().sidebarWidth,
+    setSidebarWidth(px) {
+      const { sidebarWidth: _dropped, ...rest } = prefs();
+      save(px === undefined ? rest : { ...rest, sidebarWidth: clampWidth(px) });
+    },
 
     consoleOpen: () => prefs().consoleOpen,
     setConsoleOpen: (open) => change({ consoleOpen: open }),

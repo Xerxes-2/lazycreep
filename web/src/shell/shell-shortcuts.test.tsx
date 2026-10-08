@@ -41,9 +41,9 @@ const sectionCollapsed = (id: string) => q(`[data-section="${id}"] .sidebar-sect
 const consoleHeight = () => q("[data-console-panel]")!.style.height;
 const settle = (assertion: () => void) => vi.waitFor(assertion, { timeout: 3000, interval: 5 });
 
-function pointer(target: Element, type: string, clientY: number) {
+function pointer(target: Element, type: string, clientY: number, clientX = 0) {
   // jsdom 没有 PointerEvent 时用 MouseEvent 补上 pointerId
-  const event = new MouseEvent(type, { bubbles: true, cancelable: true, clientY, button: 0 });
+  const event = new MouseEvent(type, { bubbles: true, cancelable: true, clientX, clientY, button: 0 });
   Object.defineProperty(event, "pointerId", { value: 1 });
   target.dispatchEvent(event);
 }
@@ -55,6 +55,66 @@ function dragConsoleEdge(fromY: number, toY: number) {
   pointer(handle, "pointermove", toY);
   pointer(handle, "pointerup", toY);
 }
+
+function dragSidebarEdge(fromX: number, toX: number) {
+  const handle = q("[data-action=resize-sidebar]")!;
+  pointer(handle, "pointerdown", 0, fromX);
+  pointer(handle, "pointermove", 0, toX);
+  pointer(handle, "pointerup", 0, toX);
+}
+
+const sidebarWidth = () => q(".sidebar")!.style.getPropertyValue("--sidebar-set-width");
+
+describe("Sidebar 宽度拖动", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    container = document.createElement("div");
+    document.body.append(container);
+  });
+  afterEach(() => {
+    dispose?.();
+    dispose = undefined;
+    container.remove();
+  });
+
+  it("默认自动宽度；拖动左边缘调宽度，限制在范围内，重新挂载后恢复，双击恢复自动", () => {
+    mount();
+    expect(sidebarWidth()).toBe("");
+    expect(q(".sidebar")!.dataset["width"]).toBeUndefined();
+    // jsdom 量不出宽度，从最小宽度 260px 起算；往左拖变宽
+    dragSidebarEdge(800, 700);
+    expect(sidebarWidth()).toBe("360px");
+    expect(q(".sidebar")!.dataset["width"]).toBe("custom");
+    mount();
+    expect(sidebarWidth()).toBe("360px");
+
+    dragSidebarEdge(700, 2000);
+    expect(sidebarWidth()).toBe("260px");
+
+    q("[data-action=resize-sidebar]")!.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    expect(sidebarWidth()).toBe("");
+    expect(q(".sidebar")!.dataset["width"]).toBeUndefined();
+  });
+
+  it("手柄聚焦后用左右方向键调宽度；Sidebar 收起或窄屏时没有手柄", () => {
+    mount();
+    dragSidebarEdge(800, 700);
+    const handle = q("[data-action=resize-sidebar]")!;
+    handle.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true, cancelable: true }));
+    expect(sidebarWidth()).toBe("380px");
+    expect(handle.getAttribute("aria-valuenow")).toBe("380");
+    handle.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true }));
+    expect(sidebarWidth()).toBe("360px");
+
+    press("h");
+    expect(q("[data-action=resize-sidebar]")).toBeNull();
+    mount(true);
+    press("h");
+    expect(sidebarShown()).toBe(true);
+    expect(q("[data-action=resize-sidebar]")).toBeNull();
+    expect(sidebarWidth()).toBe("");
+  });
+});
 
 describe("快捷键目录（#30）", () => {
   beforeEach(() => {
@@ -250,12 +310,13 @@ describe("设置导出涵盖外壳状态（#30）", () => {
     container.remove();
   });
 
-  it("导出 → 清空 → 导入后，Sidebar 收起（宽屏与窄屏各一份）、区块折叠、Console Panel 开合与高度全部还原；导出中无 token", () => {
+  it("导出 → 清空 → 导入后，Sidebar 收起（宽屏与窄屏各一份）与宽度、区块折叠、Console Panel 开合与高度全部还原；导出中无 token", () => {
     localStorage.setItem("msc.settings", JSON.stringify({ serverId: "season", customServers: [], token: "secret-token", shards: {} }));
     mount();
     q<HTMLButtonElement>("[data-section='map.pvp'] [data-action=toggle-section]")!.click();
     press("`");
     dragConsoleEdge(500, 300);
+    dragSidebarEdge(800, 700);
     press("h");
     expect(sectionCollapsed("map.pvp")).toBe(true);
     expect(sidebarShown()).toBe(false);
@@ -284,6 +345,7 @@ describe("设置导出涵盖外壳状态（#30）", () => {
     expect(consoleHeight()).toBe("460px");
     press("h");
     expect(sectionCollapsed("map.pvp")).toBe(true);
+    expect(sidebarWidth()).toBe("360px");
     mount(true);
     expect(sidebarShown()).toBe(true);
   });

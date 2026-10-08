@@ -251,6 +251,7 @@ body {
 /*
  * Sidebar（#24）：挤压 Main View。宽度取“视口宽 − Main View 高”，让 Main View 接近正方形
  * （房间与世界都是 1:1），多出的横向空间给 Sidebar；夹在 260px 与 640px 之间。
+ * 拖过左边缘手柄后用拖出的宽度（--sidebar-set-width），但给 Main View 至少留 240px。
  */
 .sidebar {
   --sidebar-width: clamp(260px, calc(100vw - (100dvh - var(--top-bar-height))), 640px);
@@ -261,8 +262,34 @@ body {
   border-left: 1px solid color-mix(in srgb, var(--muted) 40%, transparent);
 }
 
+.sidebar[data-width="custom"] {
+  --sidebar-width: max(260px, min(var(--sidebar-set-width), calc(100vw - 240px)));
+}
+
 .sidebar[hidden] {
   display: none;
+}
+
+/* 左边缘的拖动手柄：本身不占宽，命中区向两侧各伸出 4px，盖在 Main View 与 Sidebar 的交界上 */
+.sidebar-resize {
+  position: relative;
+  z-index: 2;
+  flex: none;
+  width: 0;
+  cursor: ew-resize;
+  touch-action: none;
+  outline: none;
+}
+
+.sidebar-resize::before {
+  content: "";
+  position: absolute;
+  inset: 0 -4px;
+}
+
+.sidebar-resize:hover::before,
+.sidebar-resize:focus-visible::before {
+  background: color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
 .sidebar-section[hidden],

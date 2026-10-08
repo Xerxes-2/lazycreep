@@ -235,6 +235,7 @@ export const zhCN = {
   "shell.menu.server": "Server 与 token",
   "shell.sidebar": "侧栏",
   "shell.sidebar.toggle": "收起或展开侧栏",
+  "shell.sidebar.resize": "拖动调整侧栏宽度，双击恢复自动宽度",
   "shell.details.hint": "在房间视图里点选对象，详情显示在这里。",
   // World Map 单位图层（#44）
   "worldMapSidebar.layers.units": "单位",
