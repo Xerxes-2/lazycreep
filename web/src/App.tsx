@@ -35,6 +35,7 @@ import { createUrlRouter, isReplayAddress } from "./shell/url-router.ts";
 import { LiveSource } from "./source/live-source.ts";
 import { sharedSources } from "./source/shared-source.ts";
 import { staticCached } from "./source/static-cache.ts";
+import { loadTilePixels } from "./source/tile-terrain.ts";
 import { browserStorage } from "./storage/local-store.ts";
 
 const liveSource: SourceFactory = (server, token) =>
@@ -76,7 +77,7 @@ function Shell(props: ShellOwnProps) {
   // 启动画面（#33）观察共享 Source 之下的真实事件；URL 指向 Replay 时认证不是必需的
   const boot = createBootProgress({ authOptional: () => replayRoute() });
   // Shard 列表与世界尺寸按 Server 缓存、在途去重（#35）：启动时不等这些请求
-  const sourceFor = sharedSources(staticCached(boot.wrapSources(props.sourceFor), { storage: browserStorage() }));
+  const sourceFor = sharedSources(staticCached(boot.wrapSources(props.sourceFor), { storage: browserStorage(), tilePixels: loadTilePixels }));
   // 窄屏（#29）：Console Panel 不显示，Console 改从 Menu 打开；Sidebar 开合按布局各记一份
   const narrow = props.narrow ?? mediaQuery(NARROW_QUERY);
   const shell = createShellState(browserStorage(), settings, narrow);

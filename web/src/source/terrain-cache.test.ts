@@ -9,6 +9,7 @@ import { SERVER_PRESETS } from "./servers.ts";
 import type { ServerConfig, ServerVersion, Source, Terrain } from "./source.ts";
 import { STATIC_CACHE_STORAGE, staticCached } from "./static-cache.ts";
 import { TERRAIN_CACHE_MAX_ROOMS, TERRAIN_CACHE_STORAGE } from "./terrain-cache.ts";
+import type { TilePixels } from "./tile-terrain.ts";
 
 const bundle = fixtureBundle(
   Object.values(import.meta.glob<unknown>("../../../fixtures/season/*.json", { eager: true, import: "default" })),
@@ -127,5 +128,90 @@ describe("房间地形缓存", () => {
   it("存储键登记为不导出的运行状态", () => {
     expect(STORED_KEYS).toContain(TERRAIN_CACHE_STORAGE);
     expect(TERRAIN_CACHE_STORAGE).toMatchObject({ role: "runtime", prefix: true });
+  });
+});
+
+/** 150×150 的瓦片：按 encoded 上色；exits 里的格子画成出口 */
+function tilePixels(encoded: string, exits: readonly number[] = []): TilePixels {
+  const colors: Record<string, readonly number[]> = { "0": [43, 43, 43], "1": [0, 0, 0], "2": [35, 37, 19] };
+  const data = new Uint8ClampedArray(150 * 150 * 4);
+  for (let py = 0; py < 150; py++)
+    for (let px = 0; px < 150; px++) {
+      const cell = Math.floor(py / 3) * 50 + Math.floor(px / 3);
+      const [r, g, b] = exits.includes(cell) ? [50, 50, 50] : colors[encoded[cell]!]!;
+      data.set([r!, g!, b!, 255], (py * 150 + px) * 4);
+    }
+  return { width: 150, height: 150, data };
+}
+
+/** 瓦片地形：W1N1 没有出口（准确），W2N2 有出口（只能先画），W3N3 认不出 */
+const TILE_TERRAIN = "1".repeat(50) + "2".repeat(50) + "0".repeat(2400);
+function tiles() {
+  const urls: string[] = [];
+  const load = async (url: string): Promise<TilePixels> => {
+    urls.push(url);
+    if (url.endsWith("/W1N1.png")) return tilePixels(TILE_TERRAIN);
+    if (url.endsWith("/W2N2.png")) return tilePixels(TILE_TERRAIN, [149]);
+    if (url.endsWith("/W3N3.png")) return { width: 150, height: 150, data: new Uint8ClampedArray(150 * 150 * 4) };
+    throw new Error("404");
+  };
+  return { urls, load };
+}
+
+describe("房间地形缓存：从地图瓦片解地形", () => {
+  const openWithTiles = (net: ReturnType<typeof network>, load: (url: string) => Promise<TilePixels>, storage = memoryStorage()) =>
+    staticCached(net.factory, { storage, tilePixels: load })(SEASON, "t");
+
+  it("瓦片没有出口：直接用解出的地形，不请求 room-terrain，并且存进缓存", async () => {
+    const net = network();
+    const t = tiles();
+    const storage = memoryStorage();
+    expect((await openWithTiles(net, t.load, storage).getTerrain(SHARD, "W1N1")).encoded).toBe(TILE_TERRAIN);
+    expect(t.urls).toEqual(["/season-static/season11/map/shardSeason/W1N1.png"]);
+    expect(net.terrain).toEqual([]);
+    // 刷新页面后从存储取，不再解瓦片
+    const again = tiles();
+    expect((await openWithTiles(net, again.load, storage).getTerrain(SHARD, "W1N1")).encoded).toBe(TILE_TERRAIN);
+    expect(again.urls).toEqual([]);
+  });
+
+  it("瓦片有出口：先把解出的地形交给 onPreview，再请求准确地形并以它完成", async () => {
+    const net = network();
+    const previews: Terrain[] = [];
+    const terrain = await openWithTiles(net, tiles().load).getTerrain(SHARD, "W2N2", { onPreview: (p) => previews.push(p) });
+    expect(previews).toEqual([{ shard: SHARD, room: "W2N2", encoded: TILE_TERRAIN }]);
+    expect(net.terrain).toEqual(["W2N2"]);
+    expect(terrain).toEqual(terrainOf("W2N2"));
+  });
+
+  it("认不出或取不到瓦片：照旧请求，不给预览", async () => {
+    const net = network();
+    const previews: Terrain[] = [];
+    const source = openWithTiles(net, tiles().load);
+    await source.getTerrain(SHARD, "W3N3", { onPreview: (p) => previews.push(p) });
+    await source.getTerrain(SHARD, "W4N4", { onPreview: (p) => previews.push(p) });
+    expect(previews).toEqual([]);
+    expect(net.terrain).toEqual(["W3N3", "W4N4"]);
+  });
+
+  it("MMO（没有本赛季瓦片根地址）用 Server 的默认瓦片地址", async () => {
+    const net = network({ root: null });
+    const t = tiles();
+    await openWithTiles(net, t.load).getTerrain(SHARD, "W1N1");
+    expect(t.urls).toEqual([`${SEASON.tileRoot}/shardSeason/W1N1.png`]);
+    expect(net.terrain).toEqual([]);
+  });
+
+  it("版本信息取不到时不解瓦片（默认地址下可能是旧赛季的瓦片）", async () => {
+    const net = network();
+    const t = tiles();
+    const factory = (server: ServerConfig) => {
+      const base = net.factory(server);
+      base.getVersion = () => Promise.reject(new Error("down"));
+      return base;
+    };
+    await staticCached(factory, { storage: memoryStorage(), tilePixels: t.load })(SEASON, "t").getTerrain(SHARD, "W1N1");
+    expect(t.urls).toEqual([]);
+    expect(net.terrain).toEqual(["W1N1"]);
   });
 });

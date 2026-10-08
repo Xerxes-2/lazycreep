@@ -8,7 +8,8 @@
  * - 条目有上限，按最近使用淘汰：存储里的对象按使用先后排列（JSON 保持字符串键的插入顺序）。
  */
 import { isRecord, readJson, writeJson, type KeyValueStorage, type StoredKey } from "../storage/local-store.ts";
-import type { ServerVersion, Terrain } from "./source.ts";
+import type { ServerVersion, Terrain, TerrainOptions } from "./source.ts";
+import type { TileTerrain } from "./tile-terrain.ts";
 
 /** 每个 Server 一个键：`msc.terrainCache.<server id>` */
 export const TERRAIN_CACHE_STORAGE: StoredKey = {
@@ -40,12 +41,32 @@ export interface TerrainCacheOptions {
   readonly serverId: string;
   readonly getVersion: () => Promise<ServerVersion>;
   readonly fetch: (shard: string, room: string) => Promise<Terrain>;
+  /**
+   * 从本赛季的地图瓦片解地形（tile-terrain.ts）；认不出时 undefined。缓存未命中时先试它：
+   * 准确就直接用（不发 `room-terrain`），不准确就交给 onPreview 先画，再照常请求
+   */
+  readonly fromTile?: (shard: string, room: string) => Promise<TileTerrain | undefined>;
 }
 
-export function createTerrainCache(options: TerrainCacheOptions): (shard: string, room: string) => Promise<Terrain> {
+export function createTerrainCache(
+  options: TerrainCacheOptions,
+): (shard: string, room: string, terrainOptions?: TerrainOptions) => Promise<Terrain> {
   const storageKey = TERRAIN_CACHE_STORAGE.key + options.serverId;
   const memory = new Map<string, Terrain>();
   const inFlight = new Map<string, Promise<Terrain>>();
+  const tiles = new Map<string, Promise<TileTerrain | undefined>>();
+
+  /** 同一房间的瓦片只解一次（结束后移除；解出来的准确地形进缓存，近似地形不留） */
+  const fromTile = (shard: string, room: string, slot: string): Promise<TileTerrain | undefined> => {
+    if (!options.fromTile) return Promise.resolve(undefined);
+    let running = tiles.get(slot);
+    if (!running) {
+      running = options.fromTile(shard, room).catch(() => undefined);
+      tiles.set(slot, running);
+      void running.then(() => tiles.delete(slot));
+    }
+    return running;
+  };
 
   const season = (): Promise<string | undefined> =>
     options.getVersion().then(
@@ -66,7 +87,7 @@ export function createTerrainCache(options: TerrainCacheOptions): (shard: string
     writeJson(options.storage, storageKey, { season: current, rooms });
   };
 
-  return async (shard, room) => {
+  return async (shard, room, terrainOptions) => {
     const slot = `${shard}/${room}`;
     const current = await season();
     const remembered = memory.get(slot);
@@ -83,6 +104,17 @@ export function createTerrainCache(options: TerrainCacheOptions): (shard: string
         return terrain;
       }
     }
+    // 版本信息取不到时不解瓦片：默认根地址下可能是旧赛季的瓦片（map-tiles.ts）
+    const tile = current === undefined ? undefined : await fromTile(shard, room, slot);
+    const again = memory.get(slot);
+    if (again) return again;
+    if (tile?.exact) {
+      const terrain = { shard, room, encoded: tile.encoded };
+      memory.set(slot, terrain);
+      touch(current!, slot, tile.encoded);
+      return terrain;
+    }
+    if (tile) terrainOptions?.onPreview?.({ shard, room, encoded: tile.encoded });
     const running = inFlight.get(slot);
     if (running) return running;
     const started = options.fetch(shard, room).then((terrain) => {

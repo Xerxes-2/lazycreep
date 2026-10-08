@@ -21,6 +21,7 @@ import { sharedTime } from "./shared-time.ts";
 import { createDecorationCache } from "./decoration-cache.ts";
 import { createSnapshotCache } from "./snapshot-cache.ts";
 import { createTerrainCache } from "./terrain-cache.ts";
+import { decodeTileTerrain, type TilePixels } from "./tile-terrain.ts";
 import type { ServerVersion, ShardInfo, Source, UserInfo, WorldSize } from "./source.ts";
 
 /** 每个 Server 一个键：`msc.staticCache.<server id>` */
@@ -41,6 +42,8 @@ export interface StaticCacheOptions {
   readonly storage: KeyValueStorage | undefined;
   /** 当前时间（Unix 毫秒）；默认 Date.now */
   readonly now?: () => number;
+  /** 取地图瓦片的像素（tile-terrain.ts 的 loadTilePixels）；不给则不从瓦片解地形 */
+  readonly tilePixels?: (url: string) => Promise<TilePixels>;
 }
 
 interface Entry<T> {
@@ -194,12 +197,19 @@ export function withStaticCache(source: Source, options: StaticCacheOptions): So
       (entry) => store.update((stored) => ({ ...stored, version: entry })),
     );
 
+  /** 本赛季的单房间瓦片 → 地形；版本信息取不到时 terrain-cache 不会调它 */
+  const tileTerrain =
+    (load: (url: string) => Promise<TilePixels>) =>
+    async (shard: string, room: string) =>
+      decodeTileTerrain(await load(source.mapTiles(shard, await getVersion()).room(room)));
+
   /** 房间地形：赛季内不变，长期缓存（terrain-cache.ts） */
   const getTerrain = createTerrainCache({
     storage: options.storage,
     serverId: source.server.id,
     getVersion,
     fetch: (shard, room) => source.getTerrain(shard, room),
+    ...(options.tilePixels ? { fromTile: tileTerrain(options.tilePixels) } : {}),
   });
 
   /** 房间装饰：一天核对一次，失败时给“没有装饰”（decoration-cache.ts） */

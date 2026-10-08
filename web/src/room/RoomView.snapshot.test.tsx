@@ -15,7 +15,7 @@ import type { Scene } from "../scene/scene.ts";
 import { createSettings } from "../settings/settings.ts";
 import { SERVER_PRESETS } from "../source/servers.ts";
 import { SNAPSHOT_FRESH_MS, SNAPSHOT_REFRESH_MS } from "../source/snapshot-cache.ts";
-import type { ConnectionState, HistoryChunk, RoomSnapshot, RoomTick, Source } from "../source/source.ts";
+import type { ConnectionState, HistoryChunk, RoomSnapshot, RoomTick, Source, Terrain } from "../source/source.ts";
 import { withStaticCache } from "../source/static-cache.ts";
 import { RoomView } from "./RoomView.tsx";
 
@@ -180,6 +180,23 @@ describe("Room View 的房间快照（#63）", () => {
     expect(objectIds()).toEqual(new Set());
     net.release("W13S28");
     await settle(() => expect(objectIds()).toEqual(new Set(["c1", "c2"])));
+  });
+
+  it("准确地形到达之前先画瓦片解出的近似地形，准确地形到了替换", async () => {
+    let exact!: (terrain: Terrain) => void;
+    net.source.getTerrain = (shard, room, options) => {
+      options?.onPreview?.({ shard, room, encoded: "0".repeat(2500) });
+      return new Promise((resolve) => (exact = resolve));
+    };
+    mount();
+    const terrainUrl = () => {
+      const p = lastScene()?.primitives.find((q) => q.key === "official-terrain");
+      return p?.kind === "image" ? p.url : undefined;
+    };
+    await settle(() => expect(terrainUrl()).toBeDefined());
+    const preview = terrainUrl();
+    exact({ shard: SHARD, room: "W13S28", encoded: "1".repeat(50) + "0".repeat(2450) });
+    await settle(() => expect(terrainUrl()).not.toBe(preview));
   });
 
   it("第一帧先到时丢弃迟到的快照", async () => {

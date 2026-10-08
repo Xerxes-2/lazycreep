@@ -287,7 +287,16 @@ export class SourceError extends Error {
   }
 }
 
-/** getTime 的选项（#38） */
+/** getTerrain 的选项 */
+export interface TerrainOptions {
+  /**
+   * 准确地形到达之前先给的近似地形（缓存层从地图瓦片解出、但出口格底下认不准时，tile-terrain.ts）；
+   * 之后 getTerrain 照常以准确地形完成。底层实现忽略它
+   */
+  readonly onPreview?: (terrain: Terrain) => void;
+}
+
+/** getRoomSnapshot 的选项（#63） */
 export interface SnapshotOptions {
   /** 可接受的已缓存快照的最大年龄（毫秒），比它旧就重新请求；默认用快照缓存的有效期（snapshot-cache.ts） */
   readonly maxAgeMs?: number;
@@ -335,7 +344,7 @@ export interface Source {
   /** 当前 Tick；options 只对去重层（shared-time.ts）有意义，底层实现可忽略 */
   getTime(shard: string, options?: TimeOptions): Promise<number>;
   getShards(): Promise<readonly ShardInfo[]>;
-  getTerrain(shard: string, room: string): Promise<Terrain>;
+  getTerrain(shard: string, room: string, options?: TerrainOptions): Promise<Terrain>;
   /** 房间的装饰（`game/room-decorations`，匿名即可，#61）；没有装饰时 objects 为空、无 wall / floor */
   getRoomDecorations(shard: string, room: string): Promise<RoomDecorations>;
   /** 房间快照（`game/room-objects`，匿名即可，#63）；缓存层只在内存里留约 10 秒（snapshot-cache.ts） */

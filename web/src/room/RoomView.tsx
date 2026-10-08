@@ -251,7 +251,9 @@ export function RoomView(props: RoomViewProps) {
     }
     // 装饰走 Source 的装饰缓存（decoration-cache.ts），从不拒绝
     void roomDecorations(src, current.shard, current.room).then((loaded) => alive && setDecorations(loaded));
-    src.getTerrain(current.shard, current.room).then(
+    // 没缓存的房间先画从地图瓦片解出的近似地形（出口格底下认不准），准确地形到了替换
+    const onPreview = (preview: Terrain) => alive && !untrack(terrain) && setTerrain(preview);
+    src.getTerrain(current.shard, current.room, { onPreview }).then(
       (loaded) => {
         if (!alive) return;
         setTerrain(loaded);
