@@ -132,3 +132,44 @@ describe("官方画风：没有映射的类型退回几何画法", () => {
     expect(parts).toContain("selected");
   });
 });
+
+describe("tower 能量条与炮塔对齐（官方 tower.metadata.js）", () => {
+  // 官方能量条是炮塔精灵的子 Graphics：本地像素坐标 (-45, 0, 90, h)，经炮塔缩放 115/128（SVG 原始 128px）
+  // 并以 pivot y=32 为旋转中心，所以世界坐标（官方单位）为 x ∈ ±45·s，y ∈ [-32, -32 + h·s]，s = 115/128。
+  const s = 115 / 128;
+  const full = { type: "tower", x: 20, y: 20, user: "me1", store: { energy: 1000 }, storeCapacityResource: { energy: 1000 } };
+  const half = { ...full, store: { energy: 500 } };
+  const energyPoints = (sc: Scene, id: string) => {
+    const p = sc.primitives.find((q) => q.objectId === id && q.key === `${id}/energy`);
+    if (p?.kind !== "polygon") throw new Error(`没有能量条：${JSON.stringify(p)}`);
+    const xs = p.points.filter((_, i) => i % 2 === 0);
+    const ys = p.points.filter((_, i) => i % 2 === 1);
+    return { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) };
+  };
+
+  it("满能量、未旋转：条从塔中心上方 0.32 格开始，长 66.7·s/100 格，宽 90·s/100 格", () => {
+    const b = energyPoints(scene({ t: full }), "t");
+    const cx = 20.5;
+    const cy = 20.5;
+    expect(b.minY - cy).toBeCloseTo(-0.32, 3);
+    expect(b.maxY - cy).toBeCloseTo(-0.32 + (66.7 * s) / 100, 3);
+    expect(b.minX - cx).toBeCloseTo((-45 * s) / 100, 3);
+    expect(b.maxX - cx).toBeCloseTo((45 * s) / 100, 3);
+  });
+
+  it("半能量：条的上沿不变，长度减半", () => {
+    const b = energyPoints(scene({ t: half }), "t");
+    expect(b.minY - 20.5).toBeCloseTo(-0.32, 3);
+    expect(b.maxY - b.minY).toBeCloseTo((33.35 * s) / 100, 3);
+  });
+
+  it("能量条整体落在炮塔贴图之内（未旋转时）", () => {
+    const sc = scene({ t: full });
+    const turret = imageOf(sc, "t", "tower-rotatable")!;
+    const b = energyPoints(sc, "t");
+    expect(b.minY).toBeGreaterThanOrEqual(turret.y - 1e-9);
+    expect(b.maxY).toBeLessThanOrEqual(turret.y + turret.height + 1e-9);
+    expect(b.minX).toBeGreaterThanOrEqual(turret.x - 1e-9);
+    expect(b.maxX).toBeLessThanOrEqual(turret.x + turret.width + 1e-9);
+  });
+});

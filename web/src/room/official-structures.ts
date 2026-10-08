@@ -302,6 +302,11 @@ const storage: ObjectPainter = (obj, ctx) => {
 
 // ---- tower（tower.metadata.js：染色底座 + 炮塔 + 炮塔上的能量条） ----
 const TOWER_ENERGY_HEIGHT = 66.7;
+/** 炮塔贴图 tower-rotatable.svg 的原始像素宽（width="128"）；官方以 width 115 显示，子图形按 115/128 缩放 */
+const TOWER_TURRET_TEXTURE = 128;
+const TOWER_TURRET_SIZE = 115;
+/** 炮塔的 pivot y（官方单位）：本地原点相对塔中心上移这么多 */
+const TOWER_TURRET_PIVOT_Y = 32;
 const isNpc = (user: unknown) => user === "2" || user === "3";
 
 /** 官方 mathHelper.calculateAngle：炮塔从 (x0, y0) 指向自己时的旋转 */
@@ -335,17 +340,22 @@ const tower: ObjectPainter = (obj, ctx) => {
     officialSprite(obj, "turret", npc ? "tower-rotatable-npc" : "tower-rotatable", { width: 115, anchorY: 32 / 115, rotation, layer }),
   ];
   const cap = energyCapacity(obj);
-  const height = cap ? Math.min(TOWER_ENERGY_HEIGHT, (TOWER_ENERGY_HEIGHT * energyStore(obj)) / cap) / 100 : 0;
-  if (!npc && height > 0) {
-    // 炮塔局部坐标里的 (-45, 0, 90, h)，随炮塔绕塔中心旋转
+  const local = cap ? Math.min(TOWER_ENERGY_HEIGHT, (TOWER_ENERGY_HEIGHT * energyStore(obj)) / cap) : 0;
+  if (!npc && local > 0) {
+    // 官方能量条是炮塔精灵的子 Graphics：本地像素坐标 (-45, 0, 90, h)。换到世界（格）要乘炮塔缩放
+    // 115/128，并减去 pivot（本地原点在塔中心上方 32 官方单位），再随炮塔绕塔中心旋转。
+    const scale = TOWER_TURRET_SIZE / TOWER_TURRET_TEXTURE;
+    const halfWidth = (45 * scale) / 100;
+    const top = -TOWER_TURRET_PIVOT_Y / 100;
+    const bottom = top + (local * scale) / 100;
     const { x, y } = center(obj);
     const cos = Math.cos(rotation);
     const sin = Math.sin(rotation);
     const corners = [
-      [-0.45, 0],
-      [0.45, 0],
-      [0.45, height],
-      [-0.45, height],
+      [-halfWidth, top],
+      [halfWidth, top],
+      [halfWidth, bottom],
+      [-halfWidth, bottom],
     ] as const;
     const points = corners.flatMap(([dx, dy]) => [x + dx * cos - dy * sin, y + dx * sin + dy * cos]);
     prims.push({ part: "energy", kind: "polygon", layer, points, fill: ENERGY });
