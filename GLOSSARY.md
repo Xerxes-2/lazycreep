@@ -27,6 +27,34 @@ _Avoid_: 后端、服务端、代理服务器
 一个 Shard 内所有房间的俯瞰视图，以房间为格子，显示地形缩略图、所有权、RCL、矿物、Power Bank、新手区 / 禁区以及 PvP 热点。
 _Avoid_: 大地图、全图
 
+**Main View（主视图）**:
+占满边栏以外全部区域的唯一视图区，任一时刻只显示 World Map 或 Room View 其中之一。
+_Avoid_: 主面板、地图区
+
+**Top Bar（顶栏）**:
+屏幕顶端的细条，左端是打开 Menu 的按钮。
+_Avoid_: 标题栏
+
+**Sidebar（侧栏）**:
+Main View 右侧的竖条，由若干 Sidebar Section 叠成，内容随 Main View 显示的是 World Map 还是 Room View 而不同，整条可收起。
+_Avoid_: 边栏、活动栏
+
+**Sidebar Section（侧栏区块）**:
+Sidebar 中一个带标题、可单独折叠的区块，例如房间信息、Minimap、选中对象、PvP Overview。
+_Avoid_: 侧栏卡片
+
+**Menu（菜单）**:
+从 Top Bar 左端打开、从左侧滑出的层，收纳不常用功能（各类设置）；同一时刻只显示一项，内容在其内部滚动。
+_Avoid_: 二级菜单、汉堡菜单
+
+**Console Panel（控制台面板）**:
+Main View 底部可收起、可调高度的区域，承载 Console。
+_Avoid_: 底栏
+
+**Minimap（小地图）**:
+Room View 下的一个 Sidebar Section，显示以当前房间为中心的 3×3 房间缩略图，可点击切换到相邻房间。
+_Avoid_: 迷你地图、导航图
+
 **Room View（房间视图）**:
 单个房间内部的逐 Tick 渲染视图，可以是即时的，也可以是回放的。
 _Avoid_: 房间画面、房间渲染
@@ -57,5 +85,5 @@ _Avoid_: 联盟、好友
 ### 使用方式
 
 **Monitor Mode（监控模式）**:
-手机与平板上的定位：只保证 World Map、Room View、Replay、Console、PvP Overview 可用且触摸友好，不承诺其他功能。
+窄屏（手机、竖屏平板）上承诺可用的功能范围：World Map、Room View、Replay、PvP Overview 可用且触摸友好；不是一套单独的布局。
 _Avoid_: 移动版、精简版

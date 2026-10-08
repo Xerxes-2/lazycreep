@@ -10,6 +10,7 @@ import { FixtureSource, fixtureBundle } from "../source/fixture-source.ts";
 import type { RoomMapUpdate } from "../source/source.ts";
 import { ICON_MIN_ZOOM } from "./map-info-layers.ts";
 import { MapView, type MapViewProps } from "./MapView.tsx";
+import { createWorldMapLink, type WorldMapLink } from "./world-map-link.ts";
 
 const bundle = fixtureBundle(
   Object.values(import.meta.glob<unknown>("../../../fixtures/season/*.json", { eager: true, import: "default" })),
@@ -24,6 +25,8 @@ let opened: { shard: string; room: string }[];
 let statsCalls: string[][];
 /** 当前订阅着的 roomMap2：房间 → 监听者 */
 let roomMaps: Map<string, (update: RoomMapUpdate) => void>;
+/** 搜索框在 Sidebar（#28）；这里直接经连接让地图居中 */
+let link: WorldMapLink;
 
 /** 记录 Scene 与视口，不真的画。 */
 async function fakeView(options: SceneViewOptions): Promise<SceneView> {
@@ -71,6 +74,7 @@ function mount(props: Partial<MapViewProps> = {}) {
           createView={fakeView}
           onOpenRoom={(target) => opened.push(target)}
           settleMs={10}
+          link={link}
           {...props}
         />
       </I18nProvider>
@@ -98,12 +102,9 @@ function wheel(at: { clientX: number; clientY: number }, deltaY: number) {
   canvas.dispatchEvent(new WheelEvent("wheel", { ...at, deltaY, bubbles: true, cancelable: true }));
 }
 
-/** 在搜索框里输入并回车 */
+/** 房间搜索：让地图居中到房间 */
 function search(text: string) {
-  const input = container.querySelector<HTMLInputElement>("input[name=world-map-search]")!;
-  input.value = text;
-  input.dispatchEvent(new Event("input", { bubbles: true }));
-  input.closest("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+  return link.centerOn(text);
 }
 
 /** W13S28 的房间中心（世界坐标） */
@@ -117,6 +118,7 @@ describe("World Map 页面", () => {
     opened = [];
     statsCalls = [];
     roomMaps = new Map();
+    link = createWorldMapLink();
     container = document.createElement("div");
     document.body.append(container);
   });
@@ -220,7 +222,7 @@ describe("World Map 页面", () => {
     expect(settings.shard()).toBe("shardSeason");
   });
 
-  describe("房间名搜索", () => {
+  describe("房间名搜索（输入框与提示在 Sidebar，见 world-map-sections.test.tsx）", () => {
     it("回车后地图居中到该房间（不分大小写），并放大到能看清房间", async () => {
       mount();
       await settle(() => expect(shown.length).toBeGreaterThan(0));
@@ -229,7 +231,6 @@ describe("World Map 页面", () => {
       expect(center.clientX).toBeCloseTo(canvas.width / 2);
       expect(center.clientY).toBeCloseTo(canvas.height / 2);
       expect(lastViewport()!.scale).toBeGreaterThanOrEqual(ICON_MIN_ZOOM);
-      expect(container.querySelector("[role=alert]")).toBeNull();
     });
 
     it("已经放得更大时保持缩放，只居中", async () => {
@@ -243,17 +244,15 @@ describe("World Map 页面", () => {
       expect(screenOf(W13S28.x, W13S28.y).clientX).toBeCloseTo(canvas.width / 2);
     });
 
-    it("不是房间名或在世界之外时提示，视口不动", async () => {
+    it("不是房间名或在世界之外时报告找不到，视口不动；地图还没就绪时不作答", async () => {
+      expect(search("W13S28")).toBeUndefined();
       mount();
       await settle(() => expect(shown.length).toBeGreaterThan(0));
       const before = lastViewport();
-      search("hello");
-      expect(container.querySelector("[role=alert]")!.textContent).toContain("hello");
-      search("W99S99");
-      expect(container.querySelector("[role=alert]")!.textContent).toContain("W99S99");
+      expect(search("hello")).toBe(false);
+      expect(search("W99S99")).toBe(false);
       expect(lastViewport()).toEqual(before);
-      search("W13S28");
-      expect(container.querySelector("[role=alert]")).toBeNull();
+      expect(search("W13S28")).toBe(true);
     });
   });
 

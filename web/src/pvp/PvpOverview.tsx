@@ -2,13 +2,14 @@
  * PvP Overview（#3）：按 Shard 分组列出时间窗内有战斗的房间（所有者、最后战斗 Tick）与飞行中的核弹。
  * 点房间进入 Room View；“回看”打开该房间的 Replay，从最后战斗 Tick 往前一小段开始。
  *
- * 列表只显示房间所有者：PvP 接口只给房间与 lastPvpTime，“涉及玩家”要读房间数据才知道，
- * 点进 Room View / Replay 后在房间里看。固定布局；面板系统见 #2。
+ * PvP 接口只给房间与 lastPvpTime；参战玩家（#34）由 combatants 给出（roomMap2，见 combatant-feed.ts），
+ * 每个房间下面一行。放在 World Map 的 Sidebar 里（#24）。
  */
 import { For, Show } from "solid-js";
 import { useI18n } from "../i18n";
-import { openReplay } from "../replay/replay-controller.ts";
 import { errorMessage } from "../settings/SettingsPage.tsx";
+import type { CombatantFeed } from "./combatant-feed.ts";
+import { PvpCombatants } from "./PvpCombatants.tsx";
 import type { PvpFeed } from "./pvp-feed.ts";
 import { PVP_WINDOWS, battleReplayTick, type RoomOwner } from "./pvp-overview.ts";
 
@@ -16,8 +17,10 @@ export interface PvpOverviewProps {
   readonly feed: PvpFeed;
   /** 进入某房间的 Room View */
   readonly onOpenRoom: (target: { readonly shard: string; readonly room: string }) => void;
-  /** 打开 Replay；默认走 #15 的 hash 路由 openReplay */
-  readonly onReplay?: (target: { readonly shard: string; readonly room: string; readonly tick: number }) => void;
+  /** 打开 Replay（外壳里是 shell.navigate） */
+  readonly onReplay: (target: { readonly shard: string; readonly room: string; readonly tick: number }) => void;
+  /** 参战玩家（#34）；不给时不显示参战者一行 */
+  readonly combatants?: CombatantFeed;
 }
 
 export function PvpOverview(props: PvpOverviewProps) {
@@ -39,8 +42,7 @@ export function PvpOverview(props: PvpOverviewProps) {
 
   const replay = (shard: string, room: string, lastPvpTime: number) => {
     const target = { shard, room, tick: battleReplayTick(lastPvpTime) };
-    if (props.onReplay) props.onReplay(target);
-    else openReplay({ ...target, latest: true });
+    props.onReplay(target);
   };
 
   return (
@@ -93,31 +95,42 @@ export function PvpOverview(props: PvpOverviewProps) {
                       <tbody>
                         <For each={group.rooms}>
                           {(entry) => (
-                            <tr data-room={entry.room}>
-                              <td>
-                                <button
-                                  type="button"
-                                  data-action="open-room"
-                                  onClick={() => props.onOpenRoom({ shard: group.shard, room: entry.room })}
-                                >
-                                  {entry.room}
-                                </button>
-                              </td>
-                              <td data-owner={entry.owner.kind}>{ownerText(entry.owner)}</td>
-                              <td>
-                                {entry.lastPvpTime}{" "}
-                                <span class="settings__muted">{t("pvp.ago", { ticks: entry.ago })}</span>
-                              </td>
-                              <td>
-                                <button
-                                  type="button"
-                                  data-action="replay-battle"
-                                  onClick={() => replay(group.shard, entry.room, entry.lastPvpTime)}
-                                >
-                                  {t("pvp.replay")}
-                                </button>
-                              </td>
-                            </tr>
+                            <>
+                              <tr data-room={entry.room}>
+                                <td>
+                                  <button
+                                    type="button"
+                                    data-action="open-room"
+                                    onClick={() => props.onOpenRoom({ shard: group.shard, room: entry.room })}
+                                  >
+                                    {entry.room}
+                                  </button>
+                                </td>
+                                <td data-owner={entry.owner.kind}>{ownerText(entry.owner)}</td>
+                                <td>
+                                  {entry.lastPvpTime}{" "}
+                                  <span class="settings__muted">{t("pvp.ago", { ticks: entry.ago })}</span>
+                                </td>
+                                <td>
+                                  <button
+                                    type="button"
+                                    data-action="replay-battle"
+                                    onClick={() => replay(group.shard, entry.room, entry.lastPvpTime)}
+                                  >
+                                    {t("pvp.replay")}
+                                  </button>
+                                </td>
+                              </tr>
+                              <Show when={props.combatants}>
+                                {(feed) => (
+                                  <tr class="pvp-overview__combatants" data-combatants={entry.room}>
+                                    <td colSpan={4}>
+                                      <PvpCombatants state={feed().of(group.shard, entry.room)} />
+                                    </td>
+                                  </tr>
+                                )}
+                              </Show>
+                            </>
                           )}
                         </For>
                       </tbody>

@@ -90,6 +90,28 @@ export interface HistoryChunk {
 /** roomMap2 一帧：键为类别（w 墙、r 路、pb、p、s、c、m、k）或用户 id，值为坐标列表。 */
 export type RoomMapUpdate = Readonly<Record<string, ReadonlyArray<readonly [number, number]>>>;
 
+/** roomMap2 里的地形 / 设施类键：墙、路、Power Bank、传送门、Source、控制器、矿物、Keeper Lair */
+const ROOM_MAP_CATEGORIES: ReadonlySet<string> = new Set(["w", "r", "pb", "p", "s", "c", "m", "k"]);
+/** roomMap2 里 NPC 的“用户 id”：2 Invader、3 Source Keeper */
+const NPC_USERS: ReadonlySet<string> = new Set(["2", "3"]);
+
+/** roomMap2 的这个键不是玩家（地形 / 设施类键或 NPC） */
+export const isNotPlayer = (key: string): boolean => ROOM_MAP_CATEGORIES.has(key) || NPC_USERS.has(key);
+
+/**
+ * 取出 roomMap2 一帧里各玩家的位置点（用户 id → 坐标），跳过地形 / 设施类键与空列表；
+ * NPC 默认也跳过，`includeNpc` 时保留（Minimap 照官方画法把 Invader / Source Keeper 也画成点）。
+ */
+export function playerPoints(
+  frame: RoomMapUpdate,
+  options?: { readonly includeNpc?: boolean },
+): Array<readonly [id: string, points: ReadonlyArray<readonly [number, number]>]> {
+  return Object.entries(frame).filter(
+    ([key, points]) =>
+      points.length > 0 && !ROOM_MAP_CATEGORIES.has(key) && (options?.includeNpc === true || !NPC_USERS.has(key)),
+  );
+}
+
 export interface RoomMapOptions {
   /**
    * 页面不可见时也保留这条订阅（默认随页面隐藏暂停，#14）。
@@ -152,6 +174,14 @@ export interface UserInfo {
   readonly rooms: Readonly<Record<string, readonly string[]>>;
 }
 
+/** 按 id 查到的玩家资料（`user/find`，匿名） */
+export interface PlayerProfile {
+  readonly id: string;
+  readonly username: string;
+  /** GCL 点数（不是等级；等级见 pvp/gcl.ts 的 gclLevel）；拿不到时为 undefined */
+  readonly gcl?: number;
+}
+
 /** 一个 Shard 的世界尺寸，以房间计（`game/world-size`）。 */
 export interface WorldSize {
   readonly width: number;
@@ -175,6 +205,19 @@ export interface RoomStats {
   readonly openTime?: number;
   /** 控制器处于安全模式 */
   readonly safeMode?: boolean;
+}
+
+/** 房间归属：map-stats 的 owner 里 level 0 是预定，1–8 是拥有（即 RCL） */
+export type RoomOwnership =
+  | { readonly kind: "none" }
+  | { readonly kind: "reserved"; readonly user: string }
+  | { readonly kind: "owned"; readonly user: string; readonly level: number };
+
+/** “谁拥有这个房间”的唯一规则；没有统计或没有所有者时为无主 */
+export function roomOwnership(stats: Pick<RoomStats, "owner"> | undefined): RoomOwnership {
+  const owner = stats?.owner;
+  if (!owner) return { kind: "none" };
+  return owner.level > 0 ? { kind: "owned", user: owner.user, level: owner.level } : { kind: "reserved", user: owner.user };
 }
 
 /** 一次 map-stats 查询的结果；不存在的房间不出现在 rooms 里。 */
@@ -277,6 +320,11 @@ export interface Source {
   getMe(): Promise<UserInfo>;
   /** 按用户 id 查玩家名（`user/find`，匿名即可）；查不到时拒绝。 */
   getUsername(id: string): Promise<string>;
+  /**
+   * 按用户 id 查玩家资料（`user/find`，匿名即可）；查不到时拒绝。
+   * 同一 Source 内缓存：同一玩家只请求一次（失败的不缓存）；getUsername 共用这份缓存。
+   */
+  getPlayer(id: string): Promise<PlayerProfile>;
   /** base 必须按 chunk 大小对齐；历史不存在时得到 null。 */
   getHistoryChunk(shard: string, room: string, base: number): Promise<HistoryChunk | null>;
 

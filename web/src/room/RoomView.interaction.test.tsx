@@ -9,9 +9,8 @@ import type { SceneView, SceneViewOptions, Viewport } from "../scene/pixi-scene-
 import { createSettings } from "../settings/settings.ts";
 import { FixtureSource, fixtureBundle } from "../source/fixture-source.ts";
 import type { Source } from "../source/source.ts";
-import { replayHref } from "../replay/replay-controller.ts";
 import { BAR_MIN_ZOOM } from "./room-detail-rules.ts";
-import { RoomView } from "./RoomView.tsx";
+import { RoomView, type RoomViewProps } from "./RoomView.tsx";
 
 const bundle = fixtureBundle(
   Object.values(import.meta.glob<unknown>("../../../fixtures/season/*.json", { eager: true, import: "default" })),
@@ -64,7 +63,7 @@ function trackingSource(): Source {
   return source;
 }
 
-function mount(detailsMount?: HTMLElement) {
+function mount(detailsMount?: HTMLElement, open?: RoomViewProps["open"]) {
   dispose = render(
     () => (
       <I18nProvider>
@@ -76,6 +75,7 @@ function mount(detailsMount?: HTMLElement) {
           allies={new Set()}
           cameraStorage={{ getItem: (k) => storage.get(k) ?? null, setItem: (k, v) => void storage.set(k, v) }}
           detailsMount={detailsMount}
+          open={open}
         />
       </I18nProvider>
     ),
@@ -183,8 +183,7 @@ describe("Room View 交互", () => {
 
   it("Replay 期间点选作用于重放出来的对象", async () => {
     const SOURCE = "6a8caaaddd4872bccd319361";
-    location.hash = replayHref({ shard: "shardSeason", room: "W13S28", tick: 1024937 });
-    mount();
+    mount(undefined, { shard: "shardSeason", room: "W13S28", replay: { tick: 1024937 } });
     await settle(() => expect(lastScene()?.primitives.some((p) => p.objectId === SOURCE)).toBe(true));
     expect(subscriptions).toEqual([]);
     const vp = lastViewport();
@@ -240,21 +239,5 @@ describe("Room View 交互", () => {
     await settle(() => expect(lastViewport().scale).toBeLessThan(zoomed.scale));
     watch("W13S28");
     await settle(() => expect(lastViewport()).toEqual(zoomed));
-  });
-
-  it("边缘箭头切到相邻房间：订阅切到新房间，旧房间退订", async () => {
-    mount();
-    await openRoom("W13S28");
-    expect(subscriptions.map((s) => s.room)).toEqual(["W13S28"]);
-
-    field<HTMLButtonElement>("[data-action=room-east]").click();
-    await settle(() => expect(subscriptions.map((s) => s.room)).toEqual(["W13S28", "W12S28"]));
-    expect(subscriptions[0]!.closed).toBe(true);
-    expect(subscriptions[1]!.closed).toBe(false);
-    expect(field<HTMLInputElement>("[name=room-view-room]").value).toBe("W12S28");
-
-    field<HTMLButtonElement>("[data-action=room-north]").click();
-    await settle(() => expect(subscriptions.at(-1)!.room).toBe("W12S27"));
-    expect(subscriptions[1]!.closed).toBe(true);
   });
 });

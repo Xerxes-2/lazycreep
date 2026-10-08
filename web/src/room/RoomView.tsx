@@ -1,10 +1,10 @@
 /**
  * Room View（Live 最小版）：选一个房间，逐 Tick 画出地形、建筑与 creep，并显示当前 Tick。
  * 数据流：Source 房间流 → reduceLiveTick → RoomState → buildRoomScene → SceneView。
- * 放在面板系统里（#2）；开发用开关可以在服务器与录制数据（FixtureSource）之间切换数据来源。
+ * 是 Main View 的一种模式（#24）；开发用开关可以在服务器与录制数据（FixtureSource）之间切换数据来源。
  * 录制数据只在开发构建里可用：生产构建既不打包 `fixtures/` 也不显示开关（#14）。
  */
-import { createEffect, createMemo, createSignal, on, onCleanup, onMount, Show, untrack } from "solid-js";
+import { batch, createEffect, createMemo, createSignal, on, onCleanup, onMount, Show, untrack } from "solid-js";
 import { Portal } from "solid-js/web";
 import { useI18n } from "../i18n";
 import { createTickRate } from "../power/tick-rate.ts";
@@ -20,23 +20,25 @@ import { STATE_KEYS } from "../readings/RawReadings.tsx";
 import type { ConnectionState, Source, StreamError, Terrain } from "../source/source.ts";
 import { browserStorage, type KeyValueStorage } from "../storage/local-store.ts";
 import { cameraKey } from "./room-camera-store.ts";
-import { RoomDetailsPanel, RoomEdgeArrows, createRoomControls } from "./room-controls.tsx";
+import { RoomDetailsPanel, createRoomControls } from "./room-controls.tsx";
 import { ROOM_SIZE, buildRoomScene } from "./room-scene.ts";
 import { reduceLiveTick, type RoomState } from "./room-state.ts";
 import type { HistoryCache } from "../replay/history-cache.ts";
 import { createReplayController } from "../replay/replay-controller.ts";
-import { ReplayControls, ReplayEntry } from "../replay/ReplayControls.tsx";
+import { ReplayControls } from "../replay/ReplayControls.tsx";
 import { sharedHistoryCache } from "../replay/replay-settings.ts";
 import type { ShortcutCommands } from "../customize/keybindings.ts";
 import { registerRoomShortcuts } from "../customize/room-shortcuts.ts";
+import type { RoomDisplay } from "./display-options.ts";
+import { RoomToolbar } from "./RoomToolbar.tsx";
+import { replayAt, replayTick, type RoomRequest, type RoomTarget } from "../shell/shell-state.ts";
 
 /** 数据来源：服务器（经共享 Source），或开发构建里的录制数据（FixtureSource） */
 type DataSource = "server" | "recording";
 
-interface Target {
-  readonly shard: string;
-  readonly room: string;
-}
+type Target = RoomTarget;
+/** 从外部打开的房间；给了 replay 就以该 Tick 进入 Replay */
+type OpenRequest = RoomRequest;
 
 /** 按需加载 `fixtures/season/` 的录制数据，按原始时序播放。 */
 async function loadSeasonFixtures(): Promise<Source> {
@@ -63,16 +65,29 @@ export interface RoomViewProps {
   readonly allies?: ReadonlySet<string>;
   /** 每个房间视口的存储；默认浏览器 localStorage */
   readonly cameraStorage?: KeyValueStorage;
-  /** 从外部（World Map，#16）打开的房间：每次给新对象就切过去 */
-  readonly open?: Target | undefined;
+  /** 从外部（World Map、URL 路由，#16 #32）打开的房间或 Replay：每次给新对象就切过去 */
+  readonly open?: OpenRequest | undefined;
   /** 给了就显示“返回地图”按钮（#16） */
   readonly onBack?: (() => void) | undefined;
-  /** 选中对象的详情改画到这个元素里（面板系统的“对象详情”面板，#2）；不给时画在房间旁边 */
+  /**
+   * 显示的房间或 Replay 变化时回报（外壳状态记录当前位置，#24）；在 Replay 中时带 replay，其 tick 是
+   * 画面上的当前 Tick（拖动、单步、播放都随之更新；latest 只在仍停在进入时的 Tick 上时保留）
+   */
+  readonly onTarget?: ((at: OpenRequest | undefined) => void) | undefined;
+  /** 选中对象的详情改画到这个元素里（Sidebar 的选中对象区块，#24）；不给时画在房间旁边 */
   readonly detailsMount?: HTMLElement | undefined;
+  /** 选中对象变化时回报（id 为 undefined 表示取消选中；窄屏据此切到选中对象标签，#29） */
+  readonly onSelect?: ((id: string | undefined) => void) | undefined;
   /** Scene 调色板与着色规则（#5）；变化时重建 Scene。默认 DEFAULT_THEME */
   readonly theme?: Theme | undefined;
   /** 快捷键（#5）：Room View 登记 Live / Replay 切换与播放控制 */
   readonly shortcuts?: ShortcutCommands | undefined;
+  /** 显示选项（#26）；默认全开 */
+  readonly display?: RoomDisplay | undefined;
+  /** 画面上的房间状态变化时回报（#26：房间信息区块） */
+  readonly onShownState?: ((state: RoomState | undefined) => void) | undefined;
+  /** 给了就由它进入 Replay（外壳经 navigate 打开 `#/replay?…`，#26）；不给时 Room View 自己打开 */
+  readonly onEnterReplay?: ((target: Target, tick: number) => void) | undefined;
 }
 
 export function RoomView(props: RoomViewProps) {
@@ -149,25 +164,33 @@ export function RoomView(props: RoomViewProps) {
     source,
     cache: (props.historyCache ?? sharedHistoryCache)(),
     visible,
-    onRoute: (opened) => {
-      setShardInput(opened.shard);
-      setRoomInput(opened.room);
-      setTarget({ shard: opened.shard, room: opened.room });
-    },
+  });
+
+  createEffect(() => {
+    const current = target();
+    const request = replay.active() ? replay.request() : undefined;
+    if (!current || !request) return props.onTarget?.(current);
+    const now = replay.snapshot()?.target ?? request.tick;
+    props.onTarget?.(replayAt(current, now, now === request.tick && request.latest));
   });
 
   registerRoomShortcuts(props.shortcuts, { replay, target, liveTick: () => roomState()?.gameTime });
 
-  // World Map 点房间进来（#16）
+  // World Map 点房间、URL 路由进来（#16 #32）
   createEffect(
     on(
       () => props.open,
       (opened) => {
         if (!opened) return;
-        replay.close();
-        setShardInput(opened.shard);
-        setRoomInput(opened.room);
-        setTarget({ shard: opened.shard, room: opened.room });
+        batch(() => {
+          setShardInput(opened.shard);
+          setRoomInput(opened.room);
+          setTarget({ shard: opened.shard, room: opened.room });
+          if (opened.replay) {
+            const { tick, latest } = opened.replay;
+            replay.open({ shard: opened.shard, room: opened.room, ...replayTick(tick, latest) });
+          } else replay.close();
+        });
       },
     ),
   );
@@ -238,6 +261,8 @@ export function RoomView(props: RoomViewProps) {
     world: { width: ROOM_SIZE, height: ROOM_SIZE },
   });
 
+  createEffect(on(controls.selectedId, (id) => props.onSelect?.(id), { defer: true }));
+
   /** 画面上的房间状态：Replay 期间是重放出来的状态，否则是 Live 状态 */
   const shownState = () => (replay.active() ? replay.snapshot()?.roomState : roomState());
 
@@ -252,9 +277,37 @@ export function RoomView(props: RoomViewProps) {
     }
     return buildRoomScene(
       { state, terrain: terrain() },
-      { theme, zoom: controls.zoom(), selectedId: controls.selectedId(), me: me(), allies: props.allies },
+      {
+        theme,
+        zoom: controls.zoom(),
+        selectedId: controls.selectedId(),
+        me: me(),
+        allies: props.allies,
+        display: props.display,
+      },
     );
   });
+
+  createEffect(() => props.onShownState?.(shownState()));
+
+  const [enterError, setEnterError] = createSignal<unknown>();
+  createEffect(on(target, () => setEnterError(undefined)));
+  /** 左侧按钮列的“进入 Replay”：从 Live 当前 Tick（未知时问服务器）开始 */
+  const enterReplay = () => {
+    const current = target();
+    const handoff = props.onEnterReplay;
+    if (!current) return;
+    if (!handoff) return replay.enterFromLive(current.shard, current.room, roomState()?.gameTime);
+    const live = roomState()?.gameTime;
+    if (live !== undefined) return handoff(current, live);
+    const src = source();
+    if (!src) return;
+    setEnterError(undefined);
+    src.getTime(current.shard).then(
+      (tick) => handoff(current, tick),
+      (error: unknown) => setEnterError(error),
+    );
+  };
 
   let host!: HTMLDivElement;
   const [viewError, setViewError] = createSignal<string>();
@@ -262,7 +315,7 @@ export function RoomView(props: RoomViewProps) {
   onMount(() => {
     const size = () => {
       const width = host.clientWidth || DEFAULT_SIZE;
-      return { width, height: width };
+      return { width, height: host.clientHeight || width };
     };
     let alive = true;
     let created: SceneView | undefined;
@@ -276,6 +329,8 @@ export function RoomView(props: RoomViewProps) {
         setView(made);
         if (typeof ResizeObserver === "function") {
           observer = new ResizeObserver(() => {
+            // 隐藏（display: none）时宽度为 0：保持原尺寸，回来时视口不变
+            if (host.clientWidth === 0) return;
             const { width, height } = size();
             made.resize(width, height);
             setCanvasSize({ width, height });
@@ -298,14 +353,6 @@ export function RoomView(props: RoomViewProps) {
     const s = scene();
     if (v && s) v.show(s);
   });
-
-  const goTo = (room: string) => {
-    const current = target();
-    if (!current) return;
-    replay.close();
-    setRoomInput(room);
-    setTarget({ shard: current.shard, room });
-  };
 
   const submit = (event: SubmitEvent) => {
     event.preventDefault();
@@ -330,11 +377,6 @@ export function RoomView(props: RoomViewProps) {
   return (
     <section class="room-view" aria-labelledby="room-view-title">
       <h2 id="room-view-title">{t("roomView.title")}</h2>
-      <Show when={props.onBack}>
-        <button type="button" data-action="back-to-map" onClick={() => props.onBack?.()}>
-          {t("worldMap.back")}
-        </button>
-      </Show>
       <form class="room-view__form" data-testid="room-view-form" onSubmit={submit}>
         <Show when={loadFixtures}>
           <label>
@@ -380,26 +422,11 @@ export function RoomView(props: RoomViewProps) {
           {tickMs() === undefined ? "—" : t("power.msPerTick", { ms: Math.round(tickMs()!) })}
         </span>
       </p>
-      <Show when={target()}>
-        {(current) => (
-          <Show
-            when={replay.snapshot()}
-            fallback={
-              <ReplayEntry
-                error={replay.entryError()}
-                onEnter={() => replay.enterFromLive(current().shard, current().room, roomState()?.gameTime)}
-              />
-            }
-          >
-            {(snapshot) => (
-              <ReplayControls
-                snapshot={snapshot()}
-                engine={replay.engine()!}
-                latest={replay.request()?.latest ?? false}
-                onBackToLive={replay.close}
-              />
-            )}
-          </Show>
+      <Show when={replay.entryError() ?? enterError()}>
+        {(error) => (
+          <p class="settings__error" role="alert">
+            {errorMessage(t, error())}
+          </p>
         )}
       </Show>
       <Show when={sourceError() ?? terrainError() ?? viewError()}>
@@ -421,8 +448,24 @@ export function RoomView(props: RoomViewProps) {
       <div class="room-view__stage">
         <div class="room-view__frame">
           <div class="room-view__canvas" ref={host} />
-          <RoomEdgeArrows room={target()?.room} onGo={goTo} />
+          <RoomToolbar
+            onBack={props.onBack}
+            onEnterReplay={target() && !replay.active() ? enterReplay : undefined}
+            onZoom={controls.zoomBy}
+          />
         </div>
+        <Show when={target() && replay.snapshot()}>
+          {(snapshot) => (
+            <div class="room-view__replay">
+              <ReplayControls
+                snapshot={snapshot()}
+                engine={replay.engine()!}
+                latest={replay.request()?.latest ?? false}
+                onBackToLive={replay.close}
+              />
+            </div>
+          )}
+        </Show>
         <Show when={props.detailsMount} keyed fallback={details()}>
           {(mount) => <Portal mount={mount}>{details()}</Portal>}
         </Show>

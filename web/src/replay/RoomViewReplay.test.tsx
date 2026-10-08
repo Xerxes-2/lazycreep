@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createSignal } from "solid-js";
 import { render } from "solid-js/web";
 import { I18nProvider } from "../i18n";
 import type { Scene } from "../scene/scene.ts";
@@ -8,7 +9,6 @@ import { FixtureSource, fixtureBundle } from "../source/fixture-source.ts";
 import type { ConnectionState, Source, Unsubscribe } from "../source/source.ts";
 import { RoomView } from "../room/RoomView.tsx";
 import { manualVisibility, type VisibilitySignal } from "../power/visibility.ts";
-import { openReplay, parseReplayHref, replayHref } from "./replay-controller.ts";
 
 const bundle = fixtureBundle(
   Object.values(import.meta.glob<unknown>("../../../fixtures/season/*.json", { eager: true, import: "default" })),
@@ -56,9 +56,21 @@ function unauthorizedSource(): Source {
   return source;
 }
 
-function mount(sourceFor: () => Source = recordedSource, visibility: VisibilitySignal = manualVisibility()) {
-  dispose = render(
-    () => (
+type OpenRequest = { shard: string; room: string; replay?: { tick: number; latest?: boolean } };
+/** 从外部打开 Replay（外壳里由 URL 路由与 navigate 经 open 交给 Room View） */
+const replayAt = (tick: number): OpenRequest => ({ shard: "shardSeason", room: "W13S28", replay: { tick } });
+
+let setOpen: (request: OpenRequest | undefined) => void;
+
+function mount(
+  sourceFor: () => Source = recordedSource,
+  visibility: VisibilitySignal = manualVisibility(),
+  initial?: OpenRequest,
+) {
+  dispose = render(() => {
+    const [open, set] = createSignal<OpenRequest | undefined>(initial);
+    setOpen = set;
+    return (
       <I18nProvider>
         <RoomView
           settings={createSettings(localStorage)}
@@ -66,11 +78,11 @@ function mount(sourceFor: () => Source = recordedSource, visibility: VisibilityS
           createView={fakeView}
           historyCache={async () => undefined}
           visibility={visibility}
+          open={open()}
         />
       </I18nProvider>
-    ),
-    container,
-  );
+    );
+  }, container);
 }
 
 function field<T extends HTMLElement>(selector: string): T {
@@ -125,30 +137,23 @@ describe("Room View 的 Replay", () => {
     history.replaceState(null, "", "/");
   });
 
-  it("地址里的“房间 + Tick”直接打开 Replay，画出该 Tick 的历史状态，不订阅 Live", async () => {
-    expect(parseReplayHref(replayHref({ shard: "shardSeason", room: "W13S28", tick: 1024937 }))).toEqual({
-      shard: "shardSeason",
-      room: "W13S28",
-      tick: 1024937,
-    });
-    location.hash = replayHref({ shard: "shardSeason", room: "W13S28", tick: 1024937 });
-    mount();
+  it("从外部以“房间 + Tick”打开 Replay，画出该 Tick 的历史状态，不订阅 Live", async () => {
+    mount(recordedSource, manualVisibility(), replayAt(1024937));
     await settle(() => expect(lastScene()?.primitives.some((p) => p.objectId === HISTORY_OBJECT)).toBe(true));
     expect(tick()).toBe("1024937");
     expect(field<HTMLInputElement>("[name=room-view-room]").value).toBe("W13S28");
     expect(roomSubscriptions).toBe(0);
   });
 
-  it("页面打开后 openReplay 也能切过去", async () => {
+  it("页面打开后也能从外部切到 Replay", async () => {
     mount();
-    openReplay({ shard: "shardSeason", room: "W13S28", tick: 1024950 });
+    setOpen(replayAt(1024950));
     await settle(() => expect(tick()).toBe("1024950"));
     await settle(() => expect(container.querySelector("[data-testid=replay-controls]")).not.toBeNull());
   });
 
   it("控制：单步、跳转、调速、时间轴拖动", async () => {
-    location.hash = replayHref({ shard: "shardSeason", room: "W13S28", tick: 1024937 });
-    mount();
+    mount(recordedSource, manualVisibility(), replayAt(1024937));
     await settle(() => expect(container.querySelector("[data-testid=replay-controls]")).not.toBeNull());
 
     click("replay-step-forward");
@@ -184,8 +189,7 @@ describe("Room View 的 Replay", () => {
 
   it("页面不可见时暂停播放", async () => {
     const visibility = manualVisibility();
-    location.hash = replayHref({ shard: "shardSeason", room: "W13S28", tick: 1024937 });
-    mount(recordedSource, visibility);
+    mount(recordedSource, visibility, replayAt(1024937));
     await settle(() => expect(container.querySelector("[data-testid=replay-controls]")).not.toBeNull());
     click("replay-toggle");
     expect(field("[data-action=replay-toggle]").getAttribute("aria-label")).toBe("暂停");
@@ -194,8 +198,7 @@ describe("Room View 的 Replay", () => {
   });
 
   it("历史不存在时明确提示，而不是一直加载", async () => {
-    location.hash = replayHref({ shard: "shardSeason", room: "W13S28", tick: 500 });
-    mount();
+    mount(recordedSource, manualVisibility(), replayAt(500));
     await settle(() => expect(container.querySelector("[data-testid=replay-missing]")).not.toBeNull());
     expect(field("[data-testid=replay-missing]").textContent).toContain("历史不存在");
   });
@@ -219,7 +222,6 @@ describe("Room View 的 Replay", () => {
     await settle(() => expect(tick()).toBe("1025238"));
     expect(roomSubscriptions).toBe(2);
     expect(container.querySelector("[data-testid=replay-controls]")).toBeNull();
-    expect(location.hash).toBe("");
   });
 
   it("token 失效时 Replay 照常可用（Live Tick 未知时向服务器要当前时间）", async () => {

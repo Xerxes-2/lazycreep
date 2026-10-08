@@ -1,9 +1,9 @@
 /**
- * Room View 里 Replay 的接线：按请求（房间 + Tick）建 Replay 引擎，跟随 Source 切换重建，
- * 并提供“房间 + Tick 直接打开 Replay”的路由入口。
+ * Room View 里 Replay 的接线：按请求（房间 + Tick）建 Replay 引擎，跟随 Source 切换重建。
  *
- * 入口（给 PvP Overview 等用）：`openReplay({ shard, room, tick })`，即把地址改成
- * `#/replay?shard=…&room=…&tick=…`；Room View 监听到后切到该房间并进入 Replay。
+ * 从别处打开某房间某 Tick 的 Replay 一律走 `shell.navigate({ shard, room, replay })`；地址
+ * （`#!/<server>/history/…`，含旧的 `#/replay?…`）由 URL 路由（shell/url-router.ts，#32）解读，
+ * 本模块不监听地址。
  */
 import { createEffect, createSignal, onCleanup, untrack, type Accessor } from "solid-js";
 import type { Source } from "../source/source.ts";
@@ -19,41 +19,6 @@ export interface ReplayTarget {
 export interface ReplayRequest extends ReplayTarget {
   /** tick 是 Live 当前 Tick：所在 chunk 还没生成时退到最近的已有历史 */
   readonly latest?: boolean;
-}
-
-const ROUTE = "#/replay";
-
-/**
- * “房间 + Tick”直接打开 Replay 的地址（hash 路由）。
- * latest：tick 可能新到所在 chunk 还没生成（例如 PvP Overview 的“回看”），没有时退到最近的已有历史。
- */
-export function replayHref(target: ReplayRequest): string {
-  const query = new URLSearchParams({ shard: target.shard, room: target.room, tick: String(target.tick) });
-  if (target.latest) query.set("latest", "1");
-  return `${ROUTE}?${query}`;
-}
-
-export function parseReplayHref(hash: string): ReplayRequest | undefined {
-  if (!hash.startsWith(`${ROUTE}?`)) return undefined;
-  const query = new URLSearchParams(hash.slice(ROUTE.length + 1));
-  const room = query.get("room")?.trim().toUpperCase();
-  const tick = Number(query.get("tick"));
-  if (!room || !Number.isInteger(tick) || tick < 0) return undefined;
-  const target = { shard: query.get("shard") ?? "", room, tick };
-  return query.get("latest") === "1" ? { ...target, latest: true } : target;
-}
-
-/** 从任何地方打开某房间某 Tick 的 Replay（例如 PvP Overview 的“回看这场战斗”）。 */
-export function openReplay(target: ReplayRequest): void {
-  const href = replayHref(target);
-  if (location.hash === href) window.dispatchEvent(new HashChangeEvent("hashchange"));
-  else location.hash = href;
-}
-
-/** 离开 Replay 时清掉路由，免得刷新又回到 Replay。 */
-function clearReplayRoute() {
-  if (!parseReplayHref(location.hash)) return;
-  history.replaceState(history.state, "", location.pathname + location.search);
 }
 
 export interface ReplayController {
@@ -76,8 +41,6 @@ export interface ReplayControllerOptions {
   readonly source: Accessor<Source | undefined>;
   /** 历史缓存；undefined 表示不缓存 */
   readonly cache: Promise<HistoryCache | undefined> | undefined;
-  /** 路由打开 Replay 时调用，让 Room View 切到该房间 */
-  readonly onRoute?: (target: ReplayTarget) => void;
   /** 页面可见性；不可见时暂停播放（省电，#14） */
   readonly visible?: Accessor<boolean>;
 }
@@ -124,16 +87,6 @@ export function createReplayController(options: ReplayControllerOptions): Replay
     setRequest(next);
   };
 
-  const fromRoute = () => {
-    const target = parseReplayHref(location.hash);
-    if (!target) return;
-    options.onRoute?.(target);
-    open(target);
-  };
-  fromRoute();
-  window.addEventListener("hashchange", fromRoute);
-  onCleanup(() => window.removeEventListener("hashchange", fromRoute));
-
   return {
     request,
     active: () => request() !== undefined,
@@ -154,7 +107,6 @@ export function createReplayController(options: ReplayControllerOptions): Replay
     close() {
       setRequest(undefined);
       setEntryError(undefined);
-      clearReplayRoute();
     },
   };
 }

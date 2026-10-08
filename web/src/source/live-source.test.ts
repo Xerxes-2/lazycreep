@@ -128,6 +128,11 @@ describe("LiveSource HTTP：与同样 wire 数据的 FixtureSource 结果一致"
     expect(await source.getUsername("nobody").catch((e: unknown) => e)).toMatchObject({ kind: "server" });
   });
 
+  it("按 id 查玩家资料（user/find）：用户名与 GCL 点数", async () => {
+    expect(await source.getPlayer(USER_ID)).toEqual({ id: USER_ID, username: "Xerxes_2", gcl: 1 });
+    expect(await source.getPlayer("nobody").catch((e: unknown) => e)).toMatchObject({ kind: "server" });
+  });
+
   it("历史 chunk", async () => {
     expect(await source.getHistoryChunk(SHARD, OWN_ROOM, 1024900)).toEqual(
       await fixture.getHistoryChunk(SHARD, OWN_ROOM, 1024900),
@@ -273,6 +278,17 @@ describe("LiveSource HTTP 请求", () => {
   it("历史不存在（404）得到 null", async () => {
     const { source } = live();
     expect(await source.getHistoryChunk(SHARD, OWN_ROOM, 100)).toBeNull();
+  });
+
+  it("玩家资料有缓存：同一玩家（含并发与查名）只请求一次；查不到的下次重试", async () => {
+    const { source, seen } = live();
+    const finds = () => seen.filter((r) => r.url.pathname.endsWith("/user/find")).map((r) => r.url.searchParams.get("id"));
+    await Promise.all([source.getPlayer(USER_ID), source.getPlayer(USER_ID)]);
+    expect(await source.getUsername(USER_ID)).toBe("Xerxes_2");
+    expect(finds()).toEqual([USER_ID]);
+    await source.getPlayer("nobody").catch(() => {});
+    await source.getPlayer("nobody").catch(() => {});
+    expect(finds()).toEqual([USER_ID, "nobody", "nobody"]);
   });
 });
 

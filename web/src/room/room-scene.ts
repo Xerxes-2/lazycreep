@@ -10,6 +10,8 @@ import { barsVisible, extraBars, ownerColorRule, selectionHighlight } from "./ro
 import { ROOM_OBJECT_PAINTERS } from "./room-painters.ts";
 import type { RoomState } from "./room-state.ts";
 import { roomVisualPrimitives } from "./room-visual.ts";
+import { DEFAULT_ROOM_DISPLAY, type RoomDisplay } from "./display-options.ts";
+import { nameLabel } from "./name-labels.ts";
 
 export { LAYER, ROOM_OBJECT_PAINTERS };
 export type { ObjectPainter, ObjectPainters, PaintContext, PrimitiveDraft };
@@ -30,6 +32,8 @@ export interface RoomSceneView {
   readonly me?: string | undefined;
   /** Ally List（用户名，不分大小写），默认空 */
   readonly allies?: ReadonlySet<string> | undefined;
+  /** 显示选项（#26）；默认全开 */
+  readonly display?: RoomDisplay | undefined;
 }
 
 /** 未知类型：洋红虚框 + 类型名 */
@@ -98,6 +102,7 @@ export function buildRoomScene(
   painters: ObjectPainters = ROOM_OBJECT_PAINTERS,
 ): Scene {
   const { theme } = view;
+  const display = view.display ?? DEFAULT_ROOM_DISPLAY;
   const ctx: PaintContext = {
     theme,
     zoom: view.zoom ?? 1,
@@ -115,12 +120,15 @@ export function buildRoomScene(
     const drafts = [...painted, ...extraBars(obj, painted, ctx)];
     if (id === ctx.selectedId) drafts.push(selectionHighlight(obj, ctx));
     const showBars = barsVisible(ctx, id);
+    const label = display.names && showBars ? nameLabel(obj, ctx) : undefined;
+    if (label) drafts.push(label);
     for (const { part, ...draft } of drafts) {
       if (!showBars && draft.kind === "bar") continue;
+      if (!display.bars && draft.kind === "bar" && part === "hits") continue;
       primitives.push({ ...draft, key: `${id}/${part}`, objectId: id } as Primitive);
     }
   }
-  primitives.push(...roomVisualPrimitives(room.state.visual));
+  if (display.visual) primitives.push(...roomVisualPrimitives(room.state.visual));
   // 稳定排序：同层按出现顺序
   primitives.sort((a, b) => a.layer - b.layer);
   return { width: ROOM_SIZE, height: ROOM_SIZE, background: theme.background, primitives };

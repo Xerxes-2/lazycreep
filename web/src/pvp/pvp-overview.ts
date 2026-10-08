@@ -5,7 +5,7 @@
  * - 接口声称按 lastPvpTime 降序，但实测 MMO shard3 是升序（2026-10-08），所以这里自己排
  * - 所有者来自 World Map 的所有权缓存（map-stats）；缓存里没有的房间为 unknown，不阻塞列表
  */
-import type { MapStats, Nuke, PvpShard } from "../source/source.ts";
+import { roomOwnership, type MapStats, type Nuke, type PvpShard } from "../source/source.ts";
 
 /** 可切换的时间窗（Tick） */
 export const PVP_WINDOWS = [20, 100, 500] as const;
@@ -74,13 +74,14 @@ const byName = new Intl.Collator("en", { numeric: true });
 function ownerOf(stats: Pick<MapStats, "rooms" | "users"> | undefined, room: string): RoomOwner {
   const entry = stats?.rooms[room];
   if (!entry) return { kind: "unknown" };
-  if (!entry.owner) return { kind: "none" };
-  const username = stats!.users[entry.owner.user]?.username;
+  const owner = roomOwnership(entry);
+  if (owner.kind === "none") return { kind: "none" };
+  const username = stats!.users[owner.user]?.username;
   return {
-    kind: entry.owner.level === 0 ? "reserved" : "owned",
-    userId: entry.owner.user,
+    kind: owner.kind,
+    userId: owner.user,
     ...(username === undefined ? {} : { username }),
-    level: entry.owner.level,
+    level: owner.kind === "owned" ? owner.level : 0,
   };
 }
 

@@ -1,12 +1,13 @@
 /**
  * Attack Alert 的投递：已授权时发系统通知，否则在页内横幅里列出；点击进入该房间的 Room View。
- * 横幅固定在视口顶部，放在哪个组件里都一样显示。
+ * 横幅挂在外壳主体顶部，从 Top Bar 下沿滑出，不属于 Main View（#25，样式见 styles.css）。
  */
 import { createSignal, For, Show, type Accessor } from "solid-js";
 import { useI18n, type MessageKey } from "../i18n";
 import type { Translate } from "../i18n/translator.ts";
 import type { PvpFeed } from "../pvp/pvp-feed.ts";
 import type { Source } from "../source/source.ts";
+import type { RoomMapHub } from "../source/room-map-hub.ts";
 import { browserStorage, type KeyValueStorage } from "../storage/local-store.ts";
 import type { Alert } from "./alert-detector.ts";
 import type { AlertSettings } from "./alert-settings.ts";
@@ -19,6 +20,8 @@ export interface AlertTarget {
 
 export interface AttackAlertProps {
   readonly source: Accessor<Source>;
+  /** 全页共用的 roomMap2 订阅中心（告警优先级最高） */
+  readonly roomMaps: Accessor<RoomMapHub>;
   readonly feed: Pick<PvpFeed, "data" | "groups">;
   readonly enabled: Accessor<boolean>;
   readonly allies: Accessor<ReadonlySet<string>>;
@@ -70,6 +73,7 @@ export function AttackAlert(props: AttackAlertProps) {
 
   createAttackAlert({
     source: props.source,
+    roomMaps: props.roomMaps,
     feed: props.feed,
     enabled: props.enabled,
     allies: props.allies,

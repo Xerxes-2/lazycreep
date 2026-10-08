@@ -6,6 +6,7 @@ import type { SceneView, SceneViewOptions } from "../scene/pixi-scene-view.ts";
 import type { Primitive, Scene } from "../scene/scene.ts";
 import { DEFAULT_THEME } from "../scene/theme.ts";
 import { createSettings } from "../settings/settings.ts";
+import { createShellState, type ShellState } from "../shell/shell-state.ts";
 import { FixtureSource, fixtureBundle } from "../source/fixture-source.ts";
 import { createColorScheme } from "./color-scheme.ts";
 
@@ -65,12 +66,15 @@ describe("配色改动后 Room View 与 World Map 用新 Theme 重建 Scene（#5
     const settings = createSettings(localStorage);
     settings.setToken("token");
     let colors!: ReturnType<typeof createColorScheme>;
+    let shell!: ShellState;
     dispose = render(() => {
       colors = createColorScheme(localStorage);
+      shell = createShellState(localStorage, settings);
       return (
         <I18nProvider>
           <MapAndRoom
             settings={settings}
+            shell={shell}
             sourceFor={() => new FixtureSource(bundle, { speed: Infinity })}
             createView={fakeView}
             roomView={{ historyCache: async () => undefined }}
@@ -81,25 +85,26 @@ describe("配色改动后 Room View 与 World Map 用新 Theme 重建 Scene（#5
       );
     }, container);
 
+    // 当前视图之外的 Main View 不构建 Scene：先看地图，再到 Room View
+    await settle(() => expect(lastScene(".world-map")?.background).toBe(DEFAULT_THEME.background));
+    shell.navigate({ view: "room" });
     const room = container.querySelector<HTMLInputElement>("[name=room-view-room]")!;
     room.value = "W13S28";
     room.dispatchEvent(new Event("input", { bubbles: true }));
     container.querySelector<HTMLFormElement>("[data-testid=room-view-form]")!.requestSubmit();
 
-    await settle(() => {
-      expect(lastScene(".world-map")?.background).toBe(DEFAULT_THEME.background);
-      expect(fills(lastScene(".room-view")).has(DEFAULT_THEME.terrainWall)).toBe(true);
-    });
+    await settle(() => expect(fills(lastScene(".room-view")).has(DEFAULT_THEME.terrainWall)).toBe(true));
 
     colors.setColor("background", 0x123456);
     colors.setColor("terrainWall", 0x654321);
 
     await settle(() => {
-      expect(lastScene(".world-map")?.background).toBe(0x123456);
       expect(lastScene(".room-view")?.background).toBe(0x123456);
       const roomFills = fills(lastScene(".room-view"));
       expect(roomFills.has(0x654321)).toBe(true);
       expect(roomFills.has(DEFAULT_THEME.terrainWall)).toBe(false);
     });
+    shell.navigate({ view: "map" });
+    await settle(() => expect(lastScene(".world-map")?.background).toBe(0x123456));
   });
 });

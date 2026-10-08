@@ -3,7 +3,7 @@ import { createRoot } from "solid-js";
 import { createAllyList } from "../allies/ally-list.ts";
 import { createAlertSettings } from "../alert/alert-settings.ts";
 import { createLocale } from "../i18n/locale.ts";
-import { createLayoutStore } from "../panels/layout-store.ts";
+import { createShellState } from "../shell/shell-state.ts";
 import { createReplaySettings } from "../replay/replay-settings.ts";
 import { cameraKey, saveCamera } from "../room/room-camera-store.ts";
 import { createSettings } from "../settings/settings.ts";
@@ -40,17 +40,15 @@ function customizeEverything() {
     const colors = createColorScheme(localStorage);
     colors.setColor("background", 0x101010);
     colors.setPlayerColor("Bob", 0x00ff00);
-    createKeybindings(localStorage).set("panel.map", "Shift+M");
+    createKeybindings(localStorage).set("sidebar.toggle", "Shift+H");
     createAllyList(localStorage).add("Friend");
     createAlertSettings(localStorage, fakeNotifications).update({ nuke: false, cooldownMinutes: 7 });
     createReplaySettings(localStorage).setCacheLimitMb(64);
-    const layout = createLayoutStore(
-      localStorage,
-      { ids: ["map", "room"], size: () => ({ w: 6, h: 8 }) },
-      { desktop: ["map", "room"], monitor: ["map", "room"] },
-    );
-    layout.closePanel("room");
-    layout.showTab("room");
+    const shell = createShellState(localStorage, settings);
+    shell.setSidebarOpen(false);
+    shell.setSectionCollapsed("map.pvp", true);
+    shell.setConsoleOpen(true);
+    shell.setConsoleHeight(400);
     saveCamera(localStorage, cameraKey("season", "shardSeason", "W13S28"), { cx: 10, cy: 20, span: 15 });
   });
 }
@@ -137,13 +135,28 @@ describe("设置导出 / 导入（#5）", () => {
     return found;
   }
 
-  it("源码里出现的每个 msc.* 存储键都已汇总到 STORED_KEYS", () => {
+  /**
+   * 已废弃、只用于启动时清除的旧键（不是本应用存储的键，不登记进 STORED_KEYS）。
+   * ADR 0005：固定外壳取代 #2 的网格停靠，`msc.layout.*` 两个布局键启动时清除、不迁移。
+   */
+  const RETIRED_KEYS: readonly string[] = ["msc.layout.desktop", "msc.layout.monitor"];
+
+  it("源码里出现的每个 msc.* 存储键都已汇总到 STORED_KEYS（只用于清除的旧键除外）", () => {
     // 各模块只在自己的文件里写键的字面量；漏汇总的键在这里变红
     const found = keyLiterals();
     expect(found.size).toBeGreaterThan(5);
     for (const key of found) {
+      if (RETIRED_KEYS.includes(key)) continue;
       const covered = STORED_KEYS.some((s) => key === s.key || (s.prefix === true && key.startsWith(s.key)));
       expect(covered, key).toBe(true);
+    }
+  });
+
+  it("豁免的旧键以普通字面量写在源码里（不拼接键名躲开扫描），且没有登记进 STORED_KEYS", () => {
+    const found = keyLiterals();
+    for (const key of RETIRED_KEYS) {
+      expect(found.has(key), key).toBe(true);
+      expect(STORED_KEYS.some((s) => s.key === key)).toBe(false);
     }
   });
 

@@ -54,6 +54,15 @@ export function writeJson(storage: KeyValueStorage | undefined, key: string, val
   writeText(storage, key, JSON.stringify(value));
 }
 
+/** 删除一个键；存储不可用、不支持删除或抛错时静默（没什么可删的） */
+export function removeKey(storage: (KeyValueStorage & Partial<Pick<Storage, "removeItem">>) | undefined, key: string): void {
+  try {
+    storage?.removeItem?.(key);
+  } catch {
+    // 存储不可用：没什么可删的
+  }
+}
+
 /** 存储值的形态：json-* 存的是 JSON；raw 存的是原样字符串 */
 export type StoredKind = "json-object" | "json-array" | "json-string" | "raw";
 

@@ -1,5 +1,5 @@
 /**
- * Console 面板（#6）：当前用户的脚本输出按 Shard 归类持续滚动，可发送命令。
+ * Console 的内容（#6，装在 Console Panel 里，见 shell/ConsolePanel.tsx）：当前用户的脚本输出按 Shard 归类持续滚动，可发送命令。
  * - 默认跟随当前 Shard（设置里选的），也可固定到某个 Shard（按 Server 记住）；
  * - 每个 Shard 保留最近若干条（可调，存浏览器），支持关键字过滤；
  * - 命令经 Source 发送；面板只提示“已发送 / 失败”，执行结果以 Console 频道回来的为准。
@@ -12,8 +12,9 @@ import type { Settings } from "../settings/settings.ts";
 import { browserStorage, type KeyValueStorage } from "../storage/local-store.ts";
 import { appendConsole, emptyConsoleLog, filterConsole, type ConsoleLog } from "./console-log.ts";
 import { createConsoleSettings, MAX_CONSOLE_LIMIT } from "./console-settings.ts";
+import { useSharedSource } from "../source/use-shared-source.ts";
 
-export interface ConsolePanelProps {
+export interface ConsoleViewProps {
   readonly settings: Settings;
   /** 应是全页共享的 Source（见 source/shared-source.ts） */
   readonly sourceFor: SourceFactory;
@@ -30,18 +31,14 @@ type SendStatus =
 /** 离底部不到这么多像素时视为“在底部”，新输出到达时自动滚到底 */
 const STICK_PX = 24;
 
-export function ConsolePanel(props: ConsolePanelProps) {
+export function ConsoleView(props: ConsoleViewProps) {
   const { t } = useI18n();
   const prefs = createConsoleSettings(props.storage ?? browserStorage());
   const settings = props.settings;
 
   // settings 的 server / token 按值判等：切 Shard 不会重建连接、清空日志
   const token = () => settings.token() || undefined;
-  const source = createMemo(() => {
-    const created = props.sourceFor(settings.server(), token());
-    onCleanup(() => created.close());
-    return created;
-  });
+  const source = useSharedSource(props.sourceFor, settings);
   const sharded = () => source().server.sharded;
 
   const [shardList, setShardList] = createSignal<readonly string[]>([]);
@@ -122,9 +119,9 @@ export function ConsolePanel(props: ConsolePanelProps) {
   };
 
   return (
-    <section class="console-panel" data-shard={shown() ?? ""}>
+    <section class="console-view" data-shard={shown() ?? ""}>
       <h2>{t("console.title")}</h2>
-      <div class="console-panel__bar">
+      <div class="console-view__bar">
         <Show when={sharded()}>
           <label>
             {t("console.shard")}
@@ -177,13 +174,13 @@ export function ConsolePanel(props: ConsolePanelProps) {
           {t("console.clear")}
         </button>
       </div>
-      <p class="console-panel__hint settings__muted">{t("console.hiddenHint")}</p>
+      <p class="console-view__hint settings__muted">{t("console.hiddenHint")}</p>
       <Show when={!token()}>
         <p class="settings__muted">{t("console.noToken")}</p>
       </Show>
       <Show when={streamError()}>{(message) => <p role="alert">{t("console.streamError", { message: message() })}</p>}</Show>
       <div
-        class="console-panel__output"
+        class="console-view__output"
         ref={output}
         role="log"
         aria-live="polite"
@@ -194,13 +191,13 @@ export function ConsolePanel(props: ConsolePanelProps) {
       >
         <For each={visible()} fallback={<p class="settings__muted">{t("console.empty")}</p>}>
           {(entry) => (
-            <div class="console-panel__entry" data-console-entry data-kind={entry.kind}>
+            <div class="console-view__entry" data-console-entry data-kind={entry.kind}>
               {entry.text}
             </div>
           )}
         </For>
       </div>
-      <form class="console-panel__send" data-console-send onSubmit={submit}>
+      <form class="console-view__send" data-console-send onSubmit={submit}>
         <input
           type="text"
           name="console-expression"
@@ -217,7 +214,7 @@ export function ConsolePanel(props: ConsolePanelProps) {
           {t("console.send")}
         </button>
       </form>
-      <p class="console-panel__status" data-console-status data-state={status().state} aria-live="polite">
+      <p class="console-view__status" data-console-status data-state={status().state} aria-live="polite">
         {(() => {
           const s = status();
           if (s.state === "sending") return t("console.sending");

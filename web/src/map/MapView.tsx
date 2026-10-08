@@ -4,7 +4,7 @@
  * 交互直接用画布上的 DOM Pointer Events（适配层停了 Pixi 的 ticker，Pixi events 不可靠）：
  * 滚轮 / 双指捏合缩放、拖拽平移；放大到 ENTER_ZOOM 以上后点房间进入 Room View，远看时点击只放大。
  * 视口按 Server + Shard 记在组件里：地图隐藏再显示、切走 Shard 再切回来都保持原样。
- * 放在面板系统的地图面板里（#2）。
+ * 是 Main View 的一种模式（#24）。
  */
 import { createEffect, createMemo, createSignal, For, on, onCleanup, onMount, Show, untrack } from "solid-js";
 import { useI18n } from "../i18n";
@@ -15,7 +15,8 @@ import type { Scene } from "../scene/scene.ts";
 import { DEFAULT_THEME, type Theme } from "../scene/theme.ts";
 import { errorMessage, type SourceFactory } from "../settings/SettingsPage.tsx";
 import type { Settings } from "../settings/settings.ts";
-import type { ShardInfo, Source } from "../source/source.ts";
+import { roomOwnership, type ShardInfo, type Source } from "../source/source.ts";
+import { roomMapHubFor, type RoomMapHub } from "../source/room-map-hub.ts";
 import { attachGestures } from "../scene/pointer-gestures.ts";
 import { panBy, screenToWorld } from "../scene/scene-camera.ts";
 import { centerOn, fitCamera, sceneRect, sceneZoom, visibleRect, zoomAt } from "./map-camera.ts";
@@ -24,6 +25,8 @@ import { applyMapStats, mapStateFrom, roomAtWorld, type MapState } from "./map-s
 import { createOwnershipLoader } from "./ownership-loader.ts";
 import type { OwnershipHub } from "./ownership-hub.ts";
 import { findRoom, useMapInfo } from "./use-map-info.ts";
+import type { WorldMapLink } from "./world-map-link.ts";
+import { useSharedSource } from "../source/use-shared-source.ts";
 
 /** 每个房间至少这么多 CSS 像素时，点击房间进入 Room View */
 export const ENTER_ZOOM = 32;
@@ -51,6 +54,11 @@ export interface MapViewProps {
    * 不给时组件自建一个加载器。
    */
   readonly ownership?: OwnershipHub;
+  /**
+   * 全页共用的 roomMap2 订阅中心（总预算与去重）；须与本组件的 Server + token 一致。
+   * 不给时组件按自己的 Source 建一个（只有地图自己用）。
+   */
+  readonly roomMaps?: RoomMapHub;
   /** 叠加在默认图层之上的额外图层（例如 PvP 热点）；按 Shard 给出，变化时重建 Scene */
   readonly overlays?: (shard: string) => readonly MapLayerPainter[];
   /** Ally List（#17）：玩家用户名，不分大小写 */
@@ -59,6 +67,12 @@ export interface MapViewProps {
   readonly active?: boolean;
   /** Scene 调色板与着色规则（#5）；变化时重建 Scene。默认 DEFAULT_THEME */
   readonly theme?: Theme | undefined;
+  /**
+   * 全部图层（#28 的图层开关在外面组成）；给出时取代 MAP_LAYERS 与 overlays。按 Shard 给出，变化时重建 Scene。
+   */
+  readonly layers?: (shard: string) => readonly MapLayerPainter[];
+  /** 与 Sidebar 区块的连接（#28）：房间搜索居中、指向房间 */
+  readonly link?: WorldMapLink;
 }
 
 export function MapView(props: MapViewProps) {
@@ -68,11 +82,7 @@ export function MapView(props: MapViewProps) {
   const settings = props.settings;
   const visible = useVisible(props.visibility);
 
-  const source = createMemo(() => {
-    const created = props.sourceFor(settings.server(), settings.token() || undefined);
-    onCleanup(() => created.close());
-    return created;
-  });
+  const source = useSharedSource(props.sourceFor, settings);
 
   const [shards, setShards] = createSignal<readonly ShardInfo[]>();
   const [loadError, setLoadError] = createSignal<string>();
@@ -224,8 +234,9 @@ export function MapView(props: MapViewProps) {
     },
   );
 
+  const ownRoomMaps = roomMapHubFor(source);
   useMapInfo({
-    source,
+    roomMaps: () => props.roomMaps ?? ownRoomMaps(),
     mapState,
     setMapState,
     allies: () => props.allies,
@@ -239,7 +250,11 @@ export function MapView(props: MapViewProps) {
     const state = mapState();
     const input = sceneInput();
     if (!state || !input) return undefined;
-    const layers = props.overlays ? [...MAP_LAYERS, ...props.overlays(state.shard)] : MAP_LAYERS;
+    const layers = props.layers
+      ? props.layers(state.shard)
+      : props.overlays
+        ? [...MAP_LAYERS, ...props.overlays(state.shard)]
+        : MAP_LAYERS;
     return buildMapScene(state, { theme: props.theme ?? DEFAULT_THEME, zoom: input.zoom, visible: input.rect }, layers);
   });
 
@@ -273,6 +288,29 @@ export function MapView(props: MapViewProps) {
     if (cam) setCamera(change(cam));
   };
 
+  /** 鼠标悬停 / 点按的房间（#28）；所有者随 MapState 更新 */
+  const [pointedRoom, setPointedRoom] = createSignal<{ shard: string; room: string }>();
+  const pointAt = (at: { x: number; y: number }) => {
+    const cam = camera();
+    const state = mapState();
+    if (!cam || !state) return;
+    const world = screenToWorld(cam, at.x, at.y);
+    const room = roomAtWorld(state, world.x, world.y);
+    const current = pointedRoom();
+    if (room && (current?.room !== room || current.shard !== state.shard)) setPointedRoom({ shard: state.shard, room });
+  };
+  createEffect(() => {
+    const link = props.link;
+    if (!link) return;
+    const at = pointedRoom();
+    const state = mapState();
+    if (!at || !state || state.shard !== at.shard) return link.setPointed(undefined);
+    const owner = roomOwnership(state.rooms[at.room]);
+    const username = owner.kind === "none" ? undefined : state.users[owner.user]?.username;
+    const rcl = owner.kind === "owned" ? owner.level : undefined;
+    link.setPointed({ ...at, ...(username ? { owner: { username, rcl } } : {}) });
+  });
+
   const click = (point: { x: number; y: number }) => {
     const cam = camera();
     const state = mapState();
@@ -286,26 +324,26 @@ export function MapView(props: MapViewProps) {
     if (room) props.onOpenRoom({ shard: state.shard, room });
   };
 
-  // 房间名搜索：居中到该房间，并至少放大到能看清图标
-  const [searchText, setSearchText] = createSignal("");
-  const [searchMiss, setSearchMiss] = createSignal<string>();
-  const onSearch = (event: Event) => {
-    event.preventDefault();
+  // 房间名搜索（输入框在 Sidebar，#28）：居中到该房间，并至少放大到能看清图标
+  const centerOnRoom = (text: string) => {
     const state = mapState();
     const cam = camera();
-    if (!state || !cam) return;
-    const text = searchText().trim();
+    if (!state || !cam) return undefined;
     const at = findRoom(state, text);
-    setSearchMiss(at ? undefined : text);
-    if (!at) return;
+    if (!at) return false;
     const { width, height } = canvasSize();
     setCamera(centerOn(at.x, at.y, width, height, Math.max(cam.scale, SEARCH_ZOOM)));
+    return true;
   };
+  createEffect(() => {
+    const link = props.link;
+    if (link) onCleanup(link.bindCenterOn(centerOnRoom));
+  });
 
   onMount(() => {
     const size = () => {
       const width = host.clientWidth || DEFAULT_WIDTH;
-      return { width, height: Math.round(width * 0.75) };
+      return { width, height: host.clientHeight || Math.round(width * 0.75) };
     };
     setCanvasSize(size());
     let alive = true;
@@ -321,10 +359,25 @@ export function MapView(props: MapViewProps) {
         detachGestures = attachGestures(canvas, {
           pan: (dx, dy) => update((cam) => panBy(cam, dx, dy)),
           zoom: (x, y, factor) => update((cam) => zoomAt(cam, x, y, factor, minScale())),
-          tap: (x, y) => click({ x, y }),
+          tap: (x, y) => {
+            pointAt({ x, y });
+            click({ x, y });
+          },
           end: () => {},
           press: setDragging,
         });
+        // 鼠标（与笔）悬停即更新指向房间；触摸没有悬停，靠点按
+        const hover = (event: PointerEvent) => {
+          if (event.pointerType === "touch") return;
+          const rect = canvas.getBoundingClientRect();
+          pointAt({ x: event.clientX - rect.left, y: event.clientY - rect.top });
+        };
+        canvas.addEventListener("pointermove", hover);
+        const detachDrag = detachGestures;
+        detachGestures = () => {
+          detachDrag();
+          canvas.removeEventListener("pointermove", hover);
+        };
         host.append(canvas);
         setView(made);
         const cam = untrack(camera);
@@ -369,26 +422,8 @@ export function MapView(props: MapViewProps) {
             </select>
           </label>
         </Show>
-        <form class="world-map__search" role="search" onSubmit={onSearch}>
-          <input
-            name="world-map-search"
-            aria-label={t("mapInfo.search")}
-            placeholder={t("mapInfo.search.placeholder")}
-            autocomplete="off"
-            size={8}
-            value={searchText()}
-            onInput={(e) => setSearchText(e.currentTarget.value)}
-          />
-        </form>
         <span class="world-map__hint">{t("worldMap.hint")}</span>
       </div>
-      <Show when={searchMiss()}>
-        {(room) => (
-          <p class="settings__error" role="alert">
-            {t("mapInfo.search.notFound", { room: room() })}
-          </p>
-        )}
-      </Show>
       <Show when={!mapState() && !loadError()}>
         <p class="settings__muted">{t("worldMap.loading")}</p>
       </Show>

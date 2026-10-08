@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readJson, readText, writeJson, type KeyValueStorage } from "./local-store.ts";
+import { readJson, readText, removeKey, writeJson, type KeyValueStorage } from "./local-store.ts";
 
 function memory(): KeyValueStorage & { data: Map<string, string> } {
   const data = new Map<string, string>();
@@ -38,5 +38,16 @@ describe("本地存储的安全读写", () => {
     expect(readText(throwing, "k")).toBeNull();
     expect(() => writeJson(throwing, "k", 1)).not.toThrow();
     expect(readJson(undefined, "k", asNumber, 7)).toBe(7);
+  });
+
+  it("removeKey 删除记录；存储不可用、没有 removeItem 或抛错时静默", () => {
+    const data = new Map([["k", "1"]]);
+    const storage = { getItem: (k: string) => data.get(k) ?? null, setItem: () => {}, removeItem: (k: string) => void data.delete(k) };
+    removeKey(storage, "k");
+    expect(data.has("k")).toBe(false);
+    expect(() => removeKey(undefined, "k")).not.toThrow();
+    expect(() => removeKey(throwing, "k")).not.toThrow();
+    const denied = { ...throwing, removeItem: () => { throw new Error("denied"); } };
+    expect(() => removeKey(denied, "k")).not.toThrow();
   });
 });

@@ -20,6 +20,12 @@ function heading() {
   return container.querySelector("h1")?.textContent;
 }
 
+/** 从 Top Bar 打开 Menu 并显示某一项 */
+function openMenuItem(id: string) {
+  container.querySelector<HTMLButtonElement>("[data-action=open-menu]")!.click();
+  container.querySelector<HTMLButtonElement>(`[data-menu-item="${id}"]`)!.click();
+}
+
 function languageButton() {
   const button = container.querySelector<HTMLButtonElement>("button[data-action=toggle-locale]");
   if (!button) throw new Error("language toggle not rendered");
@@ -63,6 +69,7 @@ describe("App", () => {
 
   it("shows the raw readings page with the connection state", () => {
     mount();
+    openMenuItem("readings");
     expect(container.querySelector("#readings-title")?.textContent).toBe("原始读数");
     expect(container.querySelector("[data-testid=readings-state]")?.textContent).toBe("已认证");
   });
@@ -75,6 +82,7 @@ describe("App", () => {
 
   it("shows the settings page, translated with the interface language", () => {
     mount();
+    openMenuItem("server");
     expect(container.querySelector("#settings-title")?.textContent).toBe("设置");
     languageButton().click();
     expect(container.querySelector("#settings-title")?.textContent).toBe("Settings");
@@ -82,16 +90,18 @@ describe("App", () => {
 
   it("shows the Ally List in the settings, kept across reloads", () => {
     mount();
+    openMenuItem("allies");
     expect(container.querySelector("#allies-title")?.textContent).toBe("Ally List");
     const input = container.querySelector<HTMLInputElement>("input[name=ally-name]")!;
     input.value = "Alice";
     input.dispatchEvent(new Event("input", { bubbles: true }));
     input.closest("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     mount();
+    openMenuItem("allies");
     expect(container.querySelector('[data-ally="Alice"]')).not.toBeNull();
   });
 
-  it("全页共用一个 Source：各面板与告警只建一个；换 token 时关掉旧的、建一个新的", async () => {
+  it("全页共用一个 Source：Main View、Sidebar 与告警只建一个；换 token 时关掉旧的、建一个新的", async () => {
     localStorage.setItem("msc.alerts", JSON.stringify({ pvp: true, nuke: true, stranger: true }));
     const made: { token: string | undefined; source: FixtureSource }[] = [];
     dispose = render(
@@ -106,9 +116,9 @@ describe("App", () => {
       ),
       container,
     );
-    expect(container.querySelector("[data-panel=map]")).not.toBeNull();
-    expect(container.querySelector("[data-panel=room]")).not.toBeNull();
-    expect(container.querySelector("[data-panel=settings]")).not.toBeNull();
+    expect(container.querySelector(".world-map")).not.toBeNull();
+    expect(container.querySelector(".room-view")).not.toBeNull();
+    openMenuItem("server");
     expect(made).toHaveLength(1);
 
     const close = vi.spyOn(made[0]!.source, "close");
@@ -117,14 +127,5 @@ describe("App", () => {
     token.dispatchEvent(new Event("change", { bubbles: true }));
     expect(made.map((m) => m.token)).toEqual([undefined, "new-token"]);
     expect(close).toHaveBeenCalledTimes(1);
-  });
-
-  it("窄屏进入 Monitor Mode：底部标签切换面板，一次只显示一个", () => {
-    dispose = render(() => <App sourceFor={() => new FixtureSource(bundle)} narrow={() => true} />, container);
-    const shown = () => [...container.querySelectorAll<HTMLElement>("[data-panel]")].filter((el) => !el.hidden).map((el) => el.dataset["panel"]);
-    expect(shown()).toEqual(["map"]);
-    container.querySelector<HTMLButtonElement>('[data-tab="settings"]')!.click();
-    expect(shown()).toEqual(["settings"]);
-    expect(container.querySelector("#settings-title")).not.toBeNull();
   });
 });

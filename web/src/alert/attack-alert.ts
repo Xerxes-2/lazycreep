@@ -3,24 +3,27 @@
  *
  * - 我的房间：`getMe()`（所有 Shard，定期刷新）并上 PvP 分组里所有权数据显示归我的房间
  * - PvP 与核弹：订阅 #3 的 PvP feed，不另起轮询
- * - 陌生人：为每个我的房间订阅 roomMap2（实测同一连接 100 个无错，不必轮换），
- *   订阅声明 keepWhileHidden：页面不可见时也保留（系统通知在那时最有用），只是不渲染
+ * - 陌生人：为每个我的房间经 roomMap2 订阅中心订阅（告警优先级最高，预算不够时最后被截），
+ *   租约声明 keepWhileHidden：页面不可见时也保留（系统通知在那时最有用），只是不渲染
  * - 玩家名：roomMap2 只给用户 id，按需 `getUsername` 查一次后缓存，用来对照 Ally List
  * - 冷却与已告警记录（AlertMemory）按 Server 存在本地，刷新后沿用（alert-memory.ts）
  */
 import { createEffect, createMemo, createSignal, onCleanup, untrack, type Accessor } from "solid-js";
 import { ALWAYS_VISIBLE, pollWhileVisible } from "../power/visibility.ts";
 import type { PvpFeed } from "../pvp/pvp-feed.ts";
-import type { Source, Unsubscribe, UserInfo } from "../source/source.ts";
+import { isNotPlayer, type Source, type UserInfo } from "../source/source.ts";
+import { ROOM_MAP_PRIORITY, useRoomMapLease, type RoomMapHub, type RoomRef } from "../source/room-map-hub.ts";
 import type { KeyValueStorage } from "../storage/local-store.ts";
 import { loadAlertMemory, saveAlertMemory } from "./alert-memory.ts";
-import { NOT_PLAYERS, createAlertDetector, myRoomsFrom, type Alert, type AlertConfig, type AlertContext } from "./alert-detector.ts";
+import { createAlertDetector, myRoomsFrom, type Alert, type AlertConfig, type AlertContext } from "./alert-detector.ts";
 
 /** 用户信息（我的房间）的刷新间隔：新占或丢失的房间 10 分钟内跟上 */
 export const ME_REFRESH_MS = 10 * 60_000;
 
 export interface AttackAlertOptions {
   readonly source: Accessor<Source>;
+  /** 全页共用的 roomMap2 订阅中心 */
+  readonly roomMaps: Accessor<RoomMapHub>;
   readonly feed: Pick<PvpFeed, "data" | "groups">;
   /** 有 token 时才能知道“我”是谁；为 false 时整个告警停用 */
   readonly enabled: Accessor<boolean>;
@@ -100,7 +103,7 @@ export function createAttackAlert(options: AttackAlertOptions): AttackAlert {
 
   const lookups = new Set<string>();
   const lookUp = (src: Source, id: string) => {
-    if (lookups.has(id) || NOT_PLAYERS.has(id) || id === me()?.id || usernames()[id] !== undefined) return;
+    if (lookups.has(id) || isNotPlayer(id) || id === me()?.id || usernames()[id] !== undefined) return;
     lookups.add(id);
     src.getUsername(id).then(
       (name) => {
@@ -123,35 +126,25 @@ export function createAttackAlert(options: AttackAlertOptions): AttackAlert {
   // 陌生人：为每个我的房间订阅 roomMap2（陌生人条件关闭时不订阅）；只在房间集合或开关变化时重订阅
   const strangerOn = createMemo(() => options.config().stranger);
   const known = createMemo(() => me() !== undefined);
-  createEffect(() => {
-    const src = options.source();
-    const current = rooms();
-    if (!strangerOn() || !known()) return;
-    const offs: Unsubscribe[] = [];
-    for (const [shard, list] of current) {
-      for (const room of list) {
-        offs.push(
-          src.subscribeRoomMap(
-            shard,
-            room,
-            (frame) => {
-              for (const id of Object.keys(frame)) lookUp(src, id);
-              untrack(() => {
-                for (const alert of detector().roomMap(shard, room, frame, context(), options.config(), now())) {
-                  options.onAlert(alert);
-                }
-              });
-            },
-            undefined,
-            { keepWhileHidden: true },
-          ),
-        );
-      }
-    }
-    onCleanup(() => {
-      for (const off of offs) off();
-    });
-  });
+  const watched = createMemo<readonly RoomRef[]>(() =>
+    strangerOn() && known() ? [...rooms()].flatMap(([shard, list]) => [...list].map((room) => ({ shard, room }))) : [],
+  );
+  useRoomMapLease(
+    options.roomMaps,
+    {
+      priority: ROOM_MAP_PRIORITY.alert,
+      keepWhileHidden: true,
+      everyFrame: true,
+      onFrame: (shard, room, frame) => {
+        const src = untrack(options.source);
+        for (const id of Object.keys(frame)) lookUp(src, id);
+        untrack(() => {
+          for (const alert of detector().roomMap(shard, room, frame, context(), options.config(), now())) options.onAlert(alert);
+        });
+      },
+    },
+    watched,
+  );
 
   return { me, rooms };
 }

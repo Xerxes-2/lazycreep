@@ -1,8 +1,11 @@
 /**
- * 快捷键（#5）：动作目录、默认键位、用户重绑（`msc.keys`，只存与默认不同的部分）与按键分发。
+ * 快捷键（#5，#30 改目录）：动作目录、默认键位、用户重绑（`msc.keys`）与按键分发。
  *
- * - 动作的执行者通过 ShortcutCommands.register 登记：App 登记面板切换（PanelController），
+ * - 动作的执行者通过 ShortcutCommands.register 登记：App 登记外壳动作（shell/shell-shortcuts.ts），
  *   Room View 登记 Live / Replay 与播放控制。没有执行者的动作按下时什么也不做，也不阻止默认行为。
+ * - `msc.keys` 存当前目录里每个动作的键（null 为解绑）。读回时发现目录外的动作或缺了目录里的动作，
+ *   说明是旧目录存下的（例如 #5 版只存与默认不同的部分、含已删除的数字键面板动作），整体回到默认。
+ *   以后改目录（增删动作）时，用户的自定义同样整体回到默认。
  * - 焦点在输入框、文本区、下拉框或可编辑元素里时不拦截；按钮等控件上的空格 / 回车交给控件本身。
  * - 每个动作至多一个键；同一个键绑给多个动作即冲突（conflicts），分发时取动作目录里靠前的那个。
  */
@@ -13,32 +16,26 @@ import { isRecord, readJson, writeJson, type KeyValueStorage, type StoredKey } f
 export const KEYBINDINGS_KEY = "msc.keys";
 export const KEYBINDINGS_STORAGE: StoredKey = { key: KEYBINDINGS_KEY, kind: "json-object", role: "settings" };
 
-/** 动作目录（显示顺序）；面板动作的 panel 是 PanelController.focus 的 id */
+/** 动作目录（显示顺序） */
 export const SHORTCUT_ACTIONS = [
-  { id: "panel.map", title: "shortcuts.action.panel.map", panel: "map" },
-  { id: "panel.room", title: "shortcuts.action.panel.room", panel: "room" },
-  { id: "panel.pvp", title: "shortcuts.action.panel.pvp", panel: "pvp" },
-  { id: "panel.details", title: "shortcuts.action.panel.details", panel: "details" },
-  { id: "panel.settings", title: "shortcuts.action.panel.settings", panel: "settings" },
-  { id: "panel.console", title: "shortcuts.action.panel.console", panel: "console" },
   { id: "view.toggleMapRoom", title: "shortcuts.action.view.toggleMapRoom" },
   { id: "replay.toggle", title: "shortcuts.action.replay.toggle" },
+  { id: "sidebar.toggle", title: "shortcuts.action.sidebar.toggle" },
+  { id: "console.toggle", title: "shortcuts.action.console.toggle" },
+  { id: "shell.close", title: "shortcuts.action.shell.close" },
   { id: "replay.playPause", title: "shortcuts.action.replay.playPause" },
   { id: "replay.stepBack", title: "shortcuts.action.replay.stepBack" },
   { id: "replay.stepForward", title: "shortcuts.action.replay.stepForward" },
-] as const satisfies readonly { id: string; title: MessageKey; panel?: string }[];
+] as const satisfies readonly { id: string; title: MessageKey }[];
 
 export type ShortcutAction = (typeof SHORTCUT_ACTIONS)[number]["id"];
 
 export const DEFAULT_KEYS: Readonly<Record<ShortcutAction, string>> = {
-  "panel.map": "1",
-  "panel.room": "2",
-  "panel.pvp": "3",
-  "panel.details": "4",
-  "panel.settings": "5",
-  "panel.console": "6",
   "view.toggleMapRoom": "M",
   "replay.toggle": "R",
+  "sidebar.toggle": "H",
+  "console.toggle": "`",
+  "shell.close": "Escape",
   "replay.playPause": "Space",
   "replay.stepBack": ",",
   "replay.stepForward": ".",
@@ -85,21 +82,27 @@ export interface Keybindings {
   resetAll(): void;
 }
 
+/** 与默认不同的部分；null 表示解绑 */
 type Overrides = Partial<Record<ShortcutAction, string | null>>;
 
-function decodeOverrides(value: unknown): Overrides | undefined {
+/** 存储里是完整的“动作 → 键或 null”；与当前目录对不上（旧目录存下的）时为 undefined，整体回到默认 */
+function decodeStored(value: unknown): Overrides | undefined {
   if (!isRecord(value)) return undefined;
+  const entries = Object.entries(value);
+  if (entries.length !== ACTION_IDS.size || entries.some(([action]) => !ACTION_IDS.has(action))) return undefined;
   const result: Overrides = {};
-  for (const [action, key] of Object.entries(value)) {
-    if (!ACTION_IDS.has(action)) continue;
-    if (key === null || (typeof key === "string" && key.trim() !== "")) result[action as ShortcutAction] = key;
+  for (const [action, key] of entries) {
+    const id = action as ShortcutAction;
+    if (key === null) result[id] = null;
+    else if (typeof key === "string" && key.trim() !== "") {
+      if (key !== DEFAULT_KEYS[id]) result[id] = key;
+    } else return undefined;
   }
   return result;
 }
 
 export function createKeybindings(storage: KeyValueStorage | undefined): Keybindings {
-  /** 与默认不同的部分；null 表示解绑 */
-  const [overrides, setOverrides] = createSignal<Overrides>(readJson(storage, KEYBINDINGS_KEY, decodeOverrides, {}));
+  const [overrides, setOverrides] = createSignal<Overrides>(readJson(storage, KEYBINDINGS_KEY, decodeStored, {}));
 
   const keys = createMemo<Bindings>(() => {
     const o = overrides();
@@ -123,7 +126,8 @@ export function createKeybindings(storage: KeyValueStorage | undefined): Keybind
 
   const save = (next: Overrides) => {
     setOverrides(next);
-    writeJson(storage, KEYBINDINGS_KEY, next);
+    // 存完整目录，读回时据此认出旧目录存下的键位
+    writeJson(storage, KEYBINDINGS_KEY, Object.fromEntries(SHORTCUT_ACTIONS.map(({ id }) => [id, next[id] === undefined ? DEFAULT_KEYS[id] : next[id]])));
   };
   const without = (action: ShortcutAction) => {
     const { [action]: _dropped, ...rest } = overrides();

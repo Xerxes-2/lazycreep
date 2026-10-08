@@ -25,6 +25,7 @@ import {
   type HistoryChunk,
   type MapStats,
   type Nuke,
+  type PlayerProfile,
   type WorldSize,
   type PvpShard,
   type RoomMapOptions,
@@ -92,6 +93,8 @@ export class LiveSource implements Source {
   private readonly token: string | undefined;
   private readonly baseUrl: string | undefined;
   private readonly fetchImpl: typeof fetch;
+  /** 玩家资料缓存（user/find）：id → 进行中或已完成的请求；失败的移除 */
+  private readonly players = new Map<string, Promise<PlayerProfile>>();
   private readonly aborter = new AbortController();
   private readonly socket: ChannelSocket;
   private room: RoomSubscription | undefined;
@@ -339,10 +342,21 @@ export class LiveSource implements Source {
   }
 
   async getUsername(id: string): Promise<string> {
-    const found = await this.api<{ user?: { username?: unknown } }>("/user/find", { id });
-    const username = found.user?.username;
-    if (typeof username !== "string") throw new SourceError("server", `/user/find：没有用户 ${id}`);
-    return username;
+    return (await this.getPlayer(id)).username;
+  }
+
+  getPlayer(id: string): Promise<PlayerProfile> {
+    let found = this.players.get(id);
+    if (!found) {
+      found = this.api<{ user?: { username?: unknown; gcl?: unknown } }>("/user/find", { id }).then(({ user }) => {
+        const username = user?.username;
+        if (typeof username !== "string") throw new SourceError("server", `/user/find：没有用户 ${id}`);
+        return { id, username, ...(typeof user?.gcl === "number" ? { gcl: user.gcl } : {}) };
+      });
+      this.players.set(id, found);
+      found.catch(() => this.players.delete(id));
+    }
+    return found;
   }
 
   /** room-history 是公开文件，不带 token。 */

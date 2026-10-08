@@ -2,11 +2,12 @@
  * 开发用的原始读数：订阅一个房间，显示最新 gameTime、本次会话收到的帧数与连接状态。
  * 用来端到端确认 LiveSource 的 WebSocket 层，不做任何渲染。
  */
-import { createEffect, createMemo, createSignal, onCleanup, Show } from "solid-js";
+import { createEffect, createSignal, onCleanup, Show } from "solid-js";
 import { useI18n, type MessageKey } from "../i18n";
 import type { Settings } from "../settings/settings.ts";
 import type { SourceFactory } from "../settings/SettingsPage.tsx";
 import type { ConnectionState, StreamError } from "../source/source.ts";
+import { useSharedSource } from "../source/use-shared-source.ts";
 
 export const STATE_KEYS: Record<ConnectionState, MessageKey> = {
   connecting: "connection.connecting",
@@ -25,11 +26,7 @@ export function RawReadings(props: { settings: Settings; sourceFor: SourceFactor
   const { t } = useI18n();
   const settings = props.settings;
 
-  const source = createMemo(() => {
-    const created = props.sourceFor(settings.server(), settings.token() || undefined);
-    onCleanup(() => created.close());
-    return created;
-  });
+  const source = useSharedSource(props.sourceFor, settings);
 
   const [state, setState] = createSignal<ConnectionState>("disconnected");
   createEffect(() => onCleanup(source().onConnection(setState)));

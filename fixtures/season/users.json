@@ -1,0 +1,5 @@
+{
+"meta":{"format":1,"kind":"users","recordedAt":"2026-10-08T03:00:00.000Z","server":{"id":"season","name":"Season","apiRoot":"/season/api","socketUrl":"wss://screeps.com/season/socket/websocket","sharded":true,"tileRoot":"/map-tiles","historyRoot":"/room-history"},"origin":"https://screeps.com","note":"roomMap2 录制里出现的玩家的 user/find（仅 _id、username、gcl）；晚于流录制补录"},
+"status":200,
+"body":{"65b2ded6e582880012134da6":{"_id":"65b2ded6e582880012134da6","username":"volotsyouga","gcl":115491280},"685da7c42df7a30011653e6a":{"_id":"685da7c42df7a30011653e6a","username":"dump_table","gcl":50784664},"6253e4a3a3d173248b5a2691":{"_id":"6253e4a3a3d173248b5a2691","username":"Xerxes_2","gcl":58385493}}
+}

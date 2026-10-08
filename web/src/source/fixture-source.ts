@@ -19,6 +19,7 @@ import {
   type StreamFrame,
   type TerrainFixture,
   type TimeFixture,
+  type UsersFixture,
   type VersionFixture,
 } from "./fixture-format.ts";
 import {
@@ -29,6 +30,7 @@ import {
   type HistoryChunk,
   type MapStats,
   type Nuke,
+  type PlayerProfile,
   type WorldSize,
   type PvpShard,
   type RoomMapOptions,
@@ -76,6 +78,7 @@ const KINDS: readonly FixtureKind[] = [
   "version",
   "worldSize",
   "mapStats",
+  "users",
 ];
 
 function isFixtureFile(value: unknown): value is FixtureFile {
@@ -292,8 +295,21 @@ export class FixtureSource implements Source {
     return meFromWire(await this.body<MeFixture>("me", "用户信息"));
   }
 
-  /** 录制格式没有 user/find：从录到的用户信息、map-stats 与房间流里的用户找。 */
   async getUsername(id: string): Promise<string> {
+    return (await this.getPlayer(id)).username;
+  }
+
+  /**
+   * 先找录到的 user/find（`users`，带 GCL）；没有时从录到的用户信息、map-stats 与房间流里的用户找名字（不带 GCL）。
+   * 不触网，所以不需要缓存。
+   */
+  async getPlayer(id: string): Promise<PlayerProfile> {
+    const recorded = this.find<UsersFixture>("users", (f) => f.body?.[id] !== undefined)?.body?.[id];
+    if (recorded) return { id, username: recorded.username, ...(recorded.gcl === undefined ? {} : { gcl: recorded.gcl }) };
+    return { id, username: this.recordedUsername(id) };
+  }
+
+  private recordedUsername(id: string): string {
     for (const file of this.files) {
       if (file.meta.kind === "me") {
         const user = (file as MeFixture).body?.user;

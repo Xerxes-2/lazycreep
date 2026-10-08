@@ -73,6 +73,21 @@ describe("生产构建不包含录制回放", () => {
     }
   });
 
+  it("index.html 内联了不依赖脚本的启动画面（#33）", () => {
+    const html = readFileSync(join(outDir, "index.html"), "utf8");
+    // #boot 是 body 里 #root 之前的那一段
+    const boot = /<div id="?boot"?[\s\S]*?(?=<div id="?root"?)/.exec(html)?.[0];
+    expect(boot, "缺少 #boot").toBeDefined();
+    // 应用名、进度条与阶段文字都直接写在 HTML 里
+    expect(boot).toContain("Screeps 客户端");
+    expect(boot).toMatch(/role="?progressbar"?/);
+    expect(boot).toMatch(/data-boot-text[^>]*>\s*[^<\s]/);
+    // 样式内联在页面里：深浅色跟随系统，不等外部样式表
+    const inline = [...html.matchAll(/<style>([\s\S]*?)<\/style>/g)].map((m) => m[1]).join("\n");
+    expect(inline).toContain("#boot");
+    expect(inline).toMatch(/prefers-color-scheme:\s*dark/);
+  });
+
   it("PWA 预缓存清单不引用 fixture", () => {
     const sw = readFileSync(join(outDir, "sw.js"), "utf8");
     const precached = [...sw.matchAll(/url:"([^"]+)"/g)].map((m) => m[1]!);
