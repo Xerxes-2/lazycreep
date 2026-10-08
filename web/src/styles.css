@@ -5,6 +5,40 @@
   --muted: #5b6470;
   --accent: #3f7d2a;
   font-family: system-ui, -apple-system, "Segoe UI", "Noto Sans SC", sans-serif;
+
+  /* ---- 信息层级（#39）：与主题无关的阶梯 ---- */
+  /* 字号：区块标题 / 分组标题 / 正文 / 次要文字 */
+  --fs-title: 0.9375rem;
+  --fs-group: 0.875rem;
+  --fs-body: 0.875rem;
+  --fs-small: 0.8125rem;
+  /* 数字等宽（Tick、坐标、计数） */
+  --font-numeric: tabular-nums;
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  /* 字重：正文 / 标题与强调 */
+  --weight-regular: 400;
+  --weight-strong: 600;
+  /* 间距阶梯 */
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 8px;
+  --space-4: 12px;
+  --space-5: 16px;
+  /* 圆角 */
+  --radius-s: 4px;
+  --radius-m: 6px;
+  --radius-l: 8px;
+
+  /* ---- 信息层级（#39）：浅色主题的颜色 ---- */
+  /* 文字：主要 / 次要 / 弱化 / 强调 / 危险 */
+  --color-primary: #1b1f24;
+  --color-secondary: #555e6a;
+  --color-faint: #808893;
+  --color-accent: #3f7d2a;
+  --color-danger: #c53030;
+  /* 分隔线（区块、卡片之间）与卡片底色 */
+  --divider: #d5d9df;
+  --surface-card: #ffffff;
 }
 
 /* 明暗主题（#5）：<html data-theme> 由 customize/ui-theme.ts 写入；脚本运行前按系统偏好兜底 */
@@ -14,6 +48,13 @@
     --fg: #e6e8eb;
     --muted: #9aa3ad;
     --accent: #8fd16a;
+    --color-primary: #e6e8eb;
+    --color-secondary: #a7b0ba;
+    --color-faint: #7b8490;
+    --color-accent: #8fd16a;
+    --color-danger: #f07272;
+    --divider: #353b43;
+    --surface-card: #22272e;
   }
 }
 
@@ -23,6 +64,13 @@
   --fg: #e6e8eb;
   --muted: #9aa3ad;
   --accent: #8fd16a;
+  --color-primary: #e6e8eb;
+  --color-secondary: #a7b0ba;
+  --color-faint: #7b8490;
+  --color-accent: #8fd16a;
+  --color-danger: #f07272;
+  --divider: #353b43;
+  --surface-card: #22272e;
 }
 
 :root[data-theme="light"] {
