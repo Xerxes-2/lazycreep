@@ -1,6 +1,6 @@
 /**
  * PvP Overview 每个房间的参战者（#34），每人一行（#39）：名字、GCL、物体数（roomMap2 位置点，含建筑），盟友有标记。
- * 数据来自 combatant-feed.ts；sectionCombatants 把它接到 Sidebar Section 的上下文上。
+ * 数据来自 combatant-feed.ts；pageCombatants 建全页一份（MapAndRoom），PvP 与 PvE 两个区块、地图图例共用。
  */
 import { For, Match, Switch } from "solid-js";
 import { useI18n } from "../i18n";
@@ -12,8 +12,8 @@ import type { Source } from "../source/source.ts";
 import type { RoomMapHub } from "../source/room-map-hub.ts";
 import type { Settings } from "../settings/settings.ts";
 
-/** 在 PvP 区块里建参战者 feed：区块不在屏幕上时退订，无 token 时不订阅 */
-export function sectionCombatants(
+/** 全页的参战者 feed：active 为 false（World Map 不可见）时退订，无 token 时不订阅 */
+export function pageCombatants(
   ctx: {
     readonly source: Accessor<Source>;
     readonly roomMaps: Accessor<RoomMapHub>;
@@ -21,16 +21,31 @@ export function sectionCombatants(
     readonly settings: Settings;
     readonly allies: Accessor<ReadonlySet<string> | undefined>;
   },
-  shown: Accessor<boolean>,
+  active: Accessor<boolean>,
 ): CombatantFeed {
   return createCombatantFeed({
     source: ctx.source,
     roomMaps: ctx.roomMaps,
     groups: ctx.pvp.groups,
-    active: shown,
+    active,
     canSubscribe: () => !!ctx.settings.token(),
     allies: () => ctx.allies() ?? new Set(),
   });
+}
+
+/** PvE 卡片的对手一行：房间里现在有哪些 NPC */
+export function PveOpponents(props: { readonly state: RoomCombatants }) {
+  const { t } = useI18n();
+  const npcs = () => (props.state.kind === "ready" ? props.state.npcs : []);
+  return (
+    <For each={npcs()}>
+      {(npc) => (
+        <li class="pvp-overview__player" data-npc={npc}>
+          {t(`pvpCombatants.npc.${npc}`)}
+        </li>
+      )}
+    </For>
+  );
 }
 
 /** 参战者列表的条目（#39：每人一行，放在卡片的 <ul data-combatants> 里） */

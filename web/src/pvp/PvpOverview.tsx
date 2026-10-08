@@ -9,12 +9,14 @@
 import { For, Show } from "solid-js";
 import { useI18n } from "../i18n";
 import { errorMessage } from "../settings/SettingsPage.tsx";
-import type { CombatantFeed } from "./combatant-feed.ts";
-import { PvpCombatants } from "./PvpCombatants.tsx";
+import { looksLikePve, type CombatantFeed } from "./combatant-feed.ts";
+import { PveOpponents, PvpCombatants } from "./PvpCombatants.tsx";
 import type { PvpFeed } from "./pvp-feed.ts";
-import { PVP_WINDOWS, battleReplayTick, type RoomOwner } from "./pvp-overview.ts";
+import { PVP_WINDOWS, battleReplayTick, type PvpShardGroup, type RoomOwner } from "./pvp-overview.ts";
 
 export interface PvpOverviewProps {
+  /** pvp：玩家之间的战斗（另列飞行中的核弹）；pve：看起来是打 NPC 的房间（looksLikePve）。没有参战者数据的房间算 pvp */
+  readonly mode: "pvp" | "pve";
   readonly feed: PvpFeed;
   /** 进入某房间的 Room View */
   readonly onOpenRoom: (target: { readonly shard: string; readonly room: string }) => void;
@@ -62,14 +64,20 @@ export function PvpOverview(props: PvpOverviewProps) {
     }
   };
 
+  const pve = props.mode === "pve";
+  const isPve = (shard: string, room: string) => props.combatants !== undefined && looksLikePve(props.combatants.of(shard, room));
+  /** 本列表的房间：PvE 列表只要看起来是打 NPC 的，PvP 列表要其余的 */
+  const listed = (group: PvpShardGroup) => group.rooms.filter((entry) => isPve(group.shard, entry.room) === pve);
+  const titleId = `${props.mode}-overview-title`;
+
   const replay = (shard: string, room: string, lastPvpTime: number) => {
     const target = { shard, room, tick: battleReplayTick(lastPvpTime) };
     props.onReplay(target);
   };
 
   return (
-    <section class="pvp-overview" aria-labelledby="pvp-overview-title">
-      <h2 id="pvp-overview-title">{t("pvp.title")}</h2>
+    <section class="pvp-overview" data-mode={props.mode} aria-labelledby={titleId}>
+      <h2 id={titleId}>{t(pve ? "pve.title" : "pvp.title")}</h2>
       <div class="pvp-overview__bar segmented" role="group" aria-label={t("pvp.window")}>
         <For each={PVP_WINDOWS}>
           {(window) => (
@@ -103,9 +111,9 @@ export function PvpOverview(props: PvpOverviewProps) {
                       <span class="pvp-overview__shard-time settings__muted">{t("pvp.shardTime", { tick: group.time! })}</span>
                     </Show>
                   </h3>
-                  <Show when={group.rooms.length > 0} fallback={<p class="settings__muted">{t("pvp.empty")}</p>}>
+                  <Show when={listed(group).length > 0} fallback={<p class="settings__muted">{t(pve ? "pve.empty" : "pvp.empty")}</p>}>
                     <ul class="pvp-overview__rooms">
-                      <For each={group.rooms}>
+                      <For each={listed(group)}>
                         {(entry) => {
                           const target = { shard: group.shard, room: entry.room };
                           const openLabel = () => t("pvp.openRoom", { room: entry.room });
@@ -124,6 +132,9 @@ export function PvpOverview(props: PvpOverviewProps) {
                               <Show when={props.combatants}>
                                 {(feed) => (
                                   <ul class="pvp-card__combatants" data-combatants={entry.room}>
+                                    <Show when={pve}>
+                                      <PveOpponents state={feed().of(group.shard, entry.room)} />
+                                    </Show>
                                     <PvpCombatants state={feed().of(group.shard, entry.room)} />
                                   </ul>
                                 )}
@@ -156,7 +167,7 @@ export function PvpOverview(props: PvpOverviewProps) {
                       </For>
                     </ul>
                   </Show>
-                  <Show when={group.nukes.length > 0}>
+                  <Show when={!pve && group.nukes.length > 0}>
                     <h4>{t("pvp.nukes")}</h4>
                     <ul class="pvp-overview__nukes">
                       <For each={group.nukes}>

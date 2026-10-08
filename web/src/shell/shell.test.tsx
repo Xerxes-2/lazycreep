@@ -68,7 +68,7 @@ describe("固定外壳（#24）", () => {
 
   it("Sidebar 的区块随 Main View 模式变化", () => {
     mount();
-    expect(shownSections()).toEqual(["map.search", "map.layers", "map.pointed", "map.pvp"]);
+    expect(shownSections()).toEqual(["map.search", "map.layers", "map.pointed", "map.pvp", "map.pve"]);
     expect(q("[data-section='map.pvp'] .pvp-overview")).not.toBeNull();
     press("m");
     expect(shownSections()).toEqual(["room.info", "room.minimap", "room.selected", "room.display"]);

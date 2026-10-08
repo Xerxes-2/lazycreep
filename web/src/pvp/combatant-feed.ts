@@ -6,6 +6,8 @@
  *   总预算由中心执行，PvP 参战者的优先级低于告警与 Minimap、高于 World Map，被截断的房间显示“超出订阅上限”
  * - 本 feed 自己至多要 maxRooms 个（默认 50，最近的优先）：MMO 500 Tick 窗口可有数百个房间，给地图留些预算
  * - 无 token 时 roomMap2 不可订阅：不订阅，各房间为 needsToken
+ * - 也记下房间里有哪些 NPC：PvP / PvE 两个列表与地图图例据此分开（looksLikePve）
+ * - 全页一份（MapAndRoom 建），World Map 可见时订阅：地图上的 PvE 图例在区块折叠时也要分类
  * - 玩家资料（名字、GCL）用 Source.getPlayer 查；同一玩家只请求一次（本 feed 记下已请求的，Source 自己也缓存）
  */
 import { createEffect, createMemo, createSignal, on, type Accessor } from "solid-js";
@@ -23,7 +25,23 @@ export type RoomCombatants =
   | { readonly kind: "unwatched" }
   /** 已订阅，还没收到帧 */
   | { readonly kind: "waiting" }
-  | { readonly kind: "ready"; readonly players: readonly Combatant[] };
+  /** npcs：房间里现在有哪些 NPC 的物体（Invader、Source Keeper） */
+  | { readonly kind: "ready"; readonly players: readonly Combatant[]; readonly npcs: readonly Npc[] };
+
+export type Npc = "invader" | "keeper";
+/** roomMap2 里 NPC 的用户 id */
+const NPC_IDS: ReadonlyMap<string, Npc> = new Map([
+  ["2", "invader"],
+  ["3", "keeper"],
+]);
+
+/**
+ * 看起来是 PvE（打 NPC）：房间里现在有 NPC，玩家至多一个。PvP 接口不区分对手是不是 NPC，只能看现在谁在场；
+ * 只有一个玩家、没有 NPC 的房间可能是另一方已经死光，仍算 PvP。没订阅到的房间不知道，也算 PvP。
+ */
+export function looksLikePve(state: RoomCombatants): boolean {
+  return state.kind === "ready" && state.npcs.length > 0 && state.players.length <= 1;
+}
 
 export interface CombatantFeedOptions {
   readonly source: Accessor<Source>;
@@ -43,16 +61,26 @@ export interface CombatantFeed {
   of(shard: string, room: string): RoomCombatants;
 }
 
-/** 帧里只留玩家（去掉地形 / 道路类键、NPC 与空列表） */
-function playersOnly(frame: RoomMapUpdate): RoomMapUpdate {
-  return Object.fromEntries(playerPoints(frame));
+/** 一帧里的玩家（去掉地形 / 道路类键、NPC 与空列表），以及有没有 NPC */
+interface RoomFrame {
+  readonly players: RoomMapUpdate;
+  readonly npcs: readonly Npc[];
 }
 
-const countsKey = (frame: RoomMapUpdate) =>
-  Object.entries(frame)
+function frameOf(update: RoomMapUpdate): RoomFrame {
+  const players = Object.fromEntries(playerPoints(update));
+  const npcs = playerPoints(update, { includeNpc: true }).flatMap(([id]) => {
+    const npc = NPC_IDS.get(id);
+    return npc ? [npc] : [];
+  });
+  return { players, npcs };
+}
+
+const countsKey = ({ players, npcs }: RoomFrame) =>
+  Object.entries(players)
     .map(([id, points]) => `${id}:${points.length}`)
     .sort()
-    .join(",");
+    .join(",") + `|${npcs.join(",")}`;
 
 export function createCombatantFeed(options: CombatantFeedOptions): CombatantFeed {
   const max = options.maxRooms ?? MAX_COMBATANT_ROOMS;
@@ -71,8 +99,8 @@ export function createCombatantFeed(options: CombatantFeedOptions): CombatantFee
     { equals: (a, b) => a.length === b.length && a.every((r, i) => r.shard === b[i]!.shard && r.room === b[i]!.room) },
   );
 
-  /** `shard/room` → 最近一帧（只含玩家） */
-  const [frames, setFrames] = createSignal<ReadonlyMap<string, RoomMapUpdate>>(new Map());
+  /** `shard/room` → 最近一帧 */
+  const [frames, setFrames] = createSignal<ReadonlyMap<string, RoomFrame>>(new Map());
   const [profiles, setProfiles] = createSignal<ReadonlyMap<string, PlayerProfile>>(new Map());
 
   // 玩家资料：每个 Source 各查一次
@@ -103,12 +131,12 @@ export function createCombatantFeed(options: CombatantFeedOptions): CombatantFee
       priority: ROOM_MAP_PRIORITY.pvp,
       onFrame: (shard, room, update) => {
         const key = roomMapKey(shard, room);
-        const players = playersOnly(update);
-        for (const id of Object.keys(players)) lookUp(id);
+        const frame = frameOf(update);
+        for (const id of Object.keys(frame.players)) lookUp(id);
         setFrames((all) => {
           const prev = all.get(key);
-          if (prev && countsKey(prev) === countsKey(players)) return all;
-          return new Map(all).set(key, players);
+          if (prev && countsKey(prev) === countsKey(frame)) return all;
+          return new Map(all).set(key, frame);
         });
       },
     },
@@ -132,7 +160,7 @@ export function createCombatantFeed(options: CombatantFeedOptions): CombatantFee
       const frame = frames().get(key);
       if (!frame) return { kind: "waiting" };
       const known = profiles();
-      return { kind: "ready", players: combatantsFrom(frame, (id) => known.get(id), options.allies()) };
+      return { kind: "ready", players: combatantsFrom(frame.players, (id) => known.get(id), options.allies()), npcs: frame.npcs };
     },
   };
 }

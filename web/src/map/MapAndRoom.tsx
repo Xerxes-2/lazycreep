@@ -22,6 +22,8 @@ import { Sidebar } from "../shell/Sidebar.tsx";
 import type { SectionContext } from "../shell/sidebar-sections.tsx";
 import { shownVisibility } from "../shell/view-visibility.ts";
 import { createPvpFeed } from "../pvp/pvp-feed.ts";
+import { looksLikePve } from "../pvp/combatant-feed.ts";
+import { pageCombatants } from "../pvp/PvpCombatants.tsx";
 import { createMapLayerPrefs, mapLayers } from "./map-layer-toggles.ts";
 import { badgeLayer } from "./map-badge-layer.ts";
 import { createMapBadges } from "./map-badges.ts";
@@ -117,6 +119,11 @@ export function MapAndRoom(props: MapAndRoomProps) {
   const [selectedId, setSelectedId] = createSignal<string>();
   const [roomState, setRoomState] = createSignal<RoomState>();
   const display = createRoomDisplayOptions(browserStorage());
+  const mapShown = () => shell.mainView() === "map";
+  const roomShown = () => shell.mainView() === "room";
+  // PvP 房间的参战者：全页一份，World Map 可见时订阅（PvP / PvE 两个区块与地图图例共用）
+  const combatants = pageCombatants({ source, roomMaps, pvp, settings: props.settings, allies: () => props.allies }, mapShown);
+
   const sectionContext: SectionContext = {
     shell,
     settings: props.settings,
@@ -125,6 +132,7 @@ export function MapAndRoom(props: MapAndRoomProps) {
     ownership,
     roomMaps,
     pvp,
+    combatants,
     setDetailsHost,
     worldMap,
     mapLayers: layerPrefs,
@@ -136,9 +144,6 @@ export function MapAndRoom(props: MapAndRoomProps) {
     roomState,
     display,
   };
-
-  const mapShown = () => shell.mainView() === "map";
-  const roomShown = () => shell.mainView() === "room";
 
   return (
     <div class="shell__body" data-layout={narrow() ? "narrow" : "wide"}>
@@ -165,7 +170,12 @@ export function MapAndRoom(props: MapAndRoomProps) {
               visibility={shownVisibility(page, mapShown)}
               ownership={ownership()}
               roomMaps={roomMaps()}
-              layers={(shard) => mapLayers(layerPrefs.enabled(), pvp.groups()?.find((g) => g.shard === shard), badges)}
+              layers={(shard) => {
+                const group = pvp.groups()?.find((g) => g.shard === shard);
+                // 在这里读分类：参战者帧到了地图跟着重画
+                const pve = new Set(group?.rooms.filter((r) => looksLikePve(combatants.of(shard, r.room))).map((r) => r.room));
+                return mapLayers(layerPrefs.enabled(), group, badges, pve);
+              }}
               link={worldMap}
               {...(props.allies ? { allies: props.allies } : {})}
               active={mapShown()}

@@ -165,15 +165,16 @@ describe("PvP Overview 接入 World Map 与 Room View", () => {
       expect(player.textContent).toMatch(/1 (objects|个物体)/);
     });
 
-    it("折叠 PvP 区块时退订全部参战者的 roomMap2，展开后重新订阅", async () => {
+    it("参战者订阅跟着 World Map：折叠 PvP 区块仍保留（地图图例要分类），进 Room View 时退订，回地图重新订阅", async () => {
       mount();
       await settle(() => expect(open.has("E13N21")).toBe(true));
-      const toggle = container.querySelector<HTMLButtonElement>('[data-section="map.pvp"] [data-action=toggle-section]')!;
-      toggle.click();
-      expect(open.has("E13N21")).toBe(false);
-      expect(open.has("W17N21")).toBe(false);
-      toggle.click();
+      container.querySelector<HTMLButtonElement>('[data-section="map.pvp"] [data-action=toggle-section]')!.click();
       expect(open.has("E13N21")).toBe(true);
+      container.querySelector<HTMLButtonElement>(".pvp-overview [data-room] [data-action=open-room]")!.click();
+      await settle(() => expect(slot("room").hidden).toBe(false));
+      expect(open.has("E13N21")).toBe(false);
+      container.querySelector<HTMLButtonElement>("button[data-action=back-to-map]")!.click();
+      await settle(() => expect(open.has("E13N21")).toBe(true));
     });
 
     it("无 token 时参战者显示“需要 token”，不订阅 roomMap2，其余信息照常", async () => {

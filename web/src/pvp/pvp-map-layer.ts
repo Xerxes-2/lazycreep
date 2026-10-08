@@ -32,14 +32,15 @@ export function pvpMapLayers(group: PvpShardGroup | undefined): readonly MapLaye
   return group ? [pvpHotspotLayer(group), nukeLayer(group)] : [];
 }
 
-/** PvP 热点（#28 的图层开关单独控制它与核弹层） */
-export function pvpHotspotLayer(group: PvpShardGroup): MapLayerPainter {
+/** PvP 热点（#28 的图层开关单独控制它与核弹层）：实心圆；pve 里的房间不画（交给 PvE 热点） */
+export function pvpHotspotLayer(group: PvpShardGroup, pve: ReadonlySet<string> = new Set()): MapLayerPainter {
   return (ctx) => {
     const radius = Math.max(HOTSPOT_RADIUS, HOTSPOT_MIN_PX / ctx.zoom);
     // 最远的那个仍保留 0.35 的不透明度
     const oldest = Math.max(1, ...group.rooms.map((r) => r.ago));
     const out: Primitive[] = [];
     for (const entry of group.rooms) {
+      if (pve.has(entry.room)) continue;
       const at = roomOrigin(ctx, entry.room);
       if (!at || !inView(ctx, at.x + 0.5, at.y + 0.5, radius)) continue;
       out.push({
@@ -52,6 +53,31 @@ export function pvpHotspotLayer(group: PvpShardGroup): MapLayerPainter {
         fill: ctx.theme.power,
         alpha: 1 - 0.65 * (entry.ago / oldest),
         stroke: { color: ctx.theme.labelOutline, width: radius * 0.15 },
+      });
+    }
+    return out;
+  };
+}
+
+/** PvE 热点（打 Invader、Source Keeper 的房间）：空心圆环，与 PvP 热点同样按远近变淡 */
+export function pveHotspotLayer(group: PvpShardGroup, pve: ReadonlySet<string>): MapLayerPainter {
+  return (ctx) => {
+    const radius = Math.max(HOTSPOT_RADIUS, HOTSPOT_MIN_PX / ctx.zoom);
+    const oldest = Math.max(1, ...group.rooms.map((r) => r.ago));
+    const out: Primitive[] = [];
+    for (const entry of group.rooms) {
+      if (!pve.has(entry.room)) continue;
+      const at = roomOrigin(ctx, entry.room);
+      if (!at || !inView(ctx, at.x + 0.5, at.y + 0.5, radius)) continue;
+      out.push({
+        kind: "circle",
+        key: `pve:${entry.room}`,
+        layer: MAP_LAYER.highlight,
+        x: at.x + 0.5,
+        y: at.y + 0.5,
+        radius,
+        alpha: 1 - 0.65 * (entry.ago / oldest),
+        stroke: { color: ctx.theme.energy, width: radius * 0.3 },
       });
     }
     return out;

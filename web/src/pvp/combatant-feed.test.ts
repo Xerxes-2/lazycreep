@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createRoot, createSignal } from "solid-js";
 import { FixtureSource, fixtureBundle } from "../source/fixture-source.ts";
-import type { Source } from "../source/source.ts";
-import { createCombatantFeed } from "./combatant-feed.ts";
+import type { RoomMapUpdate, Source } from "../source/source.ts";
+import { createCombatantFeed, looksLikePve } from "./combatant-feed.ts";
 import { roomMapHubFor } from "../source/room-map-hub.ts";
 import { createPvpFeed } from "./pvp-feed.ts";
 
@@ -41,8 +41,18 @@ afterEach(() => {
   dispose = undefined;
 });
 
-function setup(options: { token?: boolean; shown?: boolean; maxRooms?: number; budget?: number; allies?: string[] } = {}) {
+function setup(
+  options: { token?: boolean; shown?: boolean; maxRooms?: number; budget?: number; allies?: string[]; frames?: Record<string, RoomMapUpdate> } = {},
+) {
   const source = new FixtureSource(season, { speed: Infinity });
+  // 指定房间改推给定的一帧（录制里没有 NPC 的帧）
+  const recorded = source.subscribeRoomMap.bind(source);
+  source.subscribeRoomMap = (shard, room, listener, onError, opts) => {
+    const frame = options.frames?.[room];
+    if (!frame) return recorded(shard, room, listener, onError, opts);
+    queueMicrotask(() => listener(frame));
+    return () => {};
+  };
   const subs = tracked(source);
   const getPlayer = vi.spyOn(source, "getPlayer");
   const [shown, setShown] = createSignal(options.shown ?? true);
@@ -118,6 +128,27 @@ describe("参战者订阅", () => {
     await new Promise((r) => setTimeout(r, 50));
     const ids = getPlayer.mock.calls.map(([id]) => id);
     expect(ids.sort()).toEqual(["65b2ded6e582880012134da6", "685da7c42df7a30011653e6a"]);
+  });
+
+  it("记下房间里有哪些 NPC（2 Invader、3 Source Keeper）：有 NPC 且玩家至多一个算 PvE", async () => {
+    const { feed } = setup({
+      frames: {
+        W5N29: { "2": [[10, 10]], u1: [[11, 11]], w: [[0, 0]] },
+        W7N15: { "3": [[5, 5]], u1: [[6, 6]], u2: [[7, 7]] },
+        W15S8: { u1: [[6, 6]] },
+      },
+    });
+    await settle(() => expect(feed.of("shardSeason", "W5N29").kind).toBe("ready"));
+    const invaded = feed.of("shardSeason", "W5N29");
+    expect(invaded.kind === "ready" && invaded.npcs).toEqual(["invader"]);
+    expect(looksLikePve(invaded)).toBe(true);
+    await settle(() => expect(feed.of("shardSeason", "W7N15").kind).toBe("ready"));
+    // 两个玩家：即使有 Keeper 也算 PvP
+    expect(looksLikePve(feed.of("shardSeason", "W7N15"))).toBe(false);
+    await settle(() => expect(feed.of("shardSeason", "W15S8").kind).toBe("ready"));
+    // 一个玩家、没有 NPC：对手可能已死光，算 PvP
+    expect(looksLikePve(feed.of("shardSeason", "W15S8"))).toBe(false);
+    expect(looksLikePve({ kind: "waiting" })).toBe(false);
   });
 
   it("还没收到帧的房间是等待中", async () => {

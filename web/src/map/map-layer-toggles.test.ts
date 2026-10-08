@@ -31,8 +31,22 @@ state = applyPowerBanks(state, "W13S28", [[10, 10]]);
 state = applyRoomUnits(state, "W13S28", { r: [[10, 11]], me: [[12, 12]] });
 
 const nuke: Nuke = { id: "n1", shard: "s", room: "E0S0", x: 25, y: 10, landTime: 60_000, launchRoom: "W13S28" };
+/** W14S28 看起来是打 NPC：画成 PvE 热点，不画 PvP 热点 */
+const PVE_ROOMS = new Set(["W14S28"]);
 const group = aggregatePvp(
-  { pvp: [{ shard: "s", time: 1000, rooms: [{ room: "W13S28", lastPvpTime: 990 }] }], nukes: [nuke] },
+  {
+    pvp: [
+      {
+        shard: "s",
+        time: 1000,
+        rooms: [
+          { room: "W13S28", lastPvpTime: 990 },
+          { room: "W14S28", lastPvpTime: 995 },
+        ],
+      },
+    ],
+    nukes: [nuke],
+  },
   100,
 ).find((g) => g.shard === "s");
 
@@ -44,6 +58,7 @@ const PREFIX: Record<MapLayerToggle, readonly string[]> = {
   powerBanks: ["pb:"],
   zones: ["zone:"],
   pvp: ["pvp:"],
+  pve: ["pve:"],
   nukes: ["nuke:", "nuke-path:"],
   units: ["units:"],
   badges: ["badge:"],
@@ -62,7 +77,7 @@ function scene(on: Parameters<typeof mapLayers>[0]) {
   return buildMapScene(
     state,
     { theme: DEFAULT_THEME, zoom: 64, visible: { x0: 30, y0: 45, x1: 60, y1: 85 }, now: NOW },
-    mapLayers(on, group, badgeLayer((id) => `/badge/${id}`)),
+    mapLayers(on, group, badgeLayer((id) => `/badge/${id}`), PVE_ROOMS),
   ).primitives;
 }
 
@@ -86,6 +101,16 @@ describe("World Map 图层开关", () => {
         expect(keys(after, other), other).toEqual(keys(before, other));
       }
       expect(after.filter((p) => p.kind === "image").length).toBeGreaterThan(0);
+      dispose();
+    }));
+
+  it("PvE 房间画成空心圆环、不画 PvP 实心热点；其余房间照旧是 PvP 热点", () =>
+    createRoot((dispose) => {
+      const primitives = scene(createMapLayerPrefs(memoryStorage()).enabled());
+      expect(keys(primitives, "pvp")).toEqual(["pvp:W13S28"]);
+      expect(keys(primitives, "pve")).toEqual(["pve:W14S28"]);
+      const ring = primitives.find((p) => p.key === "pve:W14S28");
+      expect(ring?.kind === "circle" && ring.fill === undefined && ring.stroke !== undefined).toBe(true);
       dispose();
     }));
 

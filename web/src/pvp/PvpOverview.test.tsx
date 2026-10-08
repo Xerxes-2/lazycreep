@@ -20,7 +20,7 @@ let dispose: (() => void) | undefined;
 
 function mount(
   source: Source,
-  options: { visibility?: ReturnType<typeof manualVisibility>; pollMs?: number; combatants?: CombatantFeed } = {},
+  options: { visibility?: ReturnType<typeof manualVisibility>; pollMs?: number; combatants?: CombatantFeed; mode?: "pvp" | "pve" } = {},
 ) {
   const opened: { shard: string; room: string }[] = [];
   const replays: { shard: string; room: string; tick: number }[] = [];
@@ -33,6 +33,7 @@ function mount(
     return (
       <I18nProvider>
         <PvpOverview
+          mode={options.mode ?? "pvp"}
           feed={feed}
           onOpenRoom={(t) => opened.push(t)}
           onReplay={(t) => replays.push(t)}
@@ -136,6 +137,44 @@ describe("PvP Overview", () => {
     expect(rooms("shardSeason").length).toBeGreaterThan(0);
   });
 
+  describe("PvP 与 PvE 分开列", () => {
+    const alice = { id: "a", username: "Alice", gcl: 12, objects: 30, ally: false };
+    const bob = { id: "b", username: "Bob", gcl: 7, objects: 4, ally: false };
+    /** W17N21 打 Invader；E13N21 两个玩家（旁边也有 Keeper）；其余一个玩家、没有 NPC */
+    const combatants: CombatantFeed = {
+      of: (_shard, room) => {
+        if (room === "W17N21") return { kind: "ready", players: [alice], npcs: ["invader"] };
+        if (room === "E13N21") return { kind: "ready", players: [alice, bob], npcs: ["keeper"] };
+        return { kind: "ready", players: [alice], npcs: [] };
+      },
+    };
+
+    it("PvP 列表：去掉看起来是打 NPC 的房间（有 NPC、玩家至多一个）；两个玩家或没有 NPC 的照列", async () => {
+      mount(new FixtureSource(season), { combatants });
+      await settle(() => expect(rooms("shardSeason").length).toBeGreaterThan(0));
+      expect(rooms("shardSeason")).not.toContain("W17N21");
+      expect(rooms("shardSeason")).toContain("E13N21");
+      expect(container.querySelector("h2")!.textContent).toBe("PvP 一览");
+    });
+
+    it("PvE 列表：只列打 NPC 的房间，写明对手；不列核弹", async () => {
+      mount(new FixtureSource(season), { combatants, mode: "pve" });
+      await settle(() => expect(rooms("shardSeason")).toEqual(["W17N21"]));
+      expect(container.querySelector("h2")!.textContent).toBe("PvE 一览");
+      const card = container.querySelector<HTMLElement>('[data-room="W17N21"]')!;
+      expect(card.querySelector("[data-npc=invader]")!.textContent).toBe("对手：Invader");
+      expect(card.querySelector("[data-player=a]")).not.toBeNull();
+      expect(container.querySelector(".pvp-overview__nukes")).toBeNull();
+    });
+
+    it("没有参战者数据时全部算 PvP，PvE 列表为空", async () => {
+      mount(new FixtureSource(season), { mode: "pve" });
+      await settle(() => expect(container.querySelector('[data-shard="shardSeason"]')).not.toBeNull());
+      expect(rooms("shardSeason")).toEqual([]);
+      expect(container.querySelector('[data-shard="shardSeason"]')!.textContent).toContain("这个时间窗内没有打 NPC 的房间。");
+    });
+  });
+
   describe("卡片布局（#39，适配 260px 的 Sidebar）", () => {
     const players: CombatantFeed = {
       of: (_shard, room) =>
@@ -146,6 +185,7 @@ describe("PvP Overview", () => {
                 { id: "a", username: "Alice", gcl: 12, objects: 30, ally: true },
                 { id: "b", username: "Bob", gcl: 7, objects: 4, ally: false },
               ],
+              npcs: [],
             }
           : { kind: "needsToken" },
     };
