@@ -70,4 +70,23 @@ describe("预加载", () => {
     const old = { getWorldSize: async () => SIZE, getTerrain: async () => ({}) } as unknown as Source;
     await expect(preloadNeighbors(old, "shardSeason", "W13S28", () => true)).resolves.toBeUndefined();
   });
+
+  it("同时取邻居的房间快照（#63）；快照失败、Source 没有这个方法都静默；不要快照时不取", async () => {
+    const requested: string[] = [];
+    const source = {
+      getWorldSize: async () => SIZE,
+      getTerrain: async (_shard: string, room: string) => ({ shard: "shardSeason", room, encoded: "" }),
+      getRoomSnapshot: async (_shard: string, room: string) => {
+        requested.push(room);
+        if (room === "W14S28") throw new Error("down");
+        return { objects: {}, users: {} };
+      },
+    } as unknown as Source;
+    await expect(preloadNeighbors(source, "shardSeason", "W13S28", () => true)).resolves.toBeUndefined();
+    expect(requested).toEqual(["W13S27", "W14S28", "W12S28", "W13S29"]);
+
+    requested.length = 0;
+    await preloadNeighbors(source, "shardSeason", "W13S28", () => true, { snapshots: false });
+    expect(requested).toEqual([]);
+  });
 });

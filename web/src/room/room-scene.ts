@@ -35,6 +35,12 @@ export type { AnimationContext, ObjectPainter, ObjectPainters, PaintContext, Pri
 
 export const ROOM_SIZE = 50;
 
+/**
+ * Tick 未知时的动画标识（#63）：只有实时第一帧（不带 gameTime）接替房间快照时会用到——快照没有上一个状态，
+ * 平常的第一帧也没有；断线重订阅的第一帧沿用旧 gameTime（reduceLiveTick）
+ */
+const UNKNOWN_TICK = -1;
+
 export interface RoomSceneInput {
   readonly state: RoomState;
   readonly terrain?: Terrain | undefined;
@@ -108,11 +114,10 @@ export function buildRoomScene(
   const table = painters ?? ROOM_OBJECT_PAINTERS;
   const display = view.display ?? DEFAULT_ROOM_DISPLAY;
   const { previous } = room;
-  const tick = room.state.gameTime;
+  // 实时第一帧接替房间快照（#63）时 Tick 还未知：照样以快照为上一个状态播放，动画标识用 UNKNOWN_TICK
+  const tick = room.state.gameTime ?? UNKNOWN_TICK;
   const animation: AnimationContext | undefined =
-    display.animation && view.tickMs !== undefined && previous !== undefined && tick !== undefined
-      ? { tick, tickMs: view.tickMs, previous }
-      : undefined;
+    display.animation && view.tickMs !== undefined && previous !== undefined ? { tick, tickMs: view.tickMs, previous } : undefined;
   const decorations = display.decorations ? usable(room.decorations) : undefined;
   const ctx: PaintContext = {
     theme,

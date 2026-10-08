@@ -1,6 +1,7 @@
 /**
  * Room View（Live 最小版）：逐 Tick 画出所选房间的地形、建筑与 creep。
- * 数据流：Source 房间流 → reduceLiveTick → RoomState → buildRoomScene → SceneView。
+ * 数据流：Source 房间流 → reduceLiveTick → RoomState → buildRoomScene → SceneView。换房间时先画房间快照（#63），
+ * 房间流的第一帧到了整体替换。
  * 是 Main View 的一种模式（#24），画布占满整个 Room View：房间经 open（World Map、Minimap、PvP 卡片与 URL，
  * 都走 shell.navigate）打开，连接状态与 Tick 速度在 Top Bar（#51）。根元素的 data-shard / data-room /
  * data-tick / data-mode 反映画面上的房间、Tick 与 Live / Replay。
@@ -28,7 +29,7 @@ import { nextFacings, type Facings } from "./movement-tween.ts";
 import { PickList } from "./PickList.tsx";
 import { pickEntries } from "./pick-list.ts";
 import { ownerColorRule } from "./room-detail-rules.ts";
-import { reduceLiveTick, type RoomState } from "./room-state.ts";
+import { reduceLiveTick, roomStateFrom, type RoomState } from "./room-state.ts";
 import type { HistoryCache } from "../replay/history-cache.ts";
 import { createReplayController } from "../replay/replay-controller.ts";
 import { ReplayControls } from "../replay/ReplayControls.tsx";
@@ -42,7 +43,7 @@ import { replayMsPerTick } from "../replay/replay-engine.ts";
 import { replayAt, replayTick, type RoomRequest, type RoomTarget } from "../shell/shell-state.ts";
 import { seasonArtFor } from "../art/season-art.ts";
 import type { DataSource } from "./data-source.ts";
-import { preloadNeighbors, roomDecorations } from "./neighbor-preload.ts";
+import { preloadNeighbors, roomDecorations, roomSnapshot } from "./neighbor-preload.ts";
 
 type Target = RoomTarget;
 /** 从外部打开的房间；给了 replay 就以该 Tick 进入 Replay */
@@ -224,15 +225,29 @@ export function RoomView(props: RoomViewProps) {
     setTerrainError(undefined);
     if (!src || !current) return;
     let alive = true;
+    const live = !replay.active();
+    /** 本房间已收到实时帧（#63）：之前画面上的只可能是快照 */
+    let streaming = false;
     // Replay 期间退订 Live 房间流
-    const off = replay.active()
-      ? () => {}
-      : src.subscribeRoom(
+    const off = live
+      ? src.subscribeRoom(
           current.shard,
           current.room,
-          (tick) => setRoomState((state) => reduceLiveTick(state, tick)),
+          (tick) => {
+            // 第一帧是全量：整体替换快照（不当增量合并，否则快照里已不存在的对象会残留）
+            const first = !streaming;
+            streaming = true;
+            setRoomState((state) => reduceLiveTick(first ? undefined : state, tick));
+          },
           setStreamError,
-        );
+        )
+      : () => {};
+    // 房间快照（#63）：等第一帧要 1–4 秒，快照先到就先画（Tick 未知）；第一帧先到则丢弃迟到的快照。Replay 不取
+    if (live) {
+      void roomSnapshot(src, current.shard, current.room).then(
+        (snapshot) => alive && !streaming && snapshot && setRoomState(roomStateFrom(snapshot)),
+      );
+    }
     // 装饰走 Source 的装饰缓存（decoration-cache.ts），从不拒绝
     void roomDecorations(src, current.shard, current.room).then((loaded) => alive && setDecorations(loaded));
     src.getTerrain(current.shard, current.room).then(
@@ -240,7 +255,7 @@ export function RoomView(props: RoomViewProps) {
         if (!alive) return;
         setTerrain(loaded);
         // 当前房间的地形到了再在后台预加载邻居（neighbor-preload.ts）；页面隐藏时不做
-        void preloadNeighbors(src, current.shard, current.room, () => alive && untrack(visible));
+        void preloadNeighbors(src, current.shard, current.room, () => alive && untrack(visible), { snapshots: live });
       },
       (error: unknown) => alive && setTerrainError(errorMessage(t, error)),
     );
@@ -301,7 +316,8 @@ export function RoomView(props: RoomViewProps) {
 
   // 隐藏期间错过的动画不补播（ADR 0008）：回到屏幕时画面上的那个 Tick 不带动画，从下一个 Tick 开始
   let hidden = false;
-  let quietTick: number | undefined;
+  /** 回到屏幕时画面上的状态与它的 Tick：同一个状态、或 Tick 已知且相同的状态不带动画 */
+  let quiet: { readonly state: RoomState; readonly tick: number | undefined } | undefined;
   // 每个画面状态只取一次 Tick 间隔：之后实测值变了也不改这个 Tick 的动画描述（否则同一 Tick 内重建 Scene 会重播）
   let timing: { readonly state: RoomState; readonly ms: number } | undefined;
   const scene = createMemo<Scene | undefined>((previous) => {
@@ -317,9 +333,10 @@ export function RoomView(props: RoomViewProps) {
     }
     if (hidden) {
       hidden = false;
-      quietTick = state.gameTime;
+      quiet = { state, tick: state.gameTime };
     }
-    const animate = state.gameTime !== quietTick;
+    // 快照（#63）与接替它的第一帧都没有 Tick：按状态区分，第一帧照常以快照为起点补间
+    const animate = !quiet || (state !== quiet.state && (state.gameTime === undefined || state.gameTime !== quiet.tick));
     if (timing?.state !== state) timing = { state, ms: untrack(tickMs) };
     return buildRoomScene(
       { state, terrain: terrain(), decorations: decorations(), previous: animate ? before : undefined, facing: previousFacing },
