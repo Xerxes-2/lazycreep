@@ -8,7 +8,7 @@
  * - {@link actionEffects}：房间里各对象本 Tick 的动作产生的独立图元（不属于对象、不参与点选），
  *   按对象类型查 {@link ACTION_EFFECTS}。塔（#55）是第一个使用者；creep 的动作（#56）在表里加条目。
  *
- * 改变对象自身图元的动画（炮塔转向、冲撞、移动补间）不在这里，而是在对象的画法里给自己的图元加 animation。
+ * 改变对象自身图元的动画不在这里：炮塔、身体的转向在对象的画法里；冲撞、移动补间是整个对象的位移，见 movement-tween.ts。
  */
 import { officialArtUrl } from "../art/official-art.ts";
 import { officialTextureUrl } from "../art/official-textures.ts";
@@ -223,6 +223,48 @@ const CREEP_BEAMS: readonly { readonly action: string; readonly color: Color; re
   { action: "repair", color: ACTION_COLORS.work, targetFlash: true },
 ];
 
+/** 冲撞时目标处闪光的动作与颜色（官方 creepActions：采集黄、预定紫；0.9td，立即开始） */
+const CREEP_TARGET_FLASHES: readonly { readonly action: string; readonly color: Color }[] = [
+  { action: "harvest", color: ACTION_COLORS.work },
+  { action: "reserveController", color: ACTION_COLORS.reserveController },
+];
+
+/** 受击闪光、采集 / 预定闪光的时长占 Tick 间隔的比例 */
+export const HIT_FLASH_DURATION = 0.9;
+
+/**
+ * 受击闪光（官方 createChildCoverSprite + createChildCoverSpriteAction）：本 Tick 被攻击（actionLog.attacked，
+ * 攻击者的 {x, y}）闪红、被治疗（healed）闪绿、两者都有闪黄。cover 贴图（128，加色）挂在身体上，透明度
+ * 0 → 0.5 → 0，0.9td 的 1/4 升、3/4 降。部件名 `hit-flash`；由 creep / powerCreep 的画法放进自己的图元，
+ * 所以带 objectId、随整个 creep 位移（移动补间、冲撞）。
+ */
+export function hitFlash(obj: RoomObject, anim: AnimationContext): PrimitiveDraft[] {
+  const log = obj["actionLog"];
+  if (typeof log !== "object" || log === null) return [];
+  const { attacked, healed } = log as Record<string, unknown>;
+  const color = attacked && healed ? ACTION_COLORS.attackAndHeal : healed ? ACTION_COLORS.heal : attacked ? ACTION_COLORS.attack : undefined;
+  if (color === undefined) return [];
+  const length = HIT_FLASH_DURATION * anim.tickMs;
+  const c = center(obj);
+  const side = u(128);
+  return [
+    {
+      part: "hit-flash",
+      kind: "image",
+      layer: EFFECTS_LAYER,
+      x: c.x - side / 2,
+      y: c.y - side / 2,
+      width: side,
+      height: side,
+      url: officialArtUrl("cover"),
+      tint: color,
+      blend: "add",
+      alpha: 0,
+      animation: animationOf(anim, [pulse("alpha", 0, 0.5, length / 4, (3 * length) / 4)]),
+    },
+  ];
+}
+
 /** 群体远程攻击圆环的半径（官方单位） */
 const MASS_ATTACK_RADIUS = 300;
 
@@ -238,7 +280,8 @@ function actingPosition(obj: RoomObject, id: string, anim: AnimationContext): Po
 
 /**
  * creep 与 powerCreep（官方两者都用 creepActions）：远程攻击、远程治疗、建造、升级、维修的光束与目标闪光，
- * 群体远程攻击的圆环。冲撞、采集与预定的闪光、受击闪光在 #58；拆除、攻击控制器、transfer / withdraw 不画。
+ * 群体远程攻击的圆环，采集与预定的目标闪光（#58）。冲撞是整个 creep 的位移（movement-tween.ts 的 biteOf），
+ * 受击闪光挂在 creep 本体上（{@link hitFlash}）；拆除、攻击控制器、transfer / withdraw 不画。
  */
 const creep: EffectRule = (obj, anim, options, id) => {
   const out: PrimitiveDraft[] = [];
@@ -249,6 +292,10 @@ const creep: EffectRule = (obj, anim, options, id) => {
     if (!target) continue;
     out.push(...beam(`${action}-beam`, from, target, { color, width: 12 }, anim));
     if (targetFlash) out.push(...coverFlash(`${action}-target`, target, color, flash, anim, options));
+  }
+  for (const { action, color } of CREEP_TARGET_FLASHES) {
+    const target = actionTarget(obj, action);
+    if (target) out.push(...coverFlash(`${action}-target`, target, color, { end: HIT_FLASH_DURATION * anim.tickMs }, anim, options));
   }
   const log = obj["actionLog"];
   if (typeof log === "object" && log !== null && (log as Record<string, unknown>)["rangedMassAttack"]) {

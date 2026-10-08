@@ -4,7 +4,8 @@
  * `engine/src/lib/processors/creepBuildBody.js`）。
  *
  * 朝向（#57）：动画开关打开时，身体（官方 mainContainer 里的一切：部件环、tough、徽章、资源圆）按
- * `ctx.facings` 转到本 Tick 的朝向，有动画时 0.2td 内从上一个朝向转过去（官方 rotateTo）；关闭时总是朝上。
+ * `ctx.facings` 转到本 Tick 的朝向，有动画时从上一个朝向转过去（移动 0.2td，官方 rotateTo；冲撞 max(td/5, 0.4 秒)，
+ * 官方 creepActions）；关闭时总是朝上。受击闪光（#58，{@link hitFlash}）挂在身体上，随整个 creep 位移。
  * 移动补间的位移不在这里：buildRoomScene 统一加到对象的所有图元上（movement-tween.ts）。
  *
  * 身体部件环（creepBuildBody）：
@@ -18,8 +19,8 @@
  * 其余白）。NPC（Invader `2`、Source Keeper `3`）只有一张 creep-npc 贴图。
  */
 import type { Color } from "../scene/scene.ts";
-import { turnAnimation } from "./action-animation.ts";
-import { FACING_TURN } from "./movement-tween.ts";
+import { hitFlash, turnAnimation } from "./action-animation.ts";
+import { facingTurnMs } from "./movement-tween.ts";
 import { LAYER, center, num, type ObjectPainter, type ObjectPainters, type PaintContext, type PrimitiveDraft } from "./room-paint.ts";
 import type { RoomObject } from "./room-state.ts";
 import { ownerBadge } from "./owner-badge.ts";
@@ -135,7 +136,7 @@ function facingBody(obj: RoomObject, ctx: PaintContext, body: readonly Primitive
   const id = String(obj["_id"]);
   const angle = facings.after.get(id) ?? 0;
   const c = center(obj);
-  const turn = anim && turnAnimation(anim, c, (facings.before.get(id) ?? 0) - angle, FACING_TURN * anim.tickMs);
+  const turn = anim && turnAnimation(anim, c, (facings.before.get(id) ?? 0) - angle, facingTurnMs(anim.previous.objects[id], obj, anim.tickMs));
   if (angle === 0 && !turn) return body;
   return body.map((d) => {
     const rotated = angle === 0 ? d : rotateDraft(d, angle, c.x, c.y);
@@ -165,16 +166,17 @@ function storeCircles(obj: RoomObject, layer: number): PrimitiveDraft[] {
 
 const creep: ObjectPainter = (obj, ctx) => {
   const layer = creepLayer(6);
-  if (isNpc(obj["user"])) return facingBody(obj, ctx, [officialSprite(obj, "body", "creep-npc", { width: 100, layer })]);
+  const flash = ctx.animation ? hitFlash(obj, ctx.animation) : [];
+  if (isNpc(obj["user"])) return [...facingBody(obj, ctx, [officialSprite(obj, "body", "creep-npc", { width: 100, layer })]), ...flash];
   const toughAlive = bodyOf(obj).some((p) => p.type === "tough" && p.hits > 0);
-  return facingBody(obj, ctx, [
+  return [...facingBody(obj, ctx, [
     disc(obj, "base", 50, 0x202020, layer),
     ...bodyRing(obj, layer),
     ...(toughAlive ? [officialSprite(obj, "tough", "tough", { width: 120, layer })] : []),
     disc(obj, "core", 32, 0x000000, layer),
     ...ownerBadge(obj, ctx, { radius: 26, layer, minZoom: true }),
     ...storeCircles(obj, layer),
-  ]);
+  ]), ...flash];
 };
 
 // ---- powerCreep（powerCreep.metadata.js：按职业与等级的贴图 + 偏上的方形徽章） ----
@@ -190,10 +192,13 @@ const powerCreep: ObjectPainter = (obj, ctx) => {
   const raw = obj["className"];
   const className: PowerClass = typeof raw === "string" && Object.hasOwn(POWER_CLASSES, raw) ? (raw as PowerClass) : "operator";
   const tier = Math.max(0, Math.min(4, Math.ceil((num(obj, "level") ?? 0) / 6))) as 0 | 1 | 2 | 3 | 4;
-  return facingBody(obj, ctx, [
-    officialSprite(obj, "body", `${className}-lvl${tier}`, { width: 180, layer, tint: 0xcc3d3e }),
-    ...ownerBadge(obj, ctx, { radius: 26, layer, minZoom: true, box: POWER_CLASSES[className] }),
-  ]);
+  return [
+    ...facingBody(obj, ctx, [
+      officialSprite(obj, "body", `${className}-lvl${tier}`, { width: 180, layer, tint: 0xcc3d3e }),
+      ...ownerBadge(obj, ctx, { radius: 26, layer, minZoom: true, box: POWER_CLASSES[className] }),
+    ]),
+    ...(ctx.animation ? hitFlash(obj, ctx.animation) : []),
+  ];
 };
 
 export const OFFICIAL_CREEP_PAINTERS: ObjectPainters = { creep, powerCreep };
