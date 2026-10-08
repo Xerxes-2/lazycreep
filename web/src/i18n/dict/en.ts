@@ -357,4 +357,7 @@ export const en: Partial<Record<MessageKey, string>> = {
   "art.style.official": "Official",
   "art.style.geometric": "Geometric",
   "art.style.hint": "How Room View draws room objects. Official uses the official client's art; geometric is lighter.",
+
+  "badge.mapLayer": "Badges",
+  "badge.of": "{name}'s badge",
 };

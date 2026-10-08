@@ -204,10 +204,33 @@ describe("LiveSource map-stats 请求", () => {
     });
   });
 
+  it("徽章（#43）：user/find、auth/me 与 map-stats 的 users 都保留合法的徽章", async () => {
+    const BADGE = { type: 5, color1: "#ba0e09", color2: "#ffbf00", color3: "#ffbf00", param: -68, flip: false };
+    const { source } = live({
+      token: TOKEN,
+      routes: {
+        "/season/api/user/find?id=u1": { body: { ok: 1, user: { _id: "u1", username: "Alice", badge: BADGE, gcl: 1 } } },
+        "/season/api/auth/me": { body: { ok: 1, _id: "u1", username: "Alice", badge: BADGE } },
+        "/season/api/user/rooms?id=u1": { body: { ok: 1, shards: {} } },
+        "/season/api/game/map-stats": {
+          body: {
+            ok: 1,
+            gameTime: 5,
+            stats: { W38N13: { status: "normal", own: { user: "u1", level: 8 } } },
+            users: { u1: { _id: "u1", username: "Alice", badge: BADGE } },
+          },
+        },
+      },
+    });
+    expect((await source.getPlayer("u1")).badge).toEqual(BADGE);
+    expect((await source.getMe()).badge).toEqual(BADGE);
+    expect((await source.getMapStats(SHARD, ["W38N13"])).users["u1"]).toMatchObject({ badge: BADGE });
+  });
+
   it("速率限制（429）是 rateLimited", async () => {
     const { source } = live({
       token: TOKEN,
-      routes: { "/season/api/game/map-stats": { status: 429, body: { error: "Rate limit exceeded" } } },
+      routes: { "/season/api/game/map-stats":{ status: 429, body: { error: "Rate limit exceeded" } } },
     });
     await expect(source.getMapStats(SHARD, [OWN_ROOM])).rejects.toMatchObject({ kind: "rateLimited" });
   });

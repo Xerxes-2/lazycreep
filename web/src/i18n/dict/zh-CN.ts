@@ -355,6 +355,9 @@ export const zhCN = {
   "art.style.official": "官方",
   "art.style.geometric": "几何",
   "art.style.hint": "Room View 画房间对象的方式。官方画风使用官方客户端的贴图；几何画风更轻。",
+
+  "badge.mapLayer": "徽章",
+  "badge.of": "{name} 的徽章",
 } as const satisfies Record<string, string>;
 
 export type MessageKey = keyof typeof zhCN;

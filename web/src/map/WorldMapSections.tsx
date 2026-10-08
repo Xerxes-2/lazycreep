@@ -51,6 +51,7 @@ const LAYER_LABEL: Record<MapLayerToggle, MessageKey> = {
   pvp: "worldMapSidebar.layers.pvp",
   nukes: "worldMapSidebar.layers.nukes",
   units: "worldMapSidebar.layers.units",
+  badges: "badge.mapLayer",
 };
 
 export function MapLayersSection(props: { prefs: MapLayerPrefs }) {

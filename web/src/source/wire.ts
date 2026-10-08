@@ -14,6 +14,7 @@ import type {
   WireTerrain,
   WireVersion,
 } from "./fixture-format.ts";
+import { parseBadge } from "../badge/badge.ts";
 import type {
   ConsoleEvent,
   HistoryChunk,
@@ -69,7 +70,8 @@ export function terrainFromWire(shard: string, room: string, wire: WireTerrain):
 }
 
 export function meFromWire(wire: WireMe): UserInfo {
-  return { id: wire.user._id, username: wire.user.username, rooms: wire.rooms.shards };
+  const badge = parseBadge(wire.user.badge);
+  return { id: wire.user._id, username: wire.user.username, rooms: wire.rooms.shards, ...(badge ? { badge } : {}) };
 }
 
 export function consoleEventFromWire(wire: WireConsole): ConsoleEvent {
@@ -91,7 +93,7 @@ export function mapStatsFromWire(shard: string, wire: WireMapStats, rooms: reado
   const users: Record<string, RoomUser> = {};
   const addUser = (id: string) => {
     const user = wire.users[id];
-    if (user) users[id] = { _id: user._id, username: user.username };
+    if (user) users[id] = { _id: user._id, username: user.username, ...(user.badge === undefined ? {} : { badge: user.badge }) };
   };
   for (const room of rooms) {
     const stats = wire.stats[room];

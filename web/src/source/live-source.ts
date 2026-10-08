@@ -4,6 +4,7 @@
  * WebSocket 流直连官方（Server 配置的 socketUrl），一个 LiveSource 至多一条连接，
  * 第一次订阅流时建立；任何时刻最多一条房间订阅（ADR 0002）由这里保证。
  */
+import { parseBadge } from "../badge/badge.ts";
 import type {
   WireConsole,
   WireHistoryChunk,
@@ -338,11 +339,11 @@ export class LiveSource implements Source {
   }
 
   async getMe(): Promise<UserInfo> {
-    const user = await this.api<{ _id: string; username: string }>("/auth/me");
+    const user = await this.api<{ _id: string; username: string; badge?: unknown }>("/auth/me");
     const rooms = await this.api<{ shards: Readonly<Record<string, readonly string[]>> }>("/user/rooms", {
       id: user._id,
     });
-    return meFromWire({ user: { _id: user._id, username: user.username }, rooms: { shards: rooms.shards } });
+    return meFromWire({ user: { _id: user._id, username: user.username, badge: user.badge }, rooms: { shards: rooms.shards } });
   }
 
   async getUsername(id: string): Promise<string> {
@@ -352,10 +353,11 @@ export class LiveSource implements Source {
   getPlayer(id: string): Promise<PlayerProfile> {
     let found = this.players.get(id);
     if (!found) {
-      found = this.api<{ user?: { username?: unknown; gcl?: unknown } }>("/user/find", { id }).then(({ user }) => {
+      found = this.api<{ user?: { username?: unknown; gcl?: unknown; badge?: unknown } }>("/user/find", { id }).then(({ user }) => {
         const username = user?.username;
         if (typeof username !== "string") throw new SourceError("server", `/user/find：没有用户 ${id}`);
-        return { id, username, ...(typeof user?.gcl === "number" ? { gcl: user.gcl } : {}) };
+        const badge = parseBadge(user?.badge);
+        return { id, username, ...(typeof user?.gcl === "number" ? { gcl: user.gcl } : {}), ...(badge ? { badge } : {}) };
       });
       this.players.set(id, found);
       found.catch(() => this.players.delete(id));

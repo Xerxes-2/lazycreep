@@ -49,7 +49,7 @@ export interface StreamFrame<T> {
 export interface WireRoomPayload {
   readonly gameTime?: number;
   readonly objects?: Readonly<Record<string, Readonly<Record<string, unknown>> | null>>;
-  readonly users?: Readonly<Record<string, { readonly _id: string; readonly username: string }>> | null;
+  readonly users?: Readonly<Record<string, { readonly _id: string; readonly username: string; readonly badge?: unknown }>> | null;
   readonly visual?: string;
   readonly [key: string]: unknown;
 }
@@ -112,13 +112,13 @@ export interface WireTerrain {
 
 /** `user/find` 只保留 _id 与 username；`user/rooms` 原样。 */
 export interface WireMe {
-  readonly user: { readonly _id: string; readonly username: string };
+  readonly user: { readonly _id: string; readonly username: string; readonly badge?: unknown };
   readonly rooms: { readonly shards: Readonly<Record<string, readonly string[]>> };
 }
 
 /** 按 id 收集的 `user/find`：id → 用户（只保留 _id、username、gcl） */
 export type WireUsers = Readonly<
-  Record<string, { readonly _id: string; readonly username: string; readonly gcl?: number }>
+  Record<string, { readonly _id: string; readonly username: string; readonly gcl?: number; readonly badge?: unknown }>
 >;
 
 /** `game/world-size`：以房间计的世界宽高 */
@@ -146,7 +146,7 @@ export interface WireRoomStats {
 export interface WireMapStats {
   readonly gameTime: number;
   readonly stats: Readonly<Record<string, WireRoomStats>>;
-  readonly users: Readonly<Record<string, { readonly _id: string; readonly username: string }>>;
+  readonly users: Readonly<Record<string, { readonly _id: string; readonly username: string; readonly badge?: unknown }>>;
 }
 
 // ---- 文件 ----

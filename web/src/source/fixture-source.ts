@@ -2,6 +2,7 @@
  * FixtureSource：播放 `fixtures/` 录制文件的 Source。
  * 流按录制时的帧间隔播放，`speed` 为加速倍数（Infinity = 不等待，仍按顺序异步投递）。
  */
+import { parseBadge, type Badge } from "../badge/badge.ts";
 import {
   FIXTURE_FORMAT_VERSION,
   type FixtureFile,
@@ -309,8 +310,34 @@ export class FixtureSource implements Source {
    */
   async getPlayer(id: string): Promise<PlayerProfile> {
     const recorded = this.find<UsersFixture>("users", (f) => f.body?.[id] !== undefined)?.body?.[id];
-    if (recorded) return { id, username: recorded.username, ...(recorded.gcl === undefined ? {} : { gcl: recorded.gcl }) };
-    return { id, username: this.recordedUsername(id) };
+    const badge = this.recordedBadge(id);
+    const withBadge = badge ? { badge } : {};
+    if (recorded) {
+      return { id, username: recorded.username, ...(recorded.gcl === undefined ? {} : { gcl: recorded.gcl }), ...withBadge };
+    }
+    return { id, username: this.recordedUsername(id), ...withBadge };
+  }
+
+  /** 录到的徽章（getPlayer 用）：user/find、用户信息、map-stats 与房间流的 users 里第一个合法的（#43） */
+  private recordedBadge(id: string): Badge | undefined {
+    for (const file of this.files) {
+      const kind = file.meta.kind;
+      const raws =
+        kind === "users"
+          ? [(file as UsersFixture).body?.[id]?.badge]
+          : kind === "me"
+            ? [(file as MeFixture).body?.user._id === id ? (file as MeFixture).body?.user.badge : undefined]
+            : kind === "mapStats"
+              ? [(file as MapStatsFixture).body?.users[id]?.badge]
+              : kind === "room"
+                ? (file as RoomFixture).frames.map((frame) => frame.data.users?.[id]?.badge)
+                : [];
+      for (const raw of raws) {
+        const badge = parseBadge(raw);
+        if (badge) return badge;
+      }
+    }
+    return undefined;
   }
 
   private recordedUsername(id: string): string {

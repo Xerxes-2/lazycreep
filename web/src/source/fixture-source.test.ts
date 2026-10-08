@@ -194,12 +194,15 @@ describe("FixtureSource 一次性数据", () => {
     await expect(source.getUsername("000000000000000000000000")).rejects.toThrow();
   });
 
-  it("按 id 查玩家资料：录到的 user/find 带 GCL 点数；只有名字可查的不带 GCL", async () => {
+  it("按 id 查玩家资料：录到的 user/find 带 GCL 点数；只有名字可查的不带 GCL；徽章取自录到的房间流 users", async () => {
     expect(await source.getPlayer("65b2ded6e582880012134da6")).toEqual({
       id: "65b2ded6e582880012134da6",
       username: "volotsyouga",
       gcl: 115491280,
+      badge: expect.objectContaining({ color1: "#080811" }),
     });
+    // Source Keeper 没有徽章
+    expect((await source.getPlayer("3")).badge).toBeUndefined();
     expect(await source.getPlayer("57168c9fd490897e6186537f")).toEqual({ id: "57168c9fd490897e6186537f", username: "Kazkel" });
     await expect(source.getPlayer("000000000000000000000000")).rejects.toThrow();
   });

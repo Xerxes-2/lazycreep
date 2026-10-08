@@ -33,8 +33,8 @@ describe("参战玩家（roomMap2 一帧）", () => {
   it("每个玩家的名字、GCL 等级与物体数（位置点数），物体多的在前", async () => {
     const players = await profiles([VOLOTSYOUGA, DUMP_TABLE]);
     expect(combatantsFrom(e13n21, (id) => players.get(id), new Set())).toEqual([
-      { id: VOLOTSYOUGA, username: "volotsyouga", gcl: 8, objects: 2, ally: false },
-      { id: DUMP_TABLE, username: "dump_table", gcl: 6, objects: 1, ally: false },
+      { id: VOLOTSYOUGA, username: "volotsyouga", gcl: 8, objects: 2, ally: false, badge: expect.objectContaining({ color1: "#080811" }) },
+      { id: DUMP_TABLE, username: "dump_table", gcl: 6, objects: 1, ally: false, badge: expect.objectContaining({ color1: "#000000" }) },
     ]);
   });
 

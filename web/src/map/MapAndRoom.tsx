@@ -23,6 +23,8 @@ import type { SectionContext } from "../shell/sidebar-sections.tsx";
 import { shownVisibility } from "../shell/view-visibility.ts";
 import { createPvpFeed } from "../pvp/pvp-feed.ts";
 import { createMapLayerPrefs, mapLayers } from "./map-layer-toggles.ts";
+import { badgeLayer } from "./map-badge-layer.ts";
+import { createMapBadges } from "./map-badges.ts";
 import { createOwnershipHub } from "./ownership-hub.ts";
 import { roomMapHubFor } from "../source/room-map-hub.ts";
 import { createWorldMapLink } from "./world-map-link.ts";
@@ -78,6 +80,8 @@ export function MapAndRoom(props: MapAndRoomProps) {
     return hub;
   });
   const roomMaps = roomMapHubFor(source);
+  // World Map 徽章图层（#43）
+  const badges = badgeLayer(createMapBadges({ source }));
   // Attack Alert 需要 PvP / 核弹时，页面隐藏也继续轮询（#4 对 #14 规则的调整）
   const alertsNeedFeed = () => {
     const config = props.alerts?.config();
@@ -147,7 +151,7 @@ export function MapAndRoom(props: MapAndRoomProps) {
               visibility={shownVisibility(page, mapShown)}
               ownership={ownership()}
               roomMaps={roomMaps()}
-              layers={(shard) => mapLayers(layerPrefs.enabled(), pvp.groups()?.find((g) => g.shard === shard))}
+              layers={(shard) => mapLayers(layerPrefs.enabled(), pvp.groups()?.find((g) => g.shard === shard), badges)}
               link={worldMap}
               {...(props.allies ? { allies: props.allies } : {})}
               active={mapShown()}

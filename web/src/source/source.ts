@@ -2,6 +2,7 @@
  * Source：前端与一切外部数据之间唯一的边界（spec #1 接缝 1）。
  * 实现：FixtureSource（播放 `fixtures/` 的录制数据）；LiveSource（HTTP 经同源 Gateway，WebSocket 直连官方）。
  */
+import type { Badge } from "../badge/badge.ts";
 
 /** 一个 Server 的连接配置。路径是相对 Gateway 的同源路径，WebSocket 是绝对地址。 */
 export interface ServerConfig {
@@ -170,6 +171,8 @@ export interface Terrain {
 export interface UserInfo {
   readonly id: string;
   readonly username: string;
+  /** 在这个 Server 上的徽章（`auth/me`）；没有徽章时没有 */
+  readonly badge?: Badge;
   /** 按 Shard 列出拥有的房间 */
   readonly rooms: Readonly<Record<string, readonly string[]>>;
 }
@@ -180,6 +183,8 @@ export interface PlayerProfile {
   readonly username: string;
   /** GCL 点数（不是等级；等级见 pvp/gcl.ts 的 gclLevel）；拿不到时为 undefined */
   readonly gcl?: number;
+  /** 在这个 Server 上的徽章（#43）；没有徽章时没有 */
+  readonly badge?: Badge;
 }
 
 /** 一个 Shard 的世界尺寸，以房间计（`game/world-size`）。 */
