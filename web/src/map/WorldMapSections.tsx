@@ -97,7 +97,7 @@ export function PointedRoomSection(props: { link: WorldMapLink }) {
                 <dt>{t("worldMapSidebar.pointed.owner")}</dt>
                 <dd>{owner().username}</dd>
                 <dt>{t("worldMapSidebar.pointed.rcl")}</dt>
-                <dd>{owner().level > 0 ? owner().level : t("worldMapSidebar.pointed.reserved")}</dd>
+                <dd>{owner().rcl ?? t("worldMapSidebar.pointed.reserved")}</dd>
               </>
             )}
           </Show>

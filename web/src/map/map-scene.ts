@@ -9,6 +9,7 @@
 import type { Color, Primitive, Scene } from "../scene/scene.ts";
 import type { Theme } from "../scene/theme.ts";
 import { ownerColorRule } from "../room/room-detail-rules.ts";
+import { roomOwnership } from "../source/source.ts";
 import { paintAlliedHighlight, paintMinerals, paintPowerBanks, paintRcl, paintZones } from "./map-info-layers.ts";
 import { roomName, worldOffset, type MapState } from "./map-state.ts";
 
@@ -140,10 +141,10 @@ const OWNED_BORDER = 0.08;
 export const paintOwnership: MapLayerPainter = (ctx) => {
   const out: Primitive[] = [];
   for (const room of ctx.visibleRooms) {
-    const owner = ctx.state.rooms[room.name]?.owner;
-    if (!owner) continue;
+    const owner = roomOwnership(ctx.state.rooms[room.name]);
+    if (owner.kind === "none") continue;
     const color = ctx.ownerColor(owner.user);
-    const reserved = owner.level === 0;
+    const reserved = owner.kind === "reserved";
     out.push({
       kind: "rect",
       key: `own:${room.name}`,

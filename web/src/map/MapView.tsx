@@ -15,7 +15,7 @@ import type { Scene } from "../scene/scene.ts";
 import { DEFAULT_THEME, type Theme } from "../scene/theme.ts";
 import { errorMessage, type SourceFactory } from "../settings/SettingsPage.tsx";
 import type { Settings } from "../settings/settings.ts";
-import type { ShardInfo, Source } from "../source/source.ts";
+import { roomOwnership, type ShardInfo, type Source } from "../source/source.ts";
 import { roomMapHubFor, type RoomMapHub } from "../source/room-map-hub.ts";
 import { attachGestures } from "../scene/pointer-gestures.ts";
 import { panBy, screenToWorld } from "../scene/scene-camera.ts";
@@ -308,9 +308,10 @@ export function MapView(props: MapViewProps) {
     const at = pointedRoom();
     const state = mapState();
     if (!at || !state || state.shard !== at.shard) return link.setPointed(undefined);
-    const owner = state.rooms[at.room]?.owner;
-    const username = owner && state.users[owner.user]?.username;
-    link.setPointed({ ...at, ...(owner && username ? { owner: { username, level: owner.level } } : {}) });
+    const owner = roomOwnership(state.rooms[at.room]);
+    const username = owner.kind === "none" ? undefined : state.users[owner.user]?.username;
+    const rcl = owner.kind === "owned" ? owner.level : undefined;
+    link.setPointed({ ...at, ...(username ? { owner: { username, rcl } } : {}) });
   });
 
   const click = (point: { x: number; y: number }) => {

@@ -8,7 +8,7 @@
 import { parseRoomName, roomName, worldOffset } from "../map/map-state.ts";
 import type { Color, Primitive, Scene } from "../scene/scene.ts";
 import type { Theme } from "../scene/theme.ts";
-import { playerPoints, type RoomMapUpdate, type RoomStats, type WorldSize } from "../source/source.ts";
+import { playerPoints, roomOwnership, type RoomMapUpdate, type RoomStats, type WorldSize } from "../source/source.ts";
 
 export interface MinimapInput {
   /** 当前房间 */
@@ -74,8 +74,8 @@ export function buildMinimapScene(input: MinimapInput): Scene {
   for (const { room, col, row } of minimapCells(input.center, input.size)) {
     out.push({ kind: "image", key: `tile:${room}`, layer: LAYER.tile, x: col, y: row, width: 1, height: 1, url: input.tileUrl(room) });
 
-    const owner = input.rooms[room]?.owner;
-    if (owner) {
+    const owner = roomOwnership(input.rooms[room]);
+    if (owner.kind !== "none") {
       out.push({
         kind: "rect",
         key: `own:${room}`,
@@ -85,7 +85,7 @@ export function buildMinimapScene(input: MinimapInput): Scene {
         width: 1,
         height: 1,
         fill: input.ownerColor(owner.user),
-        alpha: owner.level === 0 ? RESERVED_ALPHA : OWNED_ALPHA,
+        alpha: owner.kind === "reserved" ? RESERVED_ALPHA : OWNED_ALPHA,
       });
     }
 

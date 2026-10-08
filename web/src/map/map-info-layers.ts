@@ -12,6 +12,7 @@
  */
 import type { Primitive } from "../scene/scene.ts";
 import { relationOf } from "../room/room-detail-rules.ts";
+import { roomOwnership } from "../source/source.ts";
 import { MAP_LAYER, type MapPaintContext } from "./map-scene.ts";
 
 /** 每个房间至少这么多 CSS 像素时显示 RCL 数字 */
@@ -65,8 +66,9 @@ export function paintRcl(ctx: MapPaintContext): Primitive[] {
   if (ctx.zoom < RCL_MIN_ZOOM) return [];
   const out: Primitive[] = [];
   for (const room of ctx.visibleRooms) {
-    const level = ctx.state.rooms[room.name]?.owner?.level ?? 0;
-    if (level <= 0) continue;
+    const owner = roomOwnership(ctx.state.rooms[room.name]);
+    if (owner.kind !== "owned") continue;
+    const level = owner.level;
     out.push({
       kind: "text",
       key: `rcl:${room.name}`,
@@ -135,8 +137,8 @@ export function paintAlliedHighlight(ctx: MapPaintContext): Primitive[] {
   const width = Math.min(0.15, 2 / ctx.zoom);
   const out: Primitive[] = [];
   for (const room of ctx.visibleRooms) {
-    const owner = state.rooms[room.name]?.owner;
-    if (!owner || owner.level === 0) continue;
+    const owner = roomOwnership(state.rooms[room.name]);
+    if (owner.kind !== "owned") continue;
     const relation = relationOf(owner.user, state.users, { me: state.me, allies: state.allies });
     if (relation !== "me" && relation !== "ally") continue;
     out.push({

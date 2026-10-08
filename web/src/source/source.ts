@@ -207,6 +207,19 @@ export interface RoomStats {
   readonly safeMode?: boolean;
 }
 
+/** 房间归属：map-stats 的 owner 里 level 0 是预定，1–8 是拥有（即 RCL） */
+export type RoomOwnership =
+  | { readonly kind: "none" }
+  | { readonly kind: "reserved"; readonly user: string }
+  | { readonly kind: "owned"; readonly user: string; readonly level: number };
+
+/** “谁拥有这个房间”的唯一规则；没有统计或没有所有者时为无主 */
+export function roomOwnership(stats: Pick<RoomStats, "owner"> | undefined): RoomOwnership {
+  const owner = stats?.owner;
+  if (!owner) return { kind: "none" };
+  return owner.level > 0 ? { kind: "owned", user: owner.user, level: owner.level } : { kind: "reserved", user: owner.user };
+}
+
 /** 一次 map-stats 查询的结果；不存在的房间不出现在 rooms 里。 */
 export interface MapStats {
   readonly shard: string;

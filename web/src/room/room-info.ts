@@ -3,7 +3,7 @@
  * 区块显示时自己经 OwnershipHub.wantRooms 补查当前房间）。
  * 控制器给出的字段（所有者、RCL、安全模式、签名）优先；新手区与重生区只有 map-stats 有。
  */
-import type { MapStats, RoomUser } from "../source/source.ts";
+import { roomOwnership, type MapStats, type RoomUser } from "../source/source.ts";
 import type { RoomObject, RoomState } from "./room-state.ts";
 
 /** 有截止时间的状态：undefined = 未知；false = 否；数字 = 截止时间（Unix 毫秒） */
@@ -50,7 +50,7 @@ export function roomInfo({ room, state, stats, now }: RoomInfoInput): RoomInfo {
   const level = typeof controller?.["level"] === "number" ? controller["level"] : undefined;
   const controllerOwner = text(controller?.["user"]);
   const reservation = record(controller?.["reservation"]);
-  const statsOwner = mapped?.owner;
+  const statsOwner = roomOwnership(mapped);
 
   const until = (at: number | undefined): Until => (mapped === undefined ? undefined : at !== undefined && at > now ? at : false);
 
@@ -65,13 +65,9 @@ export function roomInfo({ room, state, stats, now }: RoomInfoInput): RoomInfo {
 
   return {
     room,
-    owner: controller
-      ? nameOf(controllerOwner)
-      : statsOwner && statsOwner.level > 0
-        ? nameOf(statsOwner.user)
-        : undefined,
-    reservedBy: controller ? nameOf(reservation?.["user"]) : statsOwner && statsOwner.level === 0 ? nameOf(statsOwner.user) : undefined,
-    level: controller ? (controllerOwner && level ? level : undefined) : statsOwner && statsOwner.level > 0 ? statsOwner.level : undefined,
+    owner: controller ? nameOf(controllerOwner) : statsOwner.kind === "owned" ? nameOf(statsOwner.user) : undefined,
+    reservedBy: controller ? nameOf(reservation?.["user"]) : statsOwner.kind === "reserved" ? nameOf(statsOwner.user) : undefined,
+    level: controller ? (controllerOwner && level ? level : undefined) : statsOwner.kind === "owned" ? statsOwner.level : undefined,
     novice: until(mapped?.novice),
     respawnArea: until(mapped?.respawnArea),
     safeMode,

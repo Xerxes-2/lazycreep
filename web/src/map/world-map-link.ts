@@ -9,8 +9,8 @@ import { createSignal, type Accessor } from "solid-js";
 export interface PointedRoom {
   readonly shard: string;
   readonly room: string;
-  /** 所有者用户名与等级（0 为预定）；没有所有者或还不知道时缺省 */
-  readonly owner?: { readonly username: string; readonly level: number };
+  /** 所有者（或预定者）用户名与 RCL（预定时 rcl 为 undefined）；无主或还不知道时缺省 */
+  readonly owner?: { readonly username: string; readonly rcl: number | undefined };
 }
 
 /**
