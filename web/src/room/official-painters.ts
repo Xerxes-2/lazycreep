@@ -18,6 +18,7 @@ import { type OfficialSvgName } from "../art/official-art.ts";
 import type { Color } from "../scene/scene.ts";
 import { center, num, type ObjectPainter, type ObjectPainters, type PrimitiveDraft } from "./room-paint.ts";
 import { ROOM_OBJECT_PAINTERS } from "./room-painters.ts";
+import { withSeasonArt } from "./season-official-painters.ts";
 import type { RoomObject } from "./room-state.ts";
 import { ENERGY, badgeSpot, circle, energyCapacity, energyStore, officialSprite, ownerTint, u, zLayer } from "./official-sprite.ts";
 import { OFFICIAL_STRUCTURE_PAINTERS, controllerProgress } from "./official-structures.ts";
@@ -200,7 +201,7 @@ export const OFFICIAL_PAINTERS: ObjectPainters = {
   ...OFFICIAL_STRUCTURE_PAINTERS, ...OFFICIAL_WORLD_PAINTERS, // #45
 };
 
-const OFFICIAL_OBJECT_PAINTERS: ObjectPainters = { ...ROOM_OBJECT_PAINTERS, ...OFFICIAL_PAINTERS };
+const OFFICIAL_OBJECT_PAINTERS: ObjectPainters = withSeasonArt({ ...ROOM_OBJECT_PAINTERS, ...OFFICIAL_PAINTERS });
 
 /** Art Style 对应的对象画法映射表 */
 export function paintersFor(style: ArtStyle): ObjectPainters {

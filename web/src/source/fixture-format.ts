@@ -91,11 +91,12 @@ export interface WireNukes {
   >;
 }
 
-/** `version` 只保留用到的字段（serverData 里的渲染元数据很大）。 */
+/** `version` 只保留用到的字段（serverData 里别的东西很大）。 */
 export interface WireVersion {
   readonly package: number;
   readonly protocol: number;
-  readonly serverData: { readonly historyChunkSize: number };
+  /** renderer：赛季服的渲染器覆盖配置（#47），形状由 season-renderer.ts 校验 */
+  readonly serverData: { readonly historyChunkSize: number; readonly renderer?: unknown };
 }
 
 export interface WireTime {

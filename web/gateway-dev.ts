@@ -1,5 +1,6 @@
 /**
- * 开发与预览服务器上的 Gateway：与 gateway/Caddyfile 相同的代理路径与 POST 允许名单（ADR 0003），
+ * 开发与预览服务器上的 Gateway：与 gateway/Caddyfile 相同的代理路径与 POST 允许名单（ADR 0003）、
+ * 只读的赛季静态资源路径（#47），
  * 这样 `pnpm dev` 不必跑 Caddy。路径与名单都来自 gateway/routes.json。
  */
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -11,6 +12,8 @@ export interface GatewayDevOptions {
   readonly apiUpstream?: string;
   /** 地图瓦片 CDN，默认 routes.json 的 tilesOrigin */
   readonly tilesUpstream?: string;
+  /** 赛季静态资源主机（#47），默认 routes.json 的 seasonStaticOrigin */
+  readonly seasonStaticUpstream?: string;
 }
 
 /** 允许转发的 POST 完整路径：每个 API 前缀 × 允许名单。 */
@@ -21,7 +24,10 @@ export function postAllowlistPaths(): string[] {
 /** 不带给上游的请求头，与 Caddyfile 的 upstream_headers 一致。 */
 const STRIPPED_HEADERS = ["cookie", "cdn-loop", "x-http-method-override", "x-http-method", "x-method-override"];
 
-const PROXIED_PREFIXES = [...routes.apiPrefixes.map((p) => `${p}/`), "/room-history/", "/map-tiles/"];
+/** 赛季静态资源（#47）：只读，转发到静态资源主机的 /seasons/ 下 */
+const SEASON_STATIC_PREFIX = "/season-static/";
+
+const PROXIED_PREFIXES = [...routes.apiPrefixes.map((p) => `${p}/`), "/room-history/", "/map-tiles/", SEASON_STATIC_PREFIX];
 
 type Middleware = (req: IncomingMessage, res: ServerResponse, next: () => void) => void;
 
@@ -46,13 +52,15 @@ function writeGuard(): Middleware {
       return;
     }
     const method = req.method ?? "GET";
-    if (method === "GET" || method === "HEAD" || (method === "POST" && allowed.has(path))) return next();
+    if (method === "GET" || method === "HEAD") return next();
+    const readOnly = path.startsWith(SEASON_STATIC_PREFIX) || raw.startsWith(SEASON_STATIC_PREFIX);
+    if (!readOnly && method === "POST" && allowed.has(path)) return next();
     res.statusCode = 403;
-    res.end("gateway: write not allowed");
+    res.end(readOnly ? "gateway: read only" : "gateway: write not allowed");
   };
 }
 
-function proxyTable(apiUpstream: string, tilesUpstream: string): Record<string, ProxyOptions> {
+function proxyTable(apiUpstream: string, tilesUpstream: string, seasonStaticUpstream: string): Record<string, ProxyOptions> {
   const configure: ProxyOptions["configure"] = (proxy) => {
     proxy.on("proxyReq", (proxyReq) => {
       for (const name of STRIPPED_HEADERS) proxyReq.removeHeader(name);
@@ -69,11 +77,25 @@ function proxyTable(apiUpstream: string, tilesUpstream: string): Record<string, 
       configure,
       rewrite: (path) => path.replace(/^\/map-tiles\//, "/map/"),
     },
+    [SEASON_STATIC_PREFIX]: {
+      target: seasonStaticUpstream,
+      changeOrigin: true,
+      configure: (proxy, options) => {
+        configure(proxy, options);
+        // 静态资源主机不需要身份，token 不带过去（与 Caddyfile 一致）
+        proxy.on("proxyReq", (proxyReq) => proxyReq.removeHeader("x-token"));
+      },
+      rewrite: (path) => path.replace(/^\/season-static\//, "/seasons/"),
+    },
   };
 }
 
 export function gatewayDevProxy(options: GatewayDevOptions = {}): Plugin {
-  const proxy = proxyTable(options.apiUpstream ?? routes.apiOrigin, options.tilesUpstream ?? routes.tilesOrigin);
+  const proxy = proxyTable(
+    options.apiUpstream ?? routes.apiOrigin,
+    options.tilesUpstream ?? routes.tilesOrigin,
+    options.seasonStaticUpstream ?? routes.seasonStaticOrigin,
+  );
   const guard = writeGuard();
   return {
     name: "msc-gateway-dev",

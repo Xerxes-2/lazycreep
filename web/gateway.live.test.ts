@@ -59,6 +59,7 @@ describe.skipIf(!LIVE)("经 Gateway 联调", () => {
           // Caddyfile 不写默认上游，与 Nix 启动脚本一样从 routes.json 取
           MSC_API_UPSTREAM: routes.apiOrigin,
           MSC_TILES_UPSTREAM: routes.tilesOrigin,
+          MSC_SEASON_STATIC_UPSTREAM: routes.seasonStaticOrigin,
           MSC_POST_ALLOWLIST: postAllowlistPaths().join(" "),
         },
         stdio: "ignore",
@@ -97,6 +98,20 @@ describe.skipIf(!LIVE)("经 Gateway 联调", () => {
     const res = await fetch(`${base}/api/version`);
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toMatch(/^application\/json/);
+  });
+
+  it("赛季渲染器配置可取到，下发的贴图经 Gateway 只读路径取到（#47，匿名）", async () => {
+    const source = season(undefined);
+    const { renderer } = await source.getVersion();
+    expect(renderer, "赛季版本信息应带渲染器配置").toBeDefined();
+    expect(Object.keys(renderer!.metadata)).toContain("reactor");
+    const core = renderer!.resources["reactor-core"];
+    expect(core).toMatch(/^\/season-static\//);
+    const res = await fetch(new URL(core!, base));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("image/png");
+    expect((await res.arrayBuffer()).byteLength).toBeGreaterThan(0);
+    source.close();
   });
 
   it("地图瓦片：200、PNG", async () => {

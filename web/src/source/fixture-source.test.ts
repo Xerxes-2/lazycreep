@@ -208,7 +208,18 @@ describe("FixtureSource 一次性数据", () => {
   });
 
   it("版本信息带历史 chunk 大小", async () => {
-    expect(await source.getVersion()).toEqual({ package: 247, protocol: 14, historyChunkSize: 100 });
+    expect(await source.getVersion()).toMatchObject({ package: 247, protocol: 14, historyChunkSize: 100 });
+  });
+
+  it("赛季版本信息带渲染器覆盖配置：贴图换成同源的 Gateway 路径，metadata 原样（#47）", async () => {
+    const { renderer } = await source.getVersion();
+    expect(renderer?.resources).toEqual({
+      T: "/season-static/season11/renderer/T.png",
+      extractor: "/season-static/season11/renderer/extractor.svg",
+      "reactor-core": "/season-static/season11/renderer/reactor-core.png",
+      "reactor-edge": "/season-static/season11/renderer/reactor-edge.png",
+    });
+    expect(Object.keys(renderer?.metadata ?? {}).sort()).toEqual(["mineral", "reactor"]);
   });
 
   it("录到的 401 以 unauthorized 拒绝，和 LiveSource 一样", async () => {

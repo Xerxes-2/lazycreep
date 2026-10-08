@@ -197,12 +197,13 @@ mkdirSync(outDir, { recursive: true });
 if (want("version")) {
   const res = await api("/version");
   writeFixture(fixtureFileName({ kind: "version" }), {
-    meta: meta("version", { note: "serverData 只保留 historyChunkSize" }),
+    meta: meta("version", { note: "serverData 只保留 historyChunkSize 与 renderer" }),
     status: res.status,
     body: res.body && {
       package: res.body.package,
       protocol: res.body.protocol,
-      serverData: { historyChunkSize: res.body.serverData.historyChunkSize },
+      // renderer：赛季服的渲染器覆盖配置（#47），MMO 为空
+      serverData: { historyChunkSize: res.body.serverData.historyChunkSize, renderer: res.body.serverData.renderer },
     },
   });
 }

@@ -1,6 +1,7 @@
 /**
  * Room View 画法的公共部分：层级、画法签名与小工具。具体画法在 room-painters.ts 的映射表里。
  */
+import type { SeasonArt } from "../art/season-art.ts";
 import type { Color, Primitive } from "../scene/scene.ts";
 import type { Theme } from "../scene/theme.ts";
 import type { RoomUser } from "../source/source.ts";
@@ -43,6 +44,8 @@ export interface PaintContext {
   readonly gameTime?: number | undefined;
   /** 对象主人的颜色；按玩家 / 阵营着色的规则替换这里 */
   ownerColor(user: unknown): Color;
+  /** 已确认可用的赛季贴图（#47）；没有时赛季对象用几何画法 */
+  readonly seasonArt?: SeasonArt;
 }
 
 /** 一种对象类型的画法。对象保证带数值 x、y。 */

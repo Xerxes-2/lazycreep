@@ -33,6 +33,7 @@ import type { RoomDisplay } from "./display-options.ts";
 import type { ArtStyle } from "../art/art-style.ts";
 import { RoomToolbar } from "./RoomToolbar.tsx";
 import { replayAt, replayTick, type RoomRequest, type RoomTarget } from "../shell/shell-state.ts";
+import { seasonArtOf } from "./season-official-painters.ts";
 
 /** 数据来源：服务器（经共享 Source），或开发构建里的录制数据（FixtureSource） */
 type DataSource = "server" | "recording";
@@ -288,6 +289,7 @@ export function RoomView(props: RoomViewProps) {
         allies: props.allies,
         display: props.display,
         artStyle: props.artStyle,
+        seasonArt: seasonArtOf(source(), props.artStyle),
       },
     );
   });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FixtureSource, fixtureBundle } from "./fixture-source.ts";
-import type { FixtureFile } from "./fixture-format.ts";
+import type { FixtureFile, WireVersion } from "./fixture-format.ts";
 import { LiveSource } from "./live-source.ts";
 import { SERVER_PRESETS } from "./servers.ts";
 import { SourceError, type ServerConfig } from "./source.ts";
@@ -57,7 +57,8 @@ function fakeGateway(routes: Record<string, Reply | (() => never)>) {
 
 const seasonRoutes: Record<string, Reply> = {
   "/season/api/version": {
-    body: { ok: 1, ...(recorded("version") as object), serverData: { historyChunkSize: 100, renderer: {} } },
+    // 真实响应的 serverData 还带着别的字段，转换时忽略
+    body: { ok: 1, ...(recorded("version") as WireVersion), serverData: { ...(recorded("version") as WireVersion).serverData, features: [] } },
   },
   "/season/api/game/time?shard=shardSeason": { body: { ok: 1, ...(recorded("time") as object) } },
   "/season/api/game/shards/info": { body: { ok: 1, ...(recorded("shards") as object) } },

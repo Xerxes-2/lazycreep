@@ -6,7 +6,7 @@
     python3 test_gateway.py <routes.json> <gateway 命令> [参数...]
 
 Gateway 命令按环境变量 MSC_ADDRESS / MSC_PORT / MSC_WEB_ROOT / MSC_API_UPSTREAM /
-MSC_TILES_UPSTREAM 启动（见 gateway/Caddyfile）。
+MSC_TILES_UPSTREAM / MSC_SEASON_STATIC_UPSTREAM 启动（见 gateway/Caddyfile）。
 """
 
 import http.client
@@ -30,7 +30,7 @@ TOKEN = "test-token-0123"
 
 
 class MockUpstream:
-    """记录收到的每个请求，GET 回 JSON（/map/ 下回 PNG），POST 回显 body。"""
+    """记录收到的每个请求，GET 回 JSON（/map/ 与 /seasons/ 下回 PNG），POST 回显 body。"""
 
     def __init__(self):
         self.requests = []
@@ -43,7 +43,7 @@ class MockUpstream:
                 upstream.requests.append(
                     {"method": self.command, "path": self.path, "headers": dict(self.headers.items()), "body": body}
                 )
-                if self.path.startswith("/map/"):
+                if self.path.startswith(("/map/", "/seasons/")):
                     payload, ctype = b"\x89PNG\r\n\x1a\nfake", "image/png"
                 else:
                     payload, ctype = json.dumps({"ok": 1, "echo": body.decode()}).encode(), "application/json"
@@ -79,6 +79,7 @@ def free_port():
 
 api = MockUpstream()
 tiles = MockUpstream()
+season_static = MockUpstream()
 web_root = tempfile.mkdtemp()
 with open(os.path.join(web_root, "index.html"), "w") as f:
     f.write("<!doctype html><title>index</title>")
@@ -94,6 +95,7 @@ env = dict(
     MSC_WEB_ROOT=web_root,
     MSC_API_UPSTREAM=api.url,
     MSC_TILES_UPSTREAM=tiles.url,
+    MSC_SEASON_STATIC_UPSTREAM=season_static.url,
     HOME=tempfile.mkdtemp(),
     XDG_DATA_HOME=tempfile.mkdtemp(),
     XDG_CONFIG_HOME=tempfile.mkdtemp(),
@@ -133,7 +135,14 @@ BAD_PATHS = [
     "/room-history/shardSeason/W1N1/../../../api/user/code",
     "/map-tiles/../api/user/console",
     "/map-tiles/shardSeason%2F..%2FE0N0.png",
+    "/season-static/season11/../../api/user/console",
+    "/season-static/season11%2F..%2Frenderer/T.png",
+    "/season-static/./season11/renderer/T.png",
 ]
+
+
+def upstream_count():
+    return len(api.requests) + len(tiles.requests) + len(season_static.requests)
 
 
 def wait_ready():
@@ -178,7 +187,7 @@ class GatewayTest(unittest.TestCase):
                 self.assertEqual(got["headers"].get("X-Token"), TOKEN)
 
     def test_post_outside_allowlist_is_403_and_never_reaches_upstream(self):
-        before = len(api.requests) + len(tiles.requests)
+        before = upstream_count()
         paths = [
             "/api/user/code",
             "/season/api/user/code",
@@ -192,17 +201,17 @@ class GatewayTest(unittest.TestCase):
         for path in paths:
             status, _, _ = request("POST", path, b"{}", {"X-Token": TOKEN, "Content-Type": "application/json"})
             self.assertEqual(status, 403, path)
-        self.assertEqual(len(api.requests) + len(tiles.requests), before)
+        self.assertEqual(upstream_count(), before)
 
     def test_paths_with_encoded_slash_or_dot_or_dot_segments_are_400_for_any_method(self):
         # Caddy 的 path 匹配先解码再清理，上游却收到原始路径：这类路径一律拒绝（ADR 0003）
-        before = len(api.requests) + len(tiles.requests)
+        before = upstream_count()
         for path in BAD_PATHS:
             for method in ["GET", "POST"]:
                 body = b"{}" if method == "POST" else None
                 status, _, _ = request(method, path, body, {"X-Token": TOKEN, "Content-Type": "application/json"})
                 self.assertEqual(status, 400, f"{method} {path}")
-        self.assertEqual(len(api.requests) + len(tiles.requests), before)
+        self.assertEqual(upstream_count(), before)
 
     def test_encoded_slash_in_query_is_not_a_bad_path(self):
         path = "/api/user/find?username=a%2Fb/../c"
@@ -237,6 +246,31 @@ class GatewayTest(unittest.TestCase):
         [got] = tiles.received("GET", "/map/shardSeason/E0N0.png")
         self.assertEqual(got["headers"].get("Host"), f"127.0.0.1:{tiles.port}")
         self.assertEqual(api.received("GET", "/map/shardSeason/E0N0.png"), [])
+
+    def test_season_static_get_and_head_go_to_the_static_host_seasons_path(self):
+        path = "/season-static/season11/renderer/T.png"
+        for method in ["GET", "HEAD"]:
+            status, ctype, _ = request(method, path, headers={"X-Token": TOKEN, "Cookie": "CF_Authorization=secret"})
+            self.assertEqual(status, 200, method)
+            self.assertEqual(ctype, "image/png")
+            [got] = season_static.received(method, "/seasons/season11/renderer/T.png")
+            self.assertEqual(got["headers"].get("Host"), f"127.0.0.1:{season_static.port}")
+            # 静态资源主机不需要身份：token 与 cookie 都不带过去
+            sent = {k.lower() for k in got["headers"]}
+            self.assertNotIn("x-token", sent)
+            self.assertNotIn("cookie", sent)
+        self.assertEqual(api.received("GET", "/seasons/season11/renderer/T.png"), [])
+
+    def test_season_static_is_read_only_and_never_reaches_upstream(self):
+        before = upstream_count()
+        path = "/season-static/season11/renderer/T.png"
+        for method in ["POST", "PUT", "DELETE", "PATCH", "OPTIONS"]:
+            status, _, _ = request(method, path, b"{}", {"Content-Type": "application/json"})
+            self.assertEqual(status, 403, method)
+        for endpoint in ROUTES["postAllowlist"]:
+            status, _, _ = request("POST", f"/season-static/{endpoint}", b"{}")
+            self.assertEqual(status, 403, endpoint)
+        self.assertEqual(upstream_count(), before)
 
     def test_browser_and_cloudflare_headers_are_not_leaked_upstream(self):
         request(

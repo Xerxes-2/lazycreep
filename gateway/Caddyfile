@@ -7,6 +7,7 @@
 #   MSC_WEB_ROOT        前端构建产物目录（必填）
 #   MSC_API_UPSTREAM    API 与 room-history 上游（必填；启动脚本默认取 gateway/routes.json 的 apiOrigin）
 #   MSC_TILES_UPSTREAM  地图瓦片 CDN（必填；启动脚本默认取 gateway/routes.json 的 tilesOrigin）
+#   MSC_SEASON_STATIC_UPSTREAM  赛季静态资源主机（必填；启动脚本默认取 gateway/routes.json 的 seasonStaticOrigin）
 #   MSC_POST_ALLOWLIST  允许转发的 POST 完整路径，空格分隔（必填，由 gateway/routes.json 展开）
 # 上游地址只在 routes.json 写一份，这里不写默认值；不经启动脚本直接跑 Caddy 时必须自己设置。
 {
@@ -45,6 +46,8 @@ http://:{$MSC_PORT:8080} {
 	# 每个代理 handle 里都要先 respond 它，再判断写操作。
 	@ambiguous_path vars_regexp {http.request.orig_uri} `^[^?]*(%2[eEfF]|/\.\.?(/|\?|$))`
 
+	@not_read not method GET HEAD
+
 	@api path /api/* /season/api/* /ptr/api/*
 	handle @api {
 		respond @ambiguous_path "gateway: ambiguous path" 400
@@ -68,6 +71,18 @@ http://:{$MSC_PORT:8080} {
 		rewrite * /map{path}
 		reverse_proxy {$MSC_TILES_UPSTREAM} {
 			import upstream_headers
+		}
+	}
+
+	# 赛季静态资源（#47）：版本信息下发的渲染器贴图等，上游不给 CORS 头，经同源代理才能作 WebGL 纹理。
+	# 只读：只放行 GET / HEAD；不需要身份，token 不带给静态资源主机。
+	handle_path /season-static/* {
+		respond @ambiguous_path "gateway: ambiguous path" 400
+		respond @not_read "gateway: read only" 403
+		rewrite * /seasons{path}
+		reverse_proxy {$MSC_SEASON_STATIC_UPSTREAM} {
+			import upstream_headers
+			header_up -X-Token
 		}
 	}
 

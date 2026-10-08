@@ -2,6 +2,7 @@
  * 服务器 wire 格式到 Source 类型的转换。FixtureSource 与 LiveSource 共用，
  * 保证录制数据与即时数据经过同一套转换。
  */
+import { rendererFromWire } from "./season-renderer.ts";
 import type {
   WireConsole,
   WireHistoryChunk,
@@ -42,7 +43,13 @@ export function pvpFromWire(wire: WirePvp, interval: number): PvpShard[] {
 }
 
 export function versionFromWire(wire: WireVersion): ServerVersion {
-  return { package: wire.package, protocol: wire.protocol, historyChunkSize: wire.serverData.historyChunkSize };
+  const renderer = rendererFromWire(wire.serverData.renderer);
+  return {
+    package: wire.package,
+    protocol: wire.protocol,
+    historyChunkSize: wire.serverData.historyChunkSize,
+    ...(renderer ? { renderer } : {}),
+  };
 }
 
 export function nukesFromWire(wire: WireNukes): Nuke[] {

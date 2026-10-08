@@ -24,6 +24,7 @@ writeShellApplication {
     export MSC_WEB_ROOT="''${MSC_WEB_ROOT:-${web}}"
     export MSC_API_UPSTREAM="''${MSC_API_UPSTREAM:-${routes.apiOrigin}}"
     export MSC_TILES_UPSTREAM="''${MSC_TILES_UPSTREAM:-${routes.tilesOrigin}}"
+    export MSC_SEASON_STATIC_UPSTREAM="''${MSC_SEASON_STATIC_UPSTREAM:-${routes.seasonStaticOrigin}}"
     export MSC_POST_ALLOWLIST=${lib.escapeShellArg postAllowlist}
     exec caddy run --adapter caddyfile --config ${caddyfile} "$@"
   '';

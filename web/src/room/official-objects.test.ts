@@ -209,6 +209,8 @@ describe("官方画风：录制房间里的对象都不再落到几何画法", (
     for (const [id, obj] of Object.entries(state.objects)) {
       const type = String(obj["type"]);
       if (OTHER_TICKETS.has(type) || obj["x"] === undefined) continue;
+      // 钍矿与掉落的钍（#47）：没有赛季贴图时有意退回几何画法的钍色
+      if (obj["mineralType"] === "T" || obj["resourceType"] === "T") continue;
       checked.add(type);
       expect({ id, type, same: JSON.stringify(officialObjects.get(id)) === JSON.stringify(geometricObjects.get(id)) }).toEqual({ id, type, same: false });
     }

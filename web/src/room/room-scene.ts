@@ -13,6 +13,7 @@ import { roomVisualPrimitives } from "./room-visual.ts";
 import { DEFAULT_ROOM_DISPLAY, type RoomDisplay } from "./display-options.ts";
 import { nameLabel } from "./name-labels.ts";
 import type { ArtStyle } from "../art/art-style.ts";
+import type { SeasonArt } from "../art/season-art.ts";
 import { paintersFor } from "./official-painters.ts";
 
 export { LAYER, ROOM_OBJECT_PAINTERS };
@@ -38,6 +39,8 @@ export interface RoomSceneView {
   readonly display?: RoomDisplay | undefined;
   /** Art Style（#42）：选对象画法映射表；默认几何 */
   readonly artStyle?: ArtStyle | undefined;
+  /** 已确认可用的赛季贴图（#47），官方画风下用 */
+  readonly seasonArt?: SeasonArt | undefined;
 }
 
 /** 未知类型：洋红虚框 + 类型名 */
@@ -114,6 +117,7 @@ export function buildRoomScene(
     users: room.state.users,
     gameTime: room.state.gameTime,
     ownerColor: ownerColorRule(theme, room.state.users, { me: view.me, allies: view.allies }),
+    ...(view.seasonArt ? { seasonArt: view.seasonArt } : {}),
   };
 
   const primitives: Primitive[] = room.terrain ? terrainPrimitives(room.terrain, theme) : [];

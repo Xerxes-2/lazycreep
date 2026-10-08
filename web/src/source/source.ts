@@ -3,6 +3,7 @@
  * 实现：FixtureSource（播放 `fixtures/` 的录制数据）；LiveSource（HTTP 经同源 Gateway，WebSocket 直连官方）。
  */
 import type { Badge } from "../badge/badge.ts";
+import type { RendererOverride } from "./season-renderer.ts";
 
 /** 一个 Server 的连接配置。路径是相对 Gateway 的同源路径，WebSocket 是绝对地址。 */
 export interface ServerConfig {
@@ -239,6 +240,8 @@ export interface ServerVersion {
   readonly protocol: number;
   /** 历史 chunk 的 Tick 数，Replay 按它对齐 base */
   readonly historyChunkSize: number;
+  /** 赛季服下发的渲染器覆盖配置（#47）；MMO 没有 */
+  readonly renderer?: RendererOverride;
 }
 
 /**
