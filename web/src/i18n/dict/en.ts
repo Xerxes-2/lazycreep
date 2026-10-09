@@ -86,7 +86,7 @@ export const en: Partial<Record<MessageKey, string>> = {
   "copy.done": "Copied",
   "copy.failed": "Copy failed",
   "roomDetails.title": "Object details",
-  "roomDetails.close": "Close",
+  "roomDetails.close": "Deselect",
   "roomDetails.raw": "Other fields",
   "roomDetails.field.type": "Type",
   "roomDetails.field.owner": "Owner",

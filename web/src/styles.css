@@ -385,6 +385,15 @@ body {
   box-shadow: none;
 }
 
+/* 区块标题已是「对象详情」，面板自带的标题不再重复；只留取消选中按钮 */
+.details-section .room-details h3 {
+  display: none;
+}
+
+.details-section .room-details__header {
+  justify-content: flex-end;
+}
+
 /* Console Panel（#24）：Main View 底部，高度来自外壳状态 */
 .console-panel {
   flex: none;

@@ -84,7 +84,7 @@ export const zhCN = {
   "copy.done": "已复制",
   "copy.failed": "复制失败",
   "roomDetails.title": "对象详情",
-  "roomDetails.close": "收起",
+  "roomDetails.close": "取消选中",
   "roomDetails.raw": "其他字段",
   "roomDetails.field.type": "类型",
   "roomDetails.field.owner": "所有者",
