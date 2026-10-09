@@ -111,12 +111,25 @@ function parseSvg(svg: string, label: string): Document {
 }
 
 /**
+ * 没有 viewBox 的 SVG 用原来的 width/height 补一个，改宽高后内容才会跟着缩放；否则内容按原尺寸画在左上角，
+ * 放大时只占贴图的一角。官方美术里有几张（creep-npc、nuke、rampart、exit-*）把属性写成了小写 `viewbox`，
+ * SVG 区分大小写，等于没有；官方渲染器按 width/height 绘制，所以补的是 `0 0 width height`，不照抄小写那个。
+ */
+export function ensureViewBox(root: Element): void {
+  if (root.hasAttribute("viewBox")) return;
+  const w = Number.parseFloat(root.getAttribute("width") ?? "");
+  const h = Number.parseFloat(root.getAttribute("height") ?? "");
+  if (w > 0 && h > 0) root.setAttribute("viewBox", `0 0 ${w} ${h}`);
+}
+
+/**
  * SVG 文本 → width×height 像素的画布。把根元素的 width/height 改成目标像素（矢量按目标尺寸绘制，
  * 也让没有 width/height 的 SVG 有确定尺寸；不改宽高比的 viewBox 照常缩放），经 <img> 画进画布。
  */
 export async function rasterizeSvgText(svg: string, width: number, height: number): Promise<HTMLCanvasElement> {
   const doc = parseSvg(svg, "SVG");
   const root = doc.documentElement;
+  ensureViewBox(root);
   root.setAttribute("width", String(width));
   root.setAttribute("height", String(height));
   root.setAttribute("preserveAspectRatio", "none");
