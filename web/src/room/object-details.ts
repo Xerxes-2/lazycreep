@@ -33,7 +33,15 @@ export type DetailKey =
   | "structureHitsMax"
   | "structureOwner"
   | "structureId"
-  | "streak";
+  | "streak"
+  | "regeneration"
+  | "reservation"
+  | "safeMode"
+  | "safeModeCooldown"
+  | "upgradeBlocked"
+  | "sign"
+  | "landing"
+  | "nextSpawn";
 
 type AddField = (key: DetailKey, value: string | undefined, text?: DetailField["text"]) => void;
 
@@ -95,6 +103,15 @@ const KNOWN = new Set([
   "structure",
   // 赛季 reactor
   "launchTime",
+  // source / mineral 再生、控制器、核弹、Keeper Lair
+  "nextRegenerationTime",
+  "reservation",
+  "safeMode",
+  "safeModeCooldown",
+  "upgradeBlocked",
+  "sign",
+  "landTime",
+  "nextSpawnTime",
 ]);
 
 const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
@@ -233,6 +250,40 @@ function reactorFields(obj: RoomObject, gameTime: number | undefined, add: AddFi
   } else add("streak", String(launchTime), { key: "sinceTick", params: { tick: launchTime } });
 }
 
+/**
+ * 控制器：预定（谁、还剩几 Tick）、安全模式与其冷却、禁止升级的剩余 Tick、签名。
+ * 这几个都是结束 Tick，已过期的（≤ 0）不列；Tick 未知时也不列（没法推算）。
+ */
+function controllerFields(
+  obj: RoomObject,
+  users: Readonly<Record<string, RoomUser>>,
+  remaining: (time: unknown) => number | undefined,
+  add: AddField,
+) {
+  const username = (id: unknown) => (typeof id === "string" ? (users[id]?.username ?? id) : undefined);
+  const reservation = obj["reservation"];
+  if (typeof reservation === "object" && reservation !== null) {
+    const r = reservation as Record<string, unknown>;
+    const left = remaining(r["endTime"]);
+    const user = username(r["user"]);
+    if (left !== undefined) {
+      add("reservation", user !== undefined ? `${user} (${left})` : String(left), user !== undefined ? { key: "reservedBy", params: { user, ticks: left } } : undefined);
+    }
+  }
+  for (const key of ["safeMode", "safeModeCooldown", "upgradeBlocked"] as const) {
+    const left = remaining(obj[key]);
+    add(key, left !== undefined ? String(left) : undefined);
+  }
+  const sign = obj["sign"];
+  if (typeof sign === "object" && sign !== null) {
+    const s = sign as Record<string, unknown>;
+    const user = username(s["user"]);
+    if (typeof s["text"] === "string") {
+      add("sign", user !== undefined ? `${s["text"]} — ${user}` : s["text"], user !== undefined ? { key: "signedBy", params: { text: s["text"], user } } : undefined);
+    }
+  }
+}
+
 function rawText(value: unknown): string {
   if (typeof value === "string") return value;
   try {
@@ -252,6 +303,9 @@ export function describeObject(
     if (value !== undefined && value !== "") fields.push({ key, value, ...(text ? { text } : {}) });
   };
   const until = (time: unknown) => (isNum(time) && gameTime !== undefined ? String(time - gameTime) : undefined);
+  /** 结束 Tick 换算成剩余 Tick；已过期的不算 */
+  const remaining = (time: unknown) => (isNum(time) && gameTime !== undefined && time > gameTime ? time - gameTime : undefined);
+  const left = (time: unknown) => remaining(time)?.toString();
   const ratio = (a: unknown, b: unknown) => (isNum(a) ? (isNum(b) ? `${a} / ${b}` : String(a)) : undefined);
 
   add("type", typeof obj["type"] === "string" ? obj["type"] : undefined);
@@ -271,6 +325,7 @@ export function describeObject(
   add("level", isNum(obj["level"]) ? String(obj["level"]) : undefined);
   add("progress", isNum(obj["progressTotal"]) ? ratio(obj["progress"], obj["progressTotal"]) : undefined);
   add("downgrade", until(obj["downgradeTime"]));
+  controllerFields(obj, users, remaining, add);
   const spawning = obj["spawning"];
   if (typeof spawning === "object" && spawning !== null) {
     const s = spawning as Record<string, unknown>;
@@ -279,6 +334,10 @@ export function describeObject(
   }
   add("fatigue", isNum(obj["fatigue"]) && obj["fatigue"] > 0 ? String(obj["fatigue"]) : undefined);
   add("decay", until(obj["nextDecayTime"] ?? obj["decayTime"]));
+  // source / mineral 的再生：满了（null，合并后无此字段）就不列
+  add("regeneration", left(obj["nextRegenerationTime"]));
+  add("landing", left(obj["landTime"]));
+  add("nextSpawn", left(obj["nextSpawnTime"]));
   const cooldown = until(obj["cooldownTime"]);
   add("cooldown", cooldown !== undefined && Number(cooldown) > 0 ? cooldown : undefined);
   tombstoneFields(obj, gameTime, add);

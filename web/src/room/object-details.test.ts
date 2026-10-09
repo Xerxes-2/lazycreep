@@ -90,6 +90,49 @@ describe("对象详情", () => {
     expect(field(mineral, "mineral")).toBe("O 63940");
   });
 
+  describe("带结束 Tick 的字段换算成倒计时", () => {
+    const text = (d: ObjectDetails, key: string) => d.fields.find((f) => f.key === key)?.text;
+
+    it("source / mineral 的再生倒计时；满了（null 或没有）不列", () => {
+      const source = describeObject({ _id: "s", type: "source", x: 1, y: 1, energy: 0, energyCapacity: 3000, nextRegenerationTime: 1250, invaderHarvested: 0 }, users, 1000);
+      expect(field(source, "regeneration")).toBe("250");
+      expect(Object.fromEntries(source.raw)["nextRegenerationTime"]).toBeUndefined();
+      expect(field(describeObject({ _id: "s", type: "source", nextRegenerationTime: null }, users, 1000), "regeneration")).toBeUndefined();
+      expect(field(describeObject({ _id: "m", type: "mineral", nextRegenerationTime: 51000 }, users, 1000), "regeneration")).toBe("50000");
+    });
+
+    it("控制器：预定者用玩家名并给剩余 Tick；安全模式、冷却、禁止升级、签名", () => {
+      const d = describeObject(
+        {
+          _id: "k",
+          type: "controller",
+          level: 0,
+          reservation: { user: "u1", endTime: 4000 },
+          safeMode: 1500,
+          safeModeCooldown: 900,
+          upgradeBlocked: 1100,
+          sign: { user: "u1", text: "hello", time: 12, datetime: 1 },
+        },
+        users,
+        1000,
+      );
+      expect(field(d, "reservation")).toBe("Xerxes_2 (3000)");
+      expect(text(d, "reservation")).toEqual({ key: "reservedBy", params: { user: "Xerxes_2", ticks: 3000 } });
+      expect(field(d, "safeMode")).toBe("500");
+      // 已结束的冷却不列
+      expect(field(d, "safeModeCooldown")).toBeUndefined();
+      expect(field(d, "upgradeBlocked")).toBe("100");
+      expect(text(d, "sign")).toEqual({ key: "signedBy", params: { text: "hello", user: "Xerxes_2" } });
+      expect(d.raw).toEqual([]);
+    });
+
+    it("核弹落地、Keeper Lair 刷怪的倒计时；Tick 未知时不列", () => {
+      expect(field(describeObject({ _id: "n", type: "nuke", landTime: 1300 }, users, 1000), "landing")).toBe("300");
+      expect(field(describeObject({ _id: "l", type: "keeperLair", nextSpawnTime: 1042 }, users, 1000), "nextSpawn")).toBe("42");
+      expect(field(describeObject({ _id: "n", type: "nuke", landTime: 1300 }, users, undefined), "landing")).toBeUndefined();
+    });
+  });
+
   describe("墓碑", () => {
     const tombstone = {
       _id: "t1",
