@@ -59,8 +59,8 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     runHook postBuild
   '';
 
-  # 默认测试套件不触网，可以在沙箱里跑；类型检查一并执行。
-  doCheck = true;
+  # 部署构建不跑测试（小机器上很慢）；flake 的 checks.web 打开它。默认测试套件不触网，可以在沙箱里跑；类型检查一并执行。
+  doCheck = false;
   checkPhase = ''
     runHook preCheck
     pnpm --filter web typecheck

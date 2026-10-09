@@ -30,7 +30,8 @@
           packages = self.packages.${system};
         in
         {
-          inherit (packages) web;
+          # packages.web 不跑测试，这里打开：类型检查与测试套件
+          web = packages.web.overrideAttrs { doCheck = true; };
           # 允许名单与反代规则：起本地模拟上游，不触网
           gateway = pkgs.runCommand "lazycreep-gateway-test" { nativeBuildInputs = [ pkgs.python3 ]; } ''
             python3 ${./gateway/test_gateway.py} ${./gateway/routes.json} ${pkgs.lib.getExe packages.gateway}
@@ -56,8 +57,7 @@
                 ];
               };
             in
-            pkgs.writeText "lazycreep-module-eval"
-              nixos.config.systemd.units."lazycreep.service".text;
+            pkgs.writeText "lazycreep-module-eval" nixos.config.systemd.units."lazycreep.service".text;
         }
       );
 
