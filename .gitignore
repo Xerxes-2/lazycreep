@@ -16,3 +16,6 @@ result-*
 
 # 个人的 Claude Code 本地文件
 .claude/*.local.*
+
+# 子代理的 jj workspace（.claude/hooks/jj-worktree-create.sh 建在这里）
+.claude/worktrees/

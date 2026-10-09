@@ -12,6 +12,7 @@
 - 完成后在本地把工作 rebase 到 `main` 之上，验证（`pnpm test`、`pnpm typecheck`、`nix flake check`），再 `jj bookmark set main -r <顶部提交>` 快进并 `jj git push --bookmark main`。
 - 关闭 issue：在提交说明里写 `Closes #N`（推到 `main` 时 GitHub 自动关闭），或 `gh issue close`。
 - 功能书签合进 `main` 后删除（本地与远端）。需要中途备份时可以推功能书签，但不开 PR。
+- 子代理 workspace 由 `.claude/hooks/jj-worktree-*.sh` 建在 `.claude/worktrees/<name>`（已 ignore），会话结束时清理；依赖与 `.env` 的准备在 `.claude/hooks/worktree-setup.sh`。入口是全局 `~/.claude/hooks/jj-worktree-*.sh`，发现仓库里有这几个脚本就转交。
 
 ## Agent skills
 
