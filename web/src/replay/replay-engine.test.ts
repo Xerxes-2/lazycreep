@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { applyRoomTick, roomStateAt, roomStateFrom, type RoomState } from "../room/room-state.ts";
 import { FixtureSource, fixtureBundle } from "../source/fixture-source.ts";
 import type { HistoryChunk, HistoryTick } from "../source/source.ts";
-import { chunkBase, createReplay, type HistoryFetcher, type ReplayEngine, type ReplaySnapshot } from "./replay-engine.ts";
+import { chunkBase, createReplay, shiftSpeed, type HistoryFetcher, type ReplayEngine, type ReplaySnapshot } from "./replay-engine.ts";
 
 const bundle = fixtureBundle(
   Object.values(import.meta.glob<unknown>("../../../fixtures/season/*.json", { eager: true, import: "default" })),
@@ -205,11 +205,30 @@ describe("Replay 引擎（FixtureSource 驱动）", () => {
     expect((await settle(engine, (x) => x.status !== "loading")).status).toBe("missing");
   });
 
+  it("速度按档位加减，到头不变", () => {
+    expect(shiftSpeed(5, 1)).toBe(6);
+    expect(shiftSpeed(10, 1)).toBe(15);
+    expect(shiftSpeed(20, 1)).toBe(20);
+    expect(shiftSpeed(8, -1)).toBe(6);
+    expect(shiftSpeed(5, -1)).toBe(5);
+  });
+
+  it("serverTime 给出 Server 当前 Tick；取不到时保持 undefined", async () => {
+    const { fetch } = await splitFetcher();
+    engine = createReplay({ shard: SHARD, room: ROOM, start: 1024910, chunkSize: 50, fetchChunk: fetch, serverTime: Promise.resolve(1030000) });
+    expect(engine.snapshot().serverTime).toBeUndefined();
+    await settle(engine, (x) => x.serverTime === 1030000);
+    engine.dispose();
+    engine = createReplay({ shard: SHARD, room: ROOM, start: 1024910, chunkSize: 50, fetchChunk: fetch, serverTime: Promise.reject(new Error("x")) });
+    await settle(engine, ready(1024910));
+    expect(engine.snapshot().serverTime).toBeUndefined();
+  });
+
   describe("播放", () => {
     beforeEach(() => vi.useFakeTimers());
     afterEach(() => vi.useRealTimers());
 
-    it("1x 每秒前进一 Tick，16x 每秒十六 Tick；暂停后不动", async () => {
+    it("默认每秒 5 Tick，调到 20 后每秒 20 Tick；暂停后不动", async () => {
       const { fetch } = await splitFetcher();
       engine = createReplay({ shard: SHARD, room: ROOM, start: 1024910, chunkSize: 50, fetchChunk: fetch });
       await vi.advanceTimersByTimeAsync(0);
@@ -217,13 +236,13 @@ describe("Replay 引擎（FixtureSource 驱动）", () => {
       engine.play();
       expect(engine.snapshot().playing).toBe(true);
       await vi.advanceTimersByTimeAsync(3000);
-      expect(engine.snapshot().target).toBe(1024913);
-      engine.setSpeed(16);
+      expect(engine.snapshot().target).toBe(1024925);
+      engine.setSpeed(20);
       await vi.advanceTimersByTimeAsync(1000);
-      expect(engine.snapshot().target).toBe(1024929);
+      expect(engine.snapshot().target).toBe(1024945);
       engine.pause();
       await vi.advanceTimersByTimeAsync(5000);
-      expect(engine.snapshot()).toMatchObject({ target: 1024929, playing: false, speed: 16 });
+      expect(engine.snapshot()).toMatchObject({ target: 1024945, playing: false, speed: 20 });
     });
 
     it("播放到历史尽头时停下并提示 missing", async () => {
@@ -231,7 +250,6 @@ describe("Replay 引擎（FixtureSource 驱动）", () => {
       engine = createReplay({ shard: SHARD, room: ROOM, start: 1024995, chunkSize: 50, fetchChunk: fetch });
       await vi.advanceTimersByTimeAsync(0);
       engine.play();
-      engine.setSpeed(4);
       await vi.advanceTimersByTimeAsync(5000);
       const s = engine.snapshot();
       expect(s.playing).toBe(false);

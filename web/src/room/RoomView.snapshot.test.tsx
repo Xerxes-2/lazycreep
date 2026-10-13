@@ -62,6 +62,7 @@ function fakeSource() {
     getWorldSize: async () => ({ width: 102, height: 102 }),
     getTerrain: async (shard: string, room: string) => ({ shard, room, encoded: "0".repeat(2500) }),
     getVersion: async () => ({ package: 1, protocol: 14, historyChunkSize: 1000, mapTileRoot: null }),
+    getTime: async () => 1000,
     getHistoryChunk: async () => chunk,
     close() {},
   } as unknown as Source;

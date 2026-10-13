@@ -14,8 +14,10 @@ import type { HistoryChunk, Unsubscribe } from "../source/source.ts";
 /** 取一个历史 chunk；历史不存在时得到 null。通常就是 Source.getHistoryChunk（可叠一层缓存）。 */
 export type HistoryFetcher = (shard: string, room: string, base: number) => Promise<HistoryChunk | null>;
 
-export type ReplaySpeed = 1 | 4 | 16;
-export const REPLAY_SPEEDS: readonly ReplaySpeed[] = [1, 4, 16];
+/** 播放速度（Tick / 秒）：照官方回放的 −/+ 档位，取 5–20 这一段 */
+export const REPLAY_SPEEDS = [5, 6, 8, 10, 15, 20] as const;
+export type ReplaySpeed = (typeof REPLAY_SPEEDS)[number];
+export const DEFAULT_REPLAY_SPEED: ReplaySpeed = 5;
 
 /**
  * - loading：正在取目标 Tick 所在的 chunk（或 chunk 大小）
@@ -37,6 +39,8 @@ export interface ReplaySnapshot {
   readonly speed: ReplaySpeed;
   /** 尚未取到版本信息时为 undefined */
   readonly chunkSize: number | undefined;
+  /** 打开 Replay 时 Server 的当前 Tick（时间轴的右端据此算）；还不知道时为 undefined */
+  readonly serverTime: number | undefined;
 }
 
 export interface ReplayOptions {
@@ -52,6 +56,8 @@ export interface ReplayOptions {
    * （最多退两个），而不是直接提示历史不存在。
    */
   readonly latest?: boolean;
+  /** Server 的当前 Tick，通常是 `source.getTime(shard)`；失败时 serverTime 保持 undefined */
+  readonly serverTime?: number | Promise<number>;
 }
 
 export interface ReplayEngine {
@@ -67,12 +73,15 @@ export interface ReplayEngine {
 }
 
 export const DEFAULT_CHUNK_SIZE = 100;
-/** 1x 每秒一 Tick */
-const MS_PER_TICK = 1000;
-
 /** 按回放速度播放时每 Tick 的毫秒数（Room View 的动画时长按它算） */
 export function replayMsPerTick(speed: ReplaySpeed): number {
-  return MS_PER_TICK / speed;
+  return 1000 / speed;
+}
+
+/** 快一档 / 慢一档；已到头时不变 */
+export function shiftSpeed(speed: ReplaySpeed, delta: 1 | -1): ReplaySpeed {
+  const index = REPLAY_SPEEDS.indexOf(speed);
+  return REPLAY_SPEEDS[Math.min(REPLAY_SPEEDS.length - 1, Math.max(0, index + delta))]!;
 }
 /** 内存里留几个 chunk（当前与相邻的，外加一点余量） */
 const MEMORY_CHUNKS = 6;
@@ -105,8 +114,9 @@ export function createReplay(options: ReplayOptions): ReplayEngine {
     status: "loading",
     roomState: undefined,
     playing: false,
-    speed: 1,
+    speed: DEFAULT_REPLAY_SPEED,
     chunkSize: typeof options.chunkSize === "number" ? options.chunkSize : undefined,
+    serverTime: typeof options.serverTime === "number" ? options.serverTime : undefined,
   };
   const listeners = new Set<(snapshot: ReplaySnapshot) => void>();
   const memory = new Map<number, Promise<HistoryChunk | null>>();
@@ -260,6 +270,12 @@ export function createReplay(options: ReplayOptions): ReplayEngine {
       load(DEFAULT_CHUNK_SIZE);
     },
   );
+
+  if (options.serverTime instanceof Promise)
+    options.serverTime.then(
+      (time) => update({ serverTime: time }),
+      () => {},
+    );
 
   return {
     snapshot: () => snap,

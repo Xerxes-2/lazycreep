@@ -1,21 +1,26 @@
 /**
- * Replay 的控制条：播放 / 暂停、单步、速度、Tick 跳转、时间轴、回到 Live。
- * 时间轴用 DOM Pointer Events（Pixi 的 ticker 被停掉了，见 #11），鼠标、触摸、笔一致；
- * 拖动时目标 Tick 立即跟手，历史加载在引擎里异步进行，不阻塞界面。
+ * Replay 的控制条，照官方回放：−100 / −1 / 播放暂停 / +1 / +100、速度 −/+（5–20 Tick/秒）、Tick 跳转、
+ * 时间轴、回到 Live。
+ *
+ * 时间轴同官方：覆盖 Server 当前 Tick 往前 HISTORY_SPAN 到当前 Tick − HISTORY_LAG 之前的整 chunk，
+ * 拖动按 chunk 对齐。拖动时只移动滑块、显示目标 Tick，松手才跳过去（跨度很大，逐帧跳会拉一串 chunk）。
+ * 用 DOM Pointer Events（Pixi 的 ticker 被停掉了，见 #11），鼠标、触摸、笔一致。
  */
-import { createMemo, createSignal, For, Show } from "solid-js";
+import { createMemo, createSignal, Show } from "solid-js";
 import { useI18n } from "../i18n";
 import { errorMessage } from "../settings/SettingsPage.tsx";
-import { DEFAULT_CHUNK_SIZE, REPLAY_SPEEDS, chunkBase, type ReplayEngine, type ReplaySnapshot } from "./replay-engine.ts";
+import { DEFAULT_CHUNK_SIZE, REPLAY_SPEEDS, chunkBase, shiftSpeed, type ReplayEngine, type ReplaySnapshot } from "./replay-engine.ts";
 
-/** 时间轴覆盖的 chunk 数 */
-const WINDOW_CHUNKS = 10;
+/** 时间轴往前覆盖多少 Tick（官方客户端同为 150000） */
+export const HISTORY_SPAN = 150_000;
+/** 最近这么多 Tick 的 chunk 多半还没生成，时间轴不含（官方同为 50） */
+export const HISTORY_LAG = 50;
+/** 大步跳转的 Tick 数 */
+const BIG_STEP = 100;
 
 export interface ReplayControlsProps {
   readonly snapshot: ReplaySnapshot;
   readonly engine: ReplayEngine;
-  /** 起始 Tick 是 Live 当前 Tick 时，时间轴主要向前（过去）展开 */
-  readonly latest: boolean;
   readonly onBackToLive: () => void;
 }
 
@@ -26,34 +31,32 @@ function clamp(value: number, min: number, max: number): number {
 export function ReplayControls(props: ReplayControlsProps) {
   const { t } = useI18n();
   const size = () => props.snapshot.chunkSize ?? DEFAULT_CHUNK_SIZE;
-  const [dragging, setDragging] = createSignal(false);
+  /** 拖动中滑块所指的 Tick；不在拖时为 undefined */
+  const [preview, setPreview] = createSignal<number>();
 
-  const inside = (r: { lo: number; hi: number }, tick: number) => tick >= r.lo && tick <= r.hi;
-
-  /** 时间轴窗口：围绕起点所在 chunk；目标走出窗口（且没在拖）时重新以目标为中心。 */
-  let anchor: number | undefined;
+  /** 时间轴范围；目标在范围外（更早的分享链接、刚进入时的 Live Tick）时把范围撑到包含它 */
   const range = createMemo(() => {
-    const target = props.snapshot.target;
     const chunk = size();
-    const before = props.latest ? WINDOW_CHUNKS - 1 : WINDOW_CHUNKS / 2;
-    const bounds = (base: number) => {
-      const lo = Math.max(0, base - before * chunk);
-      return { lo, hi: lo + WINDOW_CHUNKS * chunk - 1 };
-    };
-    if (anchor === undefined || (!dragging() && !inside(bounds(anchor), target))) anchor = chunkBase(target, chunk);
-    return bounds(anchor);
+    const target = props.snapshot.target;
+    const now = props.snapshot.serverTime ?? target;
+    const lo = Math.min(chunkBase(Math.max(0, now - HISTORY_SPAN), chunk), chunkBase(target, chunk));
+    const hi = Math.max(lo + chunk - 1, chunkBase(now - HISTORY_LAG, chunk) - 1, target);
+    return { lo, hi };
   });
+  const shown = () => preview() ?? props.snapshot.target;
   const fraction = () => {
     const { lo, hi } = range();
-    return clamp((props.snapshot.target - lo) / (hi - lo), 0, 1);
+    return clamp((shown() - lo) / (hi - lo), 0, 1);
   };
 
   let track!: HTMLDivElement;
+  /** 指针位置对应的 Tick，对齐到 chunk 首 Tick */
   const tickAt = (clientX: number) => {
     const rect = track.getBoundingClientRect();
     const { lo, hi } = range();
     const f = rect.width > 0 ? clamp((clientX - rect.left) / rect.width, 0, 1) : 0;
-    return Math.round(lo + f * (hi - lo));
+    const chunk = size();
+    return Math.min(hi, lo + Math.round((f * (hi - lo)) / chunk) * chunk);
   };
 
   const onPointerDown = (event: PointerEvent) => {
@@ -64,21 +67,22 @@ export function ReplayControls(props: ReplayControlsProps) {
     } catch {
       // jsdom 等环境不支持捕获时，仍按普通 move 处理。
     }
-    setDragging(true);
     props.engine.pause();
-    props.engine.seek(tickAt(event.clientX));
+    setPreview(tickAt(event.clientX));
   };
   const onPointerMove = (event: PointerEvent) => {
-    if (dragging()) props.engine.seek(tickAt(event.clientX));
+    if (preview() !== undefined) setPreview(tickAt(event.clientX));
   };
   const endDrag = (event: PointerEvent) => {
-    if (!dragging()) return;
-    setDragging(false);
+    const tick = preview();
+    if (tick === undefined) return;
+    setPreview(undefined);
     try {
       track.releasePointerCapture(event.pointerId);
     } catch {
       // 同上
     }
+    if (event.type === "pointerup") props.engine.seek(tick);
   };
 
   const onKeyDown = (event: KeyboardEvent) => {
@@ -88,8 +92,8 @@ export function ReplayControls(props: ReplayControlsProps) {
       ArrowDown: () => props.snapshot.target - 1,
       ArrowRight: () => props.snapshot.target + 1,
       ArrowUp: () => props.snapshot.target + 1,
-      PageDown: () => props.snapshot.target - size(),
-      PageUp: () => props.snapshot.target + size(),
+      PageDown: () => props.snapshot.target - BIG_STEP,
+      PageUp: () => props.snapshot.target + BIG_STEP,
       Home: () => lo,
       End: () => hi,
     };
@@ -98,6 +102,8 @@ export function ReplayControls(props: ReplayControlsProps) {
     event.preventDefault();
     props.engine.seek(move());
   };
+
+  const speed = () => props.snapshot.speed;
 
   const [jumpInput, setJumpInput] = createSignal("");
   const jump = (event: SubmitEvent) => {
@@ -116,11 +122,21 @@ export function ReplayControls(props: ReplayControlsProps) {
         </button>
         <button
           type="button"
+          data-action="replay-back-100"
+          aria-label={t("replay.back100")}
+          title={t("replay.back100")}
+          onClick={() => props.engine.step(-BIG_STEP)}
+        >
+          «
+        </button>
+        <button
+          type="button"
           data-action="replay-step-back"
           aria-label={t("replay.stepBack")}
+          title={t("replay.stepBack")}
           onClick={() => props.engine.step(-1)}
         >
-          ⏮
+          ‹
         </button>
         <button
           type="button"
@@ -134,23 +150,40 @@ export function ReplayControls(props: ReplayControlsProps) {
           type="button"
           data-action="replay-step-forward"
           aria-label={t("replay.stepForward")}
+          title={t("replay.stepForward")}
           onClick={() => props.engine.step(1)}
         >
-          ⏭
+          ›
         </button>
-        <span class="replay__speeds" role="group" aria-label={t("replay.speed")}>
-          <For each={REPLAY_SPEEDS}>
-            {(speed) => (
-              <button
-                type="button"
-                data-action={`replay-speed-${speed}`}
-                aria-pressed={props.snapshot.speed === speed}
-                onClick={() => props.engine.setSpeed(speed)}
-              >
-                {speed}x
-              </button>
-            )}
-          </For>
+        <button
+          type="button"
+          data-action="replay-forward-100"
+          aria-label={t("replay.forward100")}
+          title={t("replay.forward100")}
+          onClick={() => props.engine.step(BIG_STEP)}
+        >
+          »
+        </button>
+        <span class="replay__speed" role="group" aria-label={t("replay.speed")}>
+          <button
+            type="button"
+            data-action="replay-slower"
+            aria-label={t("replay.slower")}
+            disabled={speed() === REPLAY_SPEEDS[0]}
+            onClick={() => props.engine.setSpeed(shiftSpeed(speed(), -1))}
+          >
+            −
+          </button>
+          <span data-testid="replay-speed">{t("replay.speedValue", { speed: speed() })}</span>
+          <button
+            type="button"
+            data-action="replay-faster"
+            aria-label={t("replay.faster")}
+            disabled={speed() === REPLAY_SPEEDS[REPLAY_SPEEDS.length - 1]}
+            onClick={() => props.engine.setSpeed(shiftSpeed(speed(), 1))}
+          >
+            +
+          </button>
         </span>
         <form class="replay__jump" data-testid="replay-jump" onSubmit={jump}>
           <input
@@ -175,7 +208,7 @@ export function ReplayControls(props: ReplayControlsProps) {
         aria-label={t("replay.timeline")}
         aria-valuemin={range().lo}
         aria-valuemax={range().hi}
-        aria-valuenow={props.snapshot.target}
+        aria-valuenow={shown()}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
@@ -187,6 +220,7 @@ export function ReplayControls(props: ReplayControlsProps) {
       </div>
       <div class="replay__range">
         <span>{range().lo}</span>
+        <Show when={preview()}>{(tick) => <span data-testid="replay-preview">{t("replay.previewTick", { tick: tick() })}</span>}</Show>
         <span>{range().hi}</span>
       </div>
       <Show when={props.snapshot.status === "loading"}>

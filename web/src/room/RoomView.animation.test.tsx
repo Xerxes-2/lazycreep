@@ -48,6 +48,7 @@ function manualRoomSource() {
     },
     getTerrain: async (shard: string, room: string) => ({ shard, room, encoded: "0".repeat(2500) }),
     getVersion: async () => ({ package: 1, protocol: 14, historyChunkSize: 1000, mapTileRoot: null }),
+    getTime: async () => 1000,
     getHistoryChunk: async () => chunk,
     close() {},
   } as unknown as Source;
@@ -173,22 +174,22 @@ describe("Room View 的动画接线（#55）", () => {
     expect(beam()).toBe(before);
   });
 
-  it("Replay：Tick 间隔由回放速度算出（1x 1000 ms，4x 250 ms，16x 按下限 100 ms）", async () => {
+  it("Replay：Tick 间隔由回放速度算出（5 Tick/秒 200 ms，6 约 167 ms，20 按下限 100 ms）", async () => {
     mount({ replay: 1000, msPerTick: () => 5000 });
     await settle(() => expect(field(".room-view").dataset.tick).toBe("1000"));
     await settle(() => expect(shown.at(-1)?.primitives.some((p) => p.objectId === "t1")).toBe(true));
     field("[data-action=replay-step-forward]").click();
     await settle(() => expect(field(".room-view").dataset.tick).toBe("1001"));
     await settle(() => expect(beam()).toBeDefined());
-    expect(beamMs()).toBe(600);
+    expect(beamMs()).toBe(120);
 
-    field("[data-action=replay-speed-4]").click();
+    field("[data-action=replay-faster]").click();
     field("[data-action=replay-step-forward]").click();
     field("[data-action=replay-step-forward]").click();
     await settle(() => expect(field(".room-view").dataset.tick).toBe("1003"));
-    expect(beamMs()).toBe(150);
+    expect(beamMs()).toBeCloseTo(100);
 
-    field("[data-action=replay-speed-16]").click();
+    for (let i = 0; i < 4; i++) field("[data-action=replay-faster]").click();
     field("[data-action=replay-step-back]").click();
     field("[data-action=replay-step-forward]").click();
     await settle(() => expect(field(".room-view").dataset.tick).toBe("1003"));

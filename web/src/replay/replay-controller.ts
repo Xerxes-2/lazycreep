@@ -67,6 +67,7 @@ export function createReplayController(options: ReplayControllerOptions): Replay
         start: req.tick,
         ...(req.latest ? { latest: true } : {}),
         chunkSize: src.getVersion().then((v) => v.historyChunkSize),
+        serverTime: req.latest ? req.tick : src.getTime(req.shard),
         fetchChunk,
       }),
     );

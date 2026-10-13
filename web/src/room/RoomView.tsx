@@ -538,7 +538,6 @@ export function RoomView(props: RoomViewProps) {
               <ReplayControls
                 snapshot={snapshot()}
                 engine={replay.engine()!}
-                latest={replay.request()?.latest ?? false}
                 onBackToLive={replay.close}
               />
             </div>

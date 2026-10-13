@@ -1049,14 +1049,12 @@ body {
   margin-bottom: 12px;
 }
 
-.replay__speeds {
+.replay__speed {
   display: inline-flex;
+  align-items: center;
   gap: 4px;
-}
-
-.room-view .replay button[aria-pressed="true"] {
-  background: var(--accent);
-  color: var(--bg);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .replay__jump {

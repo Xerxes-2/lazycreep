@@ -152,7 +152,7 @@ describe("Room View 的 Replay", () => {
     await settle(() => expect(container.querySelector("[data-testid=replay-controls]")).not.toBeNull());
   });
 
-  it("控制：单步、跳转、调速、时间轴拖动", async () => {
+  it("控制：单步、跳 100、跳转、调速、时间轴拖动", async () => {
     mount(recordedSource, manualVisibility(), replayAt(1024937));
     await settle(() => expect(container.querySelector("[data-testid=replay-controls]")).not.toBeNull());
 
@@ -161,27 +161,45 @@ describe("Room View 的 Replay", () => {
     click("replay-step-back");
     click("replay-step-back");
     expect(tick()).toBe("1024936");
+    click("replay-forward-100");
+    expect(tick()).toBe("1025036");
+    click("replay-back-100");
+    expect(tick()).toBe("1024936");
 
     input("replay-tick", "1024990");
     submit("form[data-testid=replay-jump]");
     expect(tick()).toBe("1024990");
 
-    click("replay-speed-16");
-    expect(field("[data-action=replay-speed-16]").getAttribute("aria-pressed")).toBe("true");
-    expect(field("[data-action=replay-speed-1]").getAttribute("aria-pressed")).toBe("false");
+    // 速度：默认 5 Tick/秒，−/+ 在 5–20 之间按档位走，到头的按钮不可点
+    expect(field("[data-testid=replay-speed]").textContent).toBe("5 Tick/秒");
+    expect(field<HTMLButtonElement>("[data-action=replay-slower]").disabled).toBe(true);
+    for (const expected of ["6", "8", "10", "15", "20"]) {
+      click("replay-faster");
+      expect(field("[data-testid=replay-speed]").textContent).toBe(`${expected} Tick/秒`);
+    }
+    expect(field<HTMLButtonElement>("[data-action=replay-faster]").disabled).toBe(true);
+    click("replay-slower");
+    expect(field("[data-testid=replay-speed]").textContent).toBe("15 Tick/秒");
 
-    // 时间轴：宽 1000px，按位置换算 Tick；拖动时 Tick 跟手
+    // 时间轴：宽 1000px，按位置换算成 chunk 首 Tick；拖动时只移动滑块，松手才跳
     const timeline = field("[data-testid=replay-timeline]");
     timeline.getBoundingClientRect = () => ({ left: 0, width: 1000, top: 0, height: 20 }) as DOMRect;
+    // 范围同官方：Server 当前 Tick（录制的 1025187）往前 150000，到当前 − 50 之前的整 chunk
+    await settle(() => expect(timeline.getAttribute("aria-valuemax")).toBe("1025099"));
+    expect(timeline.getAttribute("aria-valuemin")).toBe("875100");
     const lo = Number(timeline.getAttribute("aria-valuemin"));
     const hi = Number(timeline.getAttribute("aria-valuemax"));
     expect(lo).toBeLessThanOrEqual(1024900);
     expect(hi).toBeGreaterThanOrEqual(1024999);
+    expect(hi - lo).toBeGreaterThan(100_000);
     pointer("pointerdown", 0);
-    expect(tick()).toBe(String(lo));
+    expect(timeline.getAttribute("aria-valuenow")).toBe(String(lo));
+    expect(field("[data-testid=replay-preview]").textContent).toContain(String(lo));
     pointer("pointermove", 1000);
-    expect(tick()).toBe(String(hi));
+    expect(timeline.getAttribute("aria-valuenow")).toBe(String(hi));
+    expect(tick()).toBe("1024990");
     pointer("pointerup", 1000);
+    expect(container.querySelector("[data-testid=replay-preview]")).toBeNull();
     pointer("pointermove", 0);
     expect(tick()).toBe(String(hi));
     expect(timeline.getAttribute("aria-valuenow")).toBe(String(hi));
