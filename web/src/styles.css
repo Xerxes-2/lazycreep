@@ -140,12 +140,64 @@ body {
   color: var(--accent);
 }
 
+/* 放不下时状态区自己横向滚动，不压到右端的按钮上 */
 .top-bar__status {
   flex: 1;
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.top-bar__status::-webkit-scrollbar {
+  display: none;
+}
+
+.top-bar__status > * {
+  flex: none;
+}
+
+.top-bar__locale-short {
+  display: none;
+}
+
+/* 窄屏：省掉应用名、徽章与每 Tick 毫秒数，连接只留圆点（文字在提示里），语言按钮用短标签 */
+.shell[data-layout="narrow"] .top-bar {
+  gap: 6px;
+  padding: 4px 6px;
+}
+
+.shell[data-layout="narrow"] .top-bar__title,
+.shell[data-layout="narrow"] .top-bar__badge,
+.shell[data-layout="narrow"] .top-bar__ms {
+  display: none;
+}
+
+.shell[data-layout="narrow"] .top-bar__status {
+  gap: 6px;
+}
+
+.shell[data-layout="narrow"] .top-bar select {
+  max-width: 9em;
+}
+
+.shell[data-layout="narrow"] .top-bar__connection {
+  font-size: 0;
+}
+
+.shell[data-layout="narrow"] .top-bar__connection::before {
+  margin-right: 0;
+  font-size: var(--fs-small);
+}
+
+.shell[data-layout="narrow"] .top-bar__locale-long {
+  display: none;
+}
+
+.shell[data-layout="narrow"] .top-bar__locale-short {
+  display: inline;
 }
 
 /* #25：Top Bar 状态 */

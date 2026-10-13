@@ -192,14 +192,14 @@ export function TopBarStatus(props: TopBarStatusProps) {
       </Show>
       <Show when={connection()}>
         {(state) => (
-          <span class="top-bar__connection" data-status="connection" data-connection={state()}>
+          <span class="top-bar__connection" data-status="connection" data-connection={state()} title={t(CONNECTION_LABEL[state()])}>
             {t(CONNECTION_LABEL[state()])}
           </span>
         )}
       </Show>
       <span class="top-bar__tick" data-status="tick" title={t("power.tickRate")}>
         {tick() === undefined ? t("topBar.tick", { tick: "—" }) : t("topBar.tick", { tick: tick()! })}
-        <Show when={msPerTick()}>{(ms) => <> · {t("power.msPerTick", { ms: Math.round(ms()) })}</>}</Show>
+        <Show when={msPerTick()}>{(ms) => <span class="top-bar__ms"> · {t("power.msPerTick", { ms: Math.round(ms()) })}</span>}</Show>
       </span>
       <Show when={settings.token() ? cpu() : undefined}>
         {(update) => (

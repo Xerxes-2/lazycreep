@@ -50,7 +50,8 @@ export function TopBar(props: ParentProps<TopBarProps>) {
         aria-label={t("locale.toggleLabel")}
         onClick={() => setLocale(locale() === "zh-CN" ? "en" : "zh-CN")}
       >
-        {t("locale.toggle")}
+        <span class="top-bar__locale-long">{t("locale.toggle")}</span>
+        <span class="top-bar__locale-short">{t("locale.toggleShort")}</span>
       </button>
     </header>
   );

@@ -5,6 +5,7 @@ export const en: Partial<Record<MessageKey, string>> = {
   "app.title": "lazycreep",
   "app.tagline": "A light, power-saving personal Screeps client",
   "locale.toggle": "中文",
+  "locale.toggleShort": "中",
   "locale.toggleLabel": "Switch language",
 
   "settings.title": "Settings",

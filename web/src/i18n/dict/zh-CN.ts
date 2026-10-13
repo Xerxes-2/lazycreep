@@ -3,6 +3,7 @@ export const zhCN = {
   "app.title": "lazycreep",
   "app.tagline": "轻快、省电的自用 Screeps 客户端",
   "locale.toggle": "English",
+  "locale.toggleShort": "EN",
   "locale.toggleLabel": "切换界面语言",
 
   "settings.title": "设置",
