@@ -882,6 +882,27 @@ describe("光照组（ADR 0009）", () => {
     expect(node("lighting/a/0").parent).toBe(lighting());
   });
 
+  it("同层的图元按 Scene 里的出现顺序叠放：晚到的新图元排在前面时不压到同层已有图元之上（组内组外都是）", async () => {
+    const { view, at, world, lighting } = await lightingView("webgl");
+    const rect = (key: string, extra: Partial<Primitive> = {}): Primitive =>
+      ({ key, kind: "rect", layer: 20, x: 0, y: 0, width: 1, height: 1, fill: 0xffffff, ...extra }) as Primitive;
+    const lit = (key: string) => rect(key, { layer: 39.5, group: "lighting" });
+    view.show({ ...scene, primitives: [rect("ctl/body"), rect("ctl/badge"), ambient, lit("lighting/b")], lighting: { layer: 39 } });
+    at(0);
+    // 装饰贴图晚到，但在 Scene 里排在底座之前
+    view.show({
+      ...scene,
+      primitives: [rect("ctl/decoration"), rect("ctl/body"), rect("ctl/badge"), ambient, lit("lighting/a"), lit("lighting/b")],
+      lighting: { layer: 39 },
+    });
+    at(10);
+    world().sortChildren();
+    const labels = world().children.map((c) => c.label).filter((l) => l.startsWith("ctl/"));
+    expect(labels).toEqual(["ctl/decoration", "ctl/body", "ctl/badge"]);
+    lighting()!.sortChildren();
+    expect(lighting()!.children.map((c) => c.label)).toEqual(["lighting/ambient", "lighting/a", "lighting/b"]);
+  });
+
   it("Canvas 渲染器没有滤镜：不画光照组，渲染不抛错", async () => {
     const { view, at, lighting } = await lightingView("canvas");
     view.show(litScene());

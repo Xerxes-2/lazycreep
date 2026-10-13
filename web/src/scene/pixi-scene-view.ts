@@ -539,9 +539,21 @@ export async function createSceneView(options: SceneViewOptions): Promise<SceneV
     entry.node.destroy();
   };
 
+  /**
+   * 同一 layer 内按 Scene 里的出现顺序叠放。Pixi 只按 zIndex 稳定排序、平局按加入的先后，
+   * 后来新建的节点（例如晚到的装饰贴图）会排到同层已有节点之上，所以有新节点或换层时按出现顺序重排。
+   */
+  const restack = (container: Container, order: ReadonlyMap<Container, number>) => {
+    const rank = (node: Container) => order.get(node) ?? Number.MAX_SAFE_INTEGER;
+    container.children.sort((a, b) => a.zIndex - b.zIndex || rank(a) - rank(b));
+    container.children[0]?.depthOfChildModified();
+  };
+
   /** 把 Scene 同步进显示树；返回是否有任何可见变化。 */
   const sync = (scene: Scene): boolean => {
     let changed = false;
+    let reorder = false;
+    const order = new Map<Container, number>();
     const seen = new Set<string>();
     for (const primitive of scene.primitives) {
       const key = primitive.key;
@@ -556,12 +568,15 @@ export async function createSceneView(options: SceneViewOptions): Promise<SceneV
         node.zIndex = primitive.layer;
         node.label = key;
         (primitive.group === "lighting" ? lighting : world).addChild(node);
+        order.set(node, order.size);
+        reorder = true;
         const created = { primitive, node };
         entries.set(key, created);
         if (primitive.animation) startRun(key, created);
         changed = true;
         continue;
       }
+      order.set(entry.node, order.size);
       if (samePrimitive(entry.primitive, primitive)) {
         entry.primitive = primitive;
         continue;
@@ -573,6 +588,7 @@ export async function createSceneView(options: SceneViewOptions): Promise<SceneV
       if (restart) finish(key);
       if (!samePrimitive(previous, primitive, { ignoreAnimation: true })) {
         update(entry.node, primitive, previous);
+        if (entry.node.zIndex !== primitive.layer) reorder = true;
         entry.node.zIndex = primitive.layer;
       }
       entry.primitive = primitive;
@@ -589,6 +605,10 @@ export async function createSceneView(options: SceneViewOptions): Promise<SceneV
       drop(entry);
       entries.delete(key);
       changed = true;
+    }
+    if (reorder) {
+      restack(world, order);
+      restack(lighting, order);
     }
     if (syncLighting(scene)) changed = true;
     return changed;
