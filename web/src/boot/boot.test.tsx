@@ -126,6 +126,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.unstubAllGlobals();
   dispose?.();
   dispose = undefined;
   container.remove();
@@ -214,6 +215,21 @@ describe("启动画面", () => {
     await settle(() => expect(phase()).toBe("failed"));
     expect(stage()).toBe("connect");
     expect(boot()!.querySelector("[data-action=boot-retry]")?.textContent).toBe("重试");
+  });
+
+  it("连不上而 API 被重定向（访问网关登录过期）时提示重新登录，不再给重试", async () => {
+    const probe = vi.fn(async () => ({ type: "opaqueredirect", status: 0 }) as Response);
+    vi.stubGlobal("fetch", probe);
+    withToken();
+    const source = controlledSource();
+    mount(source);
+    source.emit("reconnecting");
+
+    await settle(() => expect(boot()!.querySelector("[data-action=boot-relogin]")?.textContent).toBe("重新登录"));
+    expect(probe).toHaveBeenCalledWith("/api/version", expect.objectContaining({ redirect: "manual" }));
+    expect(boot()!.querySelector("[role=alert]")?.textContent).toContain("Cloudflare Access");
+    expect(boot()!.querySelector("[data-action=boot-retry]")).toBeNull();
+    expect(boot()!.querySelector("[data-action=boot-enter]")).not.toBeNull();
   });
 
   it.each([

@@ -7,6 +7,12 @@ import type { VitePWAOptions } from "vite-plugin-pwa";
 const GATEWAY_PATHS = /^\/(?:api|season\/api|ptr\/api|room-history|map-tiles|season-static)(?:\/|$)/;
 
 /**
+ * 重新登录访问网关（src/boot/access-gate.ts 的 REAUTH_PARAM）：这样的导航必须走网络，
+ * 网关才能把浏览器带去登录；Workbox 拿路径加查询串来比对。
+ */
+const REAUTH_NAVIGATION = /[?&]reauth=/;
+
+/**
  * service worker 只预缓存构建产出的静态资源，不做运行时缓存：
  * API 响应、历史 chunk、地图瓦片与赛季贴图（#47）一律走网络。
  */
@@ -36,7 +42,7 @@ export const pwaOptions = {
     // 官方 PNG 纹理（#46，约 316 KB）只在官方画风画地形时按需请求、走 HTTP 缓存，不预缓存
     globIgnores: ["official-art/textures/**"],
     navigateFallback: "index.html",
-    navigateFallbackDenylist: [GATEWAY_PATHS],
+    navigateFallbackDenylist: [GATEWAY_PATHS, REAUTH_NAVIGATION],
     runtimeCaching: [],
     cleanupOutdatedCaches: true,
   },

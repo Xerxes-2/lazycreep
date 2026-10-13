@@ -363,7 +363,9 @@ export const en: Partial<Record<MessageKey, string>> = {
   "boot.stage.frame": "Waiting for the first frame…",
   "boot.failed.network": "Cannot reach the server. Check the network and retry.",
   "boot.failed.unauthorized": "The token is invalid or has expired. Enter a new one in the settings.",
+  "boot.failed.gate": "The access check in front of the server (e.g. Cloudflare Access) has expired. Sign in again.",
   "boot.retry": "Retry",
+  "boot.relogin": "Sign in again",
   "boot.enter": "Enter anyway",
   "boot.openSettings": "Open settings",
 

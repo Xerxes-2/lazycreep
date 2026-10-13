@@ -2,12 +2,14 @@
  * 启动画面（#33）：接管 index.html 里内联的 `#boot`，按 BootProgress 显示阶段与进度，
  * 完成后淡出并移除，露出下面早已挂好的外壳。页面上没有 `#boot`（测试、导入设置后重建）时什么也不做。
  *
- * 失败出口：token 被拒 →“打开设置”（进入应用并打开 Server 设置）；连不上 →“重试”（重新加载）与“仍要进入”。
+ * 失败出口：token 被拒 →“打开设置”（进入应用并打开 Server 设置）；连不上 →“重试”（重新加载）与“仍要进入”；
+ * 连不上而 API 被重定向（访问网关登录过期，见 access-gate.ts）→“重新登录”与“仍要进入”。
  * 没有 token 时不等任何阶段，直接进入并在 Menu 里打开 Server 设置引导填写（URL 指向 Replay 时不打扰）。
  */
-import { createEffect, onCleanup, onMount, Show } from "solid-js";
+import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
 import { Portal } from "solid-js/web";
 import { useI18n, type MessageKey } from "../i18n";
+import { probeAccessGate, reauthUrl } from "./access-gate.ts";
 import { BOOT_STAGES, type BootProgress, type BootStage } from "./boot-progress.ts";
 
 /** 与 index.html 里 `#boot` 的淡出过渡一致 */
@@ -31,6 +33,10 @@ export interface BootScreenProps {
   readonly openSettings: () => void;
   /** 默认重新加载页面 */
   readonly retry?: () => void;
+  /** 连不上时探测是否被访问网关拦下；默认 probeAccessGate */
+  readonly probeGate?: () => Promise<boolean>;
+  /** 默认导航到 reauthUrl，绕过 service worker 让访问网关接手 */
+  readonly relogin?: () => void;
   /** 默认取 document 里的 `#boot` */
   readonly host?: HTMLElement | null;
 }
@@ -74,6 +80,17 @@ export function BootScreen(props: BootScreenProps) {
   };
   const enter = () => progress.finish();
 
+  // 每次进入“连不上”都探一次：重试之间网关状态可能变了
+  const [gated, setGated] = createSignal(false);
+  createEffect(() => {
+    if (failure() !== "network") return setGated(false);
+    let live = true;
+    onCleanup(() => (live = false));
+    void (props.probeGate ?? probeAccessGate)().then((g) => live && setGated(g));
+  });
+  const errorText = (reason: "network" | "unauthorized"): MessageKey =>
+    reason === "unauthorized" ? "boot.failed.unauthorized" : gated() ? "boot.failed.gate" : "boot.failed.network";
+
   return (
     <Portal mount={host}>
       <div class="boot__card">
@@ -98,16 +115,29 @@ export function BootScreen(props: BootScreenProps) {
           {(reason) => (
             <>
               <p class="boot__error" role="alert">
-                {t(reason() === "unauthorized" ? "boot.failed.unauthorized" : "boot.failed.network")}
+                {t(errorText(reason()))}
               </p>
               <div class="boot__actions">
                 <Show
                   when={reason() === "unauthorized"}
                   fallback={
                     <>
-                      <button type="button" data-action="boot-retry" onClick={() => (props.retry ?? (() => location.reload()))()}>
-                        {t("boot.retry")}
-                      </button>
+                      <Show
+                        when={gated()}
+                        fallback={
+                          <button type="button" data-action="boot-retry" onClick={() => (props.retry ?? (() => location.reload()))()}>
+                            {t("boot.retry")}
+                          </button>
+                        }
+                      >
+                        <button
+                          type="button"
+                          data-action="boot-relogin"
+                          onClick={() => (props.relogin ?? (() => location.assign(reauthUrl(location))))()}
+                        >
+                          {t("boot.relogin")}
+                        </button>
+                      </Show>
                       <button type="button" data-action="boot-enter" onClick={enter}>
                         {t("boot.enter")}
                       </button>

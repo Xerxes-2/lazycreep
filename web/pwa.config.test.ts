@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { pwaOptions } from "./pwa.config";
+import { REAUTH_PARAM } from "./src/boot/access-gate";
 
 describe("PWA configuration", () => {
   it("declares an installable manifest", () => {
@@ -37,5 +38,13 @@ describe("PWA configuration", () => {
     }
     expect(denied("/")).toBe(false);
     expect(denied("/rooms/W1N1")).toBe(false);
+  });
+
+  it("lets the access-gate re-login navigation reach the network", () => {
+    const denylist = pwaOptions.workbox?.navigateFallbackDenylist ?? [];
+    const denied = (pathAndSearch: string) => denylist.some((re) => re.test(pathAndSearch));
+    expect(denied(`/?${REAUTH_PARAM}=1`)).toBe(true);
+    expect(denied(`/?a=b&${REAUTH_PARAM}=1`)).toBe(true);
+    expect(denied("/?foo=1")).toBe(false);
   });
 });

@@ -361,7 +361,9 @@ export const zhCN = {
   "boot.stage.frame": "收到首帧…",
   "boot.failed.network": "连不上 Server，请检查网络后重试。",
   "boot.failed.unauthorized": "token 无效或已失效，请在设置里重新填写。",
+  "boot.failed.gate": "Server 前面的访问验证（例如 Cloudflare Access）已过期，需要重新登录。",
   "boot.retry": "重试",
+  "boot.relogin": "重新登录",
   "boot.enter": "仍要进入",
   "boot.openSettings": "打开设置",
 
