@@ -44,7 +44,7 @@ export interface SectionContext {
   /** 全页共用的 roomMap2 订阅中心（总预算、去重、按优先级截断）；roomMap2 一律经它订阅 */
   readonly roomMaps: Accessor<RoomMapHub>;
   readonly pvp: PvpFeed;
-  /** PvP 房间的参战者（全页一份，World Map 可见时订阅）：PvP / PvE 两个区块与地图图例共用 */
+  /** 战斗房间的参战者（全页一份，World Map 可见时订阅） */
   readonly combatants: CombatantFeed;
   /** Room View 把选中对象的详情画进这个元素 */
   readonly setDetailsHost: (el: HTMLElement | undefined) => void;
@@ -119,20 +119,6 @@ export const SIDEBAR_SECTIONS: Readonly<Record<MainViewMode, readonly SidebarSec
       title: "pvp.title",
       render: (ctx) => (
         <PvpOverview
-          mode="pvp"
-          feed={ctx.pvp}
-          combatants={ctx.combatants}
-          onOpenRoom={(target) => ctx.shell.navigate(target)}
-          onReplay={({ tick, ...target }) => ctx.shell.navigate(replayAt(target, tick, true))}
-        />
-      ),
-    },
-    {
-      id: "map.pve",
-      title: "pve.title",
-      render: (ctx) => (
-        <PvpOverview
-          mode="pve"
           feed={ctx.pvp}
           combatants={ctx.combatants}
           onOpenRoom={(target) => ctx.shell.navigate(target)}

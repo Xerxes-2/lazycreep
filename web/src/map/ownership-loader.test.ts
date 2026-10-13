@@ -229,7 +229,7 @@ describe("所有权加载器", () => {
   });
 });
 
-describe("所有权加载器：按房间补查（PvP Overview 等）", () => {
+describe("所有权加载器：按房间补查（Battle Overview 等）", () => {
   it("取房间所在的整个扇区；每个 Shard 一次请求，依次取", async () => {
     const { loader, calls, received, finish } = harness();
     loader.requestRooms([

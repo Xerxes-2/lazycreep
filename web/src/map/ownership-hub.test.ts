@@ -58,7 +58,7 @@ describe("OwnershipHub", () => {
     expect(errors).toHaveLength(1);
   });
 
-  it("wantRooms 与 requestRooms 的清单并存（Minimap 不会顶掉 PvP Overview 的补查）；释放后不再补查", async () => {
+  it("wantRooms 与 requestRooms 的清单并存（Minimap 不会顶掉 Battle Overview 的补查）；释放后不再补查", async () => {
     const { hub, calls, settle } = harness();
     hub.requestRooms([{ shard: "a", room: "W1N1" }]);
     const release = hub.wantRooms([{ shard: "a", room: "E30S30" }]);

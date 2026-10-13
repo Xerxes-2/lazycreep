@@ -1,9 +1,9 @@
 /**
- * OwnershipHub：一个 Server 上所有 map-stats 用途共用的入口（World Map 的可见区域、PvP Overview 的补查）。
+ * OwnershipHub：一个 Server 上所有 map-stats 用途共用的入口（World Map 的可见区域、Battle Overview 的补查）。
  * 内部只有一个所有权加载器，所以缓存与每小时额度是同一份；取到的结果按 Shard 累积，
  * 任何订阅者（包括后加入的）都能从 stats(shard) 读到已知的房间。
  *
- * 按房间补查有两种入口，提交给加载器的是两者的并集：requestRooms 是一份“替换式”清单（PvP Overview）；
+ * 按房间补查有两种入口，提交给加载器的是两者的并集：requestRooms 是一份“替换式”清单（Battle Overview）；
  * wantRooms 是可以并存的认领，各用途（Minimap 等）各拿一份、用完释放，彼此不会顶掉。
  */
 import type { MapStats, Unsubscribe } from "../source/source.ts";

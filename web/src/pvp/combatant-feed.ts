@@ -1,15 +1,15 @@
 /**
- * PvP Overview 的参战者数据流（#34）：为时间窗内的 PvP 房间订阅 roomMap2，得出各房间的参战玩家。
+ * Battle Overview 的参战者数据流（#34）：为时间窗内的 PvP 房间订阅 roomMap2，得出各房间的参战玩家。
  *
  * - 订阅集合跟随 PvP feed 的分组（即所选时间窗）：房间离开时间窗即退订；区块折叠 / 不可见（active 为 false）时全部退订
  * - 经全页的 roomMap2 订阅中心订阅（source/room-map-hub.ts）：与地图、告警、Minimap 的同一频道只订阅一次；
  *   总预算由中心执行，PvP 参战者的优先级低于告警与 Minimap、高于 World Map，被截断的房间显示“超出订阅上限”
  * - 本 feed 自己至多要 maxRooms 个（默认 50，最近的优先）：MMO 500 Tick 窗口可有数百个房间，给地图留些预算
  * - 无 token 时 roomMap2 不可订阅：不订阅，各房间为 needsToken
- * - 也记下房间里有哪些 NPC：PvP / PvE 两个列表与地图图例据此分开（pve()）。看到过一帧“有 NPC、玩家至多一个”
- *   就记为 PvE，直到看到两个以上玩家；NPC 被打死后照样记得。记号不随退订丢掉（进 Room View 再回来还在），
+ * - 也记下房间里在打哪些 NPC（npcs()），战斗一览的卡片据此写出 NPC 对手。看到过一帧“有 NPC、玩家至多一个”
+ *   就记下，直到看到两个以上玩家（那是玩家之间的战斗）；NPC 被打死后照样记得。记号不随退订丢掉（进 Room View 再回来还在），
  *   房间离开时间窗才丢；只在内存里，刷新页面后重新观察
- * - 全页一份（MapAndRoom 建），World Map 可见时订阅：地图上的 PvE 图例在区块折叠时也要分类
+ * - 全页一份（MapAndRoom 建），World Map 可见时订阅
  * - 玩家资料（名字、GCL）用 Source.getPlayer 查；同一玩家只请求一次（本 feed 记下已请求的，Source 自己也缓存）
  */
 import { createEffect, createMemo, createSignal, on, type Accessor } from "solid-js";
@@ -53,8 +53,8 @@ export interface CombatantFeedOptions {
 
 export interface CombatantFeed {
   of(shard: string, room: string): RoomCombatants;
-  /** 记为 PvE 时给出见过的 NPC（非空），否则 undefined（包括还不知道的房间） */
-  pve(shard: string, room: string): readonly Npc[] | undefined;
+  /** 记下的 NPC 对手（非空），否则 undefined（包括还不知道的房间） */
+  npcs(shard: string, room: string): readonly Npc[] | undefined;
 }
 
 /** 一帧里的玩家（去掉地形 / 道路类键、NPC 与空列表），以及有没有 NPC */
@@ -98,8 +98,8 @@ export function createCombatantFeed(options: CombatantFeedOptions): CombatantFee
   /** `shard/room` → 最近一帧 */
   const [frames, setFrames] = createSignal<ReadonlyMap<string, RoomFrame>>(new Map());
   const [profiles, setProfiles] = createSignal<ReadonlyMap<string, PlayerProfile>>(new Map());
-  /** `shard/room` → 记为 PvE 时见过的 NPC */
-  const [pveMarks, setPveMarks] = createSignal<ReadonlyMap<string, readonly Npc[]>>(new Map());
+  /** `shard/room` → 记下的 NPC 对手 */
+  const [npcMarks, setNpcMarks] = createSignal<ReadonlyMap<string, readonly Npc[]>>(new Map());
 
   // 玩家资料：每个 Source 各查一次
   let requested = new Set<string>();
@@ -107,7 +107,7 @@ export function createCombatantFeed(options: CombatantFeedOptions): CombatantFee
     on(options.source, () => {
       requested = new Set();
       setFrames(new Map());
-      setPveMarks(new Map());
+      setNpcMarks(new Map());
       setProfiles(new Map());
     }),
   );
@@ -132,9 +132,9 @@ export function createCombatantFeed(options: CombatantFeedOptions): CombatantFee
         const key = roomMapKey(shard, room);
         const frame = frameOf(update);
         for (const id of Object.keys(frame.players)) lookUp(id);
-        // 看起来是 PvE：有 NPC、玩家至多一个（PvP 接口不区分对手，只能看谁在场；只有一个玩家、没有 NPC 的可能是对手已死光，仍算 PvP）
+        // 在打 NPC：有 NPC、玩家至多一个（PvP 接口不区分对手，只能看谁在场；只有一个玩家、没有 NPC 的可能是对手已死光，不记）
         const players = Object.keys(frame.players).length;
-        setPveMarks((marks) => {
+        setNpcMarks((marks) => {
           const seen = marks.get(key);
           if (frame.npcs.length > 0 && players <= 1) {
             const npcs = [...new Set([...(seen ?? []), ...frame.npcs])];
@@ -157,10 +157,10 @@ export function createCombatantFeed(options: CombatantFeedOptions): CombatantFee
     wanted,
   );
 
-  // 离开时间窗的房间丢掉 PvE 记号
+  // 离开时间窗的房间丢掉 NPC 记号
   createEffect(() => {
     const inWindow = new Set((options.groups() ?? []).flatMap((g) => g.rooms.map((r) => roomMapKey(g.shard, r.room))));
-    setPveMarks((marks) => ([...marks.keys()].every((key) => inWindow.has(key)) ? marks : new Map([...marks].filter(([key]) => inWindow.has(key)))));
+    setNpcMarks((marks) => ([...marks.keys()].every((key) => inWindow.has(key)) ? marks : new Map([...marks].filter(([key]) => inWindow.has(key)))));
   });
 
   // 不再订阅的房间丢掉旧帧（再订阅时重新等帧）
@@ -182,6 +182,6 @@ export function createCombatantFeed(options: CombatantFeedOptions): CombatantFee
       const known = profiles();
       return { kind: "ready", players: combatantsFrom(frame.players, (id) => known.get(id), options.allies()), npcs: frame.npcs };
     },
-    pve: (shard, room) => pveMarks().get(roomMapKey(shard, room)),
+    npcs: (shard, room) => npcMarks().get(roomMapKey(shard, room)),
   };
 }

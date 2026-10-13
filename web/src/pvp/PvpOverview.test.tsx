@@ -20,7 +20,7 @@ let dispose: (() => void) | undefined;
 
 function mount(
   source: Source,
-  options: { visibility?: ReturnType<typeof manualVisibility>; pollMs?: number; combatants?: CombatantFeed; mode?: "pvp" | "pve" } = {},
+  options: { visibility?: ReturnType<typeof manualVisibility>; pollMs?: number; combatants?: CombatantFeed } = {},
 ) {
   const opened: { shard: string; room: string }[] = [];
   const replays: { shard: string; room: string; tick: number }[] = [];
@@ -33,7 +33,6 @@ function mount(
     return (
       <I18nProvider>
         <PvpOverview
-          mode={options.mode ?? "pvp"}
           feed={feed}
           onOpenRoom={(t) => opened.push(t)}
           onReplay={(t) => replays.push(t)}
@@ -64,7 +63,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("PvP Overview", () => {
+describe("Battle Overview", () => {
   it("MMO：每个 Shard 一组，组内最近的在前；所有者未知时显示“未知”", async () => {
     mount(new FixtureSource(mmo));
     await settle(() => expect(shards()).toEqual(["shard0", "shard1", "shard2", "shard3", "shardX"]));
@@ -137,43 +136,29 @@ describe("PvP Overview", () => {
     expect(rooms("shardSeason").length).toBeGreaterThan(0);
   });
 
-  describe("PvP 与 PvE 分开列", () => {
+  describe("打玩家与打 NPC 的房间合在一个列表里", () => {
     const alice = { id: "a", username: "Alice", gcl: 12, objects: 30, ally: false };
     const bob = { id: "b", username: "Bob", gcl: 7, objects: 4, ally: false };
-    /** W17N21 记为 PvE（打过 Invader）；E13N21 两个玩家（旁边也有 Keeper）；其余一个玩家、没有 NPC */
+    /** W17N21 打过 Invader（已被打死，记号还在）；E13N21 两个玩家 */
     const combatants: CombatantFeed = {
       of: (_shard, room) => {
-        if (room === "W17N21") return { kind: "ready", players: [alice], npcs: [] };
         if (room === "E13N21") return { kind: "ready", players: [alice, bob], npcs: ["keeper"] };
         return { kind: "ready", players: [alice], npcs: [] };
       },
-      // W17N21 记为 PvE：Invader 已被打死，记号还在
-      pve: (_shard, room) => (room === "W17N21" ? ["invader"] : undefined),
+      npcs: (_shard, room) => (room === "W17N21" ? ["invader"] : undefined),
     };
 
-    it("PvP 列表：去掉记为 PvE 的房间，其余照列", async () => {
+    it("都列出来；打过 NPC 的卡片多一行对手，其余没有", async () => {
       mount(new FixtureSource(season), { combatants });
       await settle(() => expect(rooms("shardSeason").length).toBeGreaterThan(0));
-      expect(rooms("shardSeason")).not.toContain("W17N21");
-      expect(rooms("shardSeason")).toContain("E13N21");
-      expect(container.querySelector("h2")!.textContent).toBe("PvP 一览");
-    });
-
-    it("PvE 列表：只列记为 PvE 的房间，写明见过的对手（已被打死的也算）；不列核弹", async () => {
-      mount(new FixtureSource(season), { combatants, mode: "pve" });
-      await settle(() => expect(rooms("shardSeason")).toEqual(["W17N21"]));
-      expect(container.querySelector("h2")!.textContent).toBe("PvE 一览");
-      const card = container.querySelector<HTMLElement>('[data-room="W17N21"]')!;
-      expect(card.querySelector("[data-npc=invader]")!.textContent).toBe("对手：Invader");
-      expect(card.querySelector("[data-player=a]")).not.toBeNull();
-      expect(container.querySelector(".pvp-overview__nukes")).toBeNull();
-    });
-
-    it("没有参战者数据时全部算 PvP，PvE 列表为空", async () => {
-      mount(new FixtureSource(season), { mode: "pve" });
-      await settle(() => expect(container.querySelector('[data-shard="shardSeason"]')).not.toBeNull());
-      expect(rooms("shardSeason")).toEqual([]);
-      expect(container.querySelector('[data-shard="shardSeason"]')!.textContent).toContain("这个时间窗内没有打 NPC 的房间。");
+      expect(rooms("shardSeason")).toEqual(expect.arrayContaining(["W17N21", "E13N21"]));
+      expect(container.querySelector("h2")!.textContent).toBe("战斗一览");
+      const npcCard = container.querySelector<HTMLElement>('[data-room="W17N21"]')!;
+      expect(npcCard.querySelector("[data-npc=invader]")!.textContent).toBe("对手：Invader");
+      expect(npcCard.querySelector("[data-player=a]")).not.toBeNull();
+      const pvpCard = container.querySelector<HTMLElement>('[data-room="E13N21"]')!;
+      expect(pvpCard.querySelector("[data-npc]")).toBeNull();
+      expect(pvpCard.querySelectorAll("[data-player]")).toHaveLength(2);
     });
   });
 
@@ -190,7 +175,7 @@ describe("PvP Overview", () => {
               npcs: [],
             }
           : { kind: "needsToken" },
-      pve: () => undefined,
+      npcs: () => undefined,
     };
 
     it("不用表格；每个房间一张卡片：房间名、所有者、相对 Tick（完整 Tick 在提示里）、参战者每人一行、两个有名字的图标按钮", async () => {

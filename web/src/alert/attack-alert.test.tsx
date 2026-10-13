@@ -223,7 +223,7 @@ describe("Attack Alert 接入", () => {
     const subscribe = vi.spyOn(FixtureSource.prototype, "subscribeRoomMap");
     mount();
     await settle(() => expect(banners()).toContain("pvp:E13N21"));
-    // PvP Overview 的参战者（#34）也订阅 roomMap2，但不声明 keepWhileHidden；这里只看告警的
+    // Battle Overview 的参战者（#34）也订阅 roomMap2，但不声明 keepWhileHidden；这里只看告警的
     expect(subscribe.mock.calls.filter((c) => c[4]?.keepWhileHidden)).toEqual([]);
     subscribe.mockRestore();
   });
@@ -231,7 +231,7 @@ describe("Attack Alert 接入", () => {
   it("为每个我的房间订阅 roomMap2，并声明页面隐藏时保留", async () => {
     const subscribe = vi.spyOn(FixtureSource.prototype, "subscribeRoomMap");
     mount();
-    // PvP Overview 的参战者（#34）也订阅 roomMap2，但不声明 keepWhileHidden；这里只看告警的
+    // Battle Overview 的参战者（#34）也订阅 roomMap2，但不声明 keepWhileHidden；这里只看告警的
     const alertCalls = () => subscribe.mock.calls.filter((c) => c[4]?.keepWhileHidden);
     await settle(() => expect(alertCalls()).toHaveLength(2));
     expect(alertCalls().map((c) => [c[0], c[1], c[4]])).toEqual([

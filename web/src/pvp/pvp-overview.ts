@@ -1,5 +1,5 @@
 /**
- * PvP Overview 的聚合器（#3）：把 PvP 列表、核弹列表与所有权缓存合成按 Shard 分组的视图数据。纯函数。
+ * Battle Overview 的聚合器（#3）：把 PvP 列表、核弹列表与所有权缓存合成按 Shard 分组的视图数据。纯函数。
  *
  * - PvP 接口一次返回所有 Shard；轮询时总按最大窗口（PVP_FETCH_INTERVAL）取，切换时间窗只在本地过滤，不多发请求
  * - 接口声称按 lastPvpTime 降序，但实测 MMO shard3 是升序（2026-10-08），所以这里自己排

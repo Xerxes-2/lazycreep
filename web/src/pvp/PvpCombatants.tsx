@@ -1,6 +1,6 @@
 /**
- * PvP Overview 每个房间的参战者（#34），每人一行（#39）：名字、GCL、物体数（roomMap2 位置点，含建筑），盟友有标记。
- * 数据来自 combatant-feed.ts；pageCombatants 建全页一份（MapAndRoom），PvP 与 PvE 两个区块、地图图例共用。
+ * 战斗一览每个房间的参战者（#34），每人一行（#39）：名字、GCL、物体数（roomMap2 位置点，含建筑），盟友有标记；
+ * 打过 NPC 的房间另有对手行。数据来自 combatant-feed.ts；pageCombatants 建全页一份（MapAndRoom）。
  */
 import { For, Match, Switch } from "solid-js";
 import { useI18n } from "../i18n";
@@ -33,8 +33,8 @@ export function pageCombatants(
   });
 }
 
-/** PvE 卡片的对手一行：记为 PvE 时见过的 NPC（已被打死的也算） */
-export function PveOpponents(props: { readonly npcs: readonly Npc[] }) {
+/** 卡片的 NPC 对手行：记下的 NPC（已被打死的也算） */
+export function NpcOpponents(props: { readonly npcs: readonly Npc[] }) {
   const { t } = useI18n();
   return (
     <For each={props.npcs}>

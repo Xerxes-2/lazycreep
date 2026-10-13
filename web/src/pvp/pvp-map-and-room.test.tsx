@@ -66,7 +66,7 @@ const slot = (view: string) => container.querySelector<HTMLElement>(`.main-view 
 const row = (room: string) => container.querySelector<HTMLElement>(`.pvp-overview [data-room="${room}"]`);
 const combatants = (room: string) => container.querySelector<HTMLElement>(`.pvp-overview [data-combatants="${room}"]`);
 
-describe("PvP Overview 接入 World Map 与 Room View", () => {
+describe("Battle Overview 接入 World Map 与 Room View", () => {
   beforeEach(() => {
     localStorage.clear();
     mapScene = undefined;
@@ -99,7 +99,7 @@ describe("PvP Overview 接入 World Map 与 Room View", () => {
     expect(row("E13N21")!.querySelector("[data-owner]")!.textContent).toBe("未知");
   });
 
-  it("PvP Overview 在 World Map 的 Sidebar 里；点列表里的房间把 Main View 切到该房间", async () => {
+  it("Battle Overview 在 World Map 的 Sidebar 里；点列表里的房间把 Main View 切到该房间", async () => {
     mount();
     expect(container.querySelector('[data-section="map.pvp"] .pvp-overview')).not.toBeNull();
     await settle(() => expect(row("W17N21")).not.toBeNull());
@@ -165,7 +165,7 @@ describe("PvP Overview 接入 World Map 与 Room View", () => {
       expect(player.textContent).toMatch(/1 (objects|个物体)/);
     });
 
-    it("参战者订阅跟着 World Map：折叠 PvP 区块仍保留（地图图例要分类），进 Room View 时退订，回地图重新订阅", async () => {
+    it("参战者订阅跟着 World Map：折叠战斗区块仍保留，进 Room View 时退订，回地图重新订阅", async () => {
       mount();
       await settle(() => expect(open.has("E13N21")).toBe(true));
       container.querySelector<HTMLButtonElement>('[data-section="map.pvp"] [data-action=toggle-section]')!.click();

@@ -131,7 +131,7 @@ describe("参战者订阅", () => {
     expect(ids.sort()).toEqual(["65b2ded6e582880012134da6", "685da7c42df7a30011653e6a"]);
   });
 
-  it("看到过“有 NPC（2 Invader、3 Source Keeper）、玩家至多一个”的房间记为 PvE，并记下见过的 NPC", async () => {
+  it("看到过“有 NPC（2 Invader、3 Source Keeper）、玩家至多一个”的房间记下 NPC 对手", async () => {
     const { feed } = setup({
       frames: {
         W5N29: [{ "2": [[10, 10]], u1: [[11, 11]], w: [[0, 0]] }],
@@ -139,17 +139,17 @@ describe("参战者订阅", () => {
         W15S8: [{ u1: [[6, 6]] }],
       },
     });
-    await settle(() => expect(feed.pve("shardSeason", "W5N29")).toEqual(["invader"]));
+    await settle(() => expect(feed.npcs("shardSeason", "W5N29")).toEqual(["invader"]));
     await settle(() => expect(feed.of("shardSeason", "W7N15").kind).toBe("ready"));
     // 两个玩家：即使有 Keeper 也算 PvP；一个玩家、没有 NPC：对手可能已死光，也算 PvP
-    expect(feed.pve("shardSeason", "W7N15")).toBeUndefined();
+    expect(feed.npcs("shardSeason", "W7N15")).toBeUndefined();
     await settle(() => expect(feed.of("shardSeason", "W15S8").kind).toBe("ready"));
-    expect(feed.pve("shardSeason", "W15S8")).toBeUndefined();
+    expect(feed.npcs("shardSeason", "W15S8")).toBeUndefined();
     // 还不知道的房间不算
-    expect(feed.pve("shardSeason", "E26N3")).toBeUndefined();
+    expect(feed.npcs("shardSeason", "E26N3")).toBeUndefined();
   });
 
-  it("NPC 被打死后仍记为 PvE；看到两个以上玩家才取消；退订再订阅记号还在", async () => {
+  it("NPC 被打死后仍记着；看到两个以上玩家才取消；退订再订阅记号还在", async () => {
     const { feed, setShown } = setup({
       frames: {
         W5N29: [{ "2": [[10, 10]], u1: [[11, 11]] }, { u1: [[11, 11]] }],
@@ -157,13 +157,13 @@ describe("参战者订阅", () => {
       },
     });
     await settle(() => expect(feed.of("shardSeason", "W5N29")).toMatchObject({ kind: "ready", npcs: [] }));
-    expect(feed.pve("shardSeason", "W5N29")).toEqual(["invader"]);
+    expect(feed.npcs("shardSeason", "W5N29")).toEqual(["invader"]);
     await settle(() => expect(feed.of("shardSeason", "W7N15")).toMatchObject({ kind: "ready", npcs: [] }));
-    expect(feed.pve("shardSeason", "W7N15")).toBeUndefined();
+    expect(feed.npcs("shardSeason", "W7N15")).toBeUndefined();
 
     setShown(false);
     expect(feed.of("shardSeason", "W5N29").kind).toBe("unwatched");
-    expect(feed.pve("shardSeason", "W5N29")).toEqual(["invader"]);
+    expect(feed.npcs("shardSeason", "W5N29")).toEqual(["invader"]);
   });
 
   it("还没收到帧的房间是等待中", async () => {

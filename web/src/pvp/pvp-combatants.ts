@@ -1,5 +1,5 @@
 /**
- * PvP Overview 的参战者（#34）：从一个房间的 roomMap2 帧得出在场玩家与各自的物体数。纯函数。
+ * Battle Overview 的参战者（#34）：从一个房间的 roomMap2 帧得出在场玩家与各自的物体数。纯函数。
  *
  * - roomMap2 每帧按用户 id 给出该玩家在房间里的位置点（官方世界地图的小点）；键里另有地形 / 道路类（w、r、pb……）
  *   与 NPC（2 Invader、3 Source Keeper），由 source.ts 的 playerPoints 排除

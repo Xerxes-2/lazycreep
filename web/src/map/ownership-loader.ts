@@ -12,7 +12,7 @@
  *
  * 调用方应只在视口稳定后调用 request（例如拖动 / 缩放结束后一小段时间），见 MapView。
  *
- * 按房间补查（requestRooms，PvP Overview 等用）：与地图共用同一份扇区缓存与每小时额度，
+ * 按房间补查（requestRooms，Battle Overview 等用）：与地图共用同一份扇区缓存与每小时额度，
  * 但排在地图的可见区域之后，只用额度里留给地图（backgroundReserve）之外的部分，
  * 结果按更长的有效期（backgroundTtlMs）算；每个 Shard 一次请求，依次取。
  */

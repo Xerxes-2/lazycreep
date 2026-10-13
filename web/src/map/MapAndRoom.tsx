@@ -4,10 +4,10 @@
  *
  * World Map 与 Room View 常驻挂载：非当前的一个只隐藏并暂停渲染，切换时视口、房间与订阅都保留。
  * 跨视图跳转都经外壳状态的唯一入口 shell.navigate（shell-state.ts）：
- * - 地图点房间、PvP Overview 点房间、告警 → navigate({ shard, room })（别的 Shard 上的房间同时切 Shard）；
+ * - 地图点房间、Battle Overview 点房间、告警 → navigate({ shard, room })（别的 Shard 上的房间同时切 Shard）；
  * - Room View 的“返回地图” → navigate({ view: "map" })；
  * - “回看” → navigate({ shard, room, replay })；地址（URL 路由，shell/url-router.ts）也经 navigate 导航。
- * 地图、PvP Overview 与告警共用一个 OwnershipHub（同一份 map-stats 缓存与额度）与一个 PvP feed；
+ * 地图、Battle Overview 与告警共用一个 OwnershipHub（同一份 map-stats 缓存与额度）与一个 PvP feed；
  * 所有 roomMap2（告警、Minimap、PvP 参战者、地图）经同一个订阅中心（source/room-map-hub.ts），总数受预算约束。
  */
 import { createEffect, createMemo, createSignal, on, onCleanup, Show, untrack, type Accessor, type JSX } from "solid-js";
@@ -120,7 +120,7 @@ export function MapAndRoom(props: MapAndRoomProps) {
   const display = createRoomDisplayOptions(browserStorage());
   const mapShown = () => shell.mainView() === "map";
   const roomShown = () => shell.mainView() === "room";
-  // PvP 房间的参战者：全页一份，World Map 可见时订阅（PvP / PvE 两个区块与地图图例共用）
+  // 战斗房间的参战者：全页一份，World Map 可见时订阅
   const combatants = pageCombatants({ source, roomMaps, pvp, settings: props.settings, allies: () => props.allies }, mapShown);
 
   const sectionContext: SectionContext = {
@@ -169,12 +169,13 @@ export function MapAndRoom(props: MapAndRoomProps) {
               visibility={shownVisibility(page, mapShown)}
               ownership={ownership()}
               roomMaps={roomMaps()}
-              layers={(shard) => {
-                const group = pvp.groups()?.find((g) => g.shard === shard);
-                // 在这里读分类：参战者帧到了地图跟着重画
-                const pve = new Set(group?.rooms.filter((r) => combatants.pve(shard, r.room)).map((r) => r.room));
-                return mapLayers(layerPrefs.enabled(), group, badges, pve);
-              }}
+              layers={(shard) =>
+                mapLayers(
+                  layerPrefs.enabled(),
+                  pvp.groups()?.find((g) => g.shard === shard),
+                  badges,
+                )
+              }
               link={worldMap}
               {...(props.allies ? { allies: props.allies } : {})}
               active={mapShown()}

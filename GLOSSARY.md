@@ -24,7 +24,7 @@ _Avoid_: 后端、服务端、代理服务器
 ### 视图
 
 **World Map（世界地图）**:
-一个 Shard 内所有房间的俯瞰视图，以房间为格子，显示地形缩略图、所有权、RCL、矿物、Power Bank、新手区 / 禁区以及 PvP 热点。
+一个 Shard 内所有房间的俯瞰视图，以房间为格子，显示地形缩略图、所有权、RCL、矿物、Power Bank、新手区 / 禁区以及战斗热点。
 _Avoid_: 大地图、全图
 
 **Main View（主视图）**:
@@ -40,7 +40,7 @@ Main View 右侧的竖条，由若干 Sidebar Section 叠成，内容随 Main Vi
 _Avoid_: 边栏、活动栏
 
 **Sidebar Section（侧栏区块）**:
-Sidebar 中一个带标题、可单独折叠的区块，例如房间信息、Minimap、选中对象、PvP Overview。
+Sidebar 中一个带标题、可单独折叠的区块，例如房间信息、Minimap、选中对象、Battle Overview。
 _Avoid_: 侧栏卡片
 
 **Menu（菜单）**:
@@ -90,20 +90,20 @@ _Avoid_: 徽标、队徽
 **Console（控制台）**:
 查看自己脚本的日志输出并向其发送命令的面板。
 
-**PvP Overview（PvP 一览）**:
-列出最近若干 Tick 内发生过战斗的房间及涉及玩家，可点击跳转到对应 Room View。
-_Avoid_: 战斗列表、战争地图
+**Battle Overview（战斗一览）**:
+列出最近若干 Tick 内发生过战斗的房间及涉及玩家（打 NPC 的也在内，另写出 NPC 对手），可点击跳转到对应 Room View。数据来自官方的 PvP 接口，代码里沿用 `pvp` 命名。
+_Avoid_: PvP 一览、PvE 一览、战斗列表、战争地图
 
 **Attack Alert（遇袭通知）**:
 自己拥有的房间出现敌对行为时推送给用户的通知。
 _Avoid_: 警报、提醒
 
 **Ally List（盟友名单）**:
-用户手动维护的玩家名单，用于着色与 PvP Overview 的归类。第一版不自动导入。
+用户手动维护的玩家名单，用于着色与 Battle Overview 的归类。第一版不自动导入。
 _Avoid_: 联盟、好友
 
 ### 使用方式
 
 **Monitor Mode（监控模式）**:
-窄屏（手机、竖屏平板）上承诺可用的功能范围：World Map、Room View、Replay、PvP Overview 可用且触摸友好；不是一套单独的布局。
+窄屏（手机、竖屏平板）上承诺可用的功能范围：World Map、Room View、Replay、Battle Overview 可用且触摸友好；不是一套单独的布局。
 _Avoid_: 移动版、精简版

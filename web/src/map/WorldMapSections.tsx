@@ -49,7 +49,6 @@ const LAYER_LABEL: Record<MapLayerToggle, MessageKey> = {
   powerBanks: "worldMapSidebar.layers.powerBanks",
   zones: "worldMapSidebar.layers.zones",
   pvp: "worldMapSidebar.layers.pvp",
-  pve: "worldMapSidebar.layers.pve",
   nukes: "worldMapSidebar.layers.nukes",
   units: "worldMapSidebar.layers.units",
   badges: "badge.mapLayer",

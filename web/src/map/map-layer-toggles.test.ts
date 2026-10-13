@@ -31,8 +31,6 @@ state = applyPowerBanks(state, "W13S28", [[10, 10]]);
 state = applyRoomUnits(state, "W13S28", { r: [[10, 11]], me: [[12, 12]] });
 
 const nuke: Nuke = { id: "n1", shard: "s", room: "E0S0", x: 25, y: 10, landTime: 60_000, launchRoom: "W13S28" };
-/** W14S28 看起来是打 NPC：画成 PvE 热点，不画 PvP 热点 */
-const PVE_ROOMS = new Set(["W14S28"]);
 const group = aggregatePvp(
   {
     pvp: [
@@ -58,7 +56,6 @@ const PREFIX: Record<MapLayerToggle, readonly string[]> = {
   powerBanks: ["pb:"],
   zones: ["zone:"],
   pvp: ["pvp:"],
-  pve: ["pve:"],
   nukes: ["nuke:", "nuke-path:"],
   units: ["units:"],
   badges: ["badge:"],
@@ -77,7 +74,7 @@ function scene(on: Parameters<typeof mapLayers>[0]) {
   return buildMapScene(
     state,
     { theme: DEFAULT_THEME, zoom: 64, visible: { x0: 30, y0: 45, x1: 60, y1: 85 }, now: NOW },
-    mapLayers(on, group, badgeLayer((id) => `/badge/${id}`), PVE_ROOMS),
+    mapLayers(on, group, badgeLayer((id) => `/badge/${id}`)),
   ).primitives;
 }
 
@@ -104,13 +101,14 @@ describe("World Map 图层开关", () => {
       dispose();
     }));
 
-  it("PvE 房间画成空心圆环、不画 PvP 实心热点；其余房间照旧是 PvP 热点", () =>
+  it("时间窗内每个战斗房间都是同样的实心热点", () =>
     createRoot((dispose) => {
       const primitives = scene(createMapLayerPrefs(memoryStorage()).enabled());
-      expect(keys(primitives, "pvp")).toEqual(["pvp:W13S28"]);
-      expect(keys(primitives, "pve")).toEqual(["pve:W14S28"]);
-      const ring = primitives.find((p) => p.key === "pve:W14S28");
-      expect(ring?.kind === "circle" && ring.fill === undefined && ring.stroke !== undefined).toBe(true);
+      expect(keys(primitives, "pvp").sort()).toEqual(["pvp:W13S28", "pvp:W14S28"]);
+      for (const key of ["pvp:W13S28", "pvp:W14S28"]) {
+        const dot = primitives.find((p) => p.key === key);
+        expect(dot?.kind === "circle" && dot.fill !== undefined).toBe(true);
+      }
       dispose();
     }));
 
