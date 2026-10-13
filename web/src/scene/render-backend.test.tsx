@@ -1,5 +1,5 @@
 /**
- * 渲染后端偏好：默认 WebGL，可选 WebGPU（试验）；存在 `msc.renderBackend`，刷新后生效。
+ * 渲染后端偏好：Mac 上默认 WebGPU，其他平台默认 WebGL；存在 `msc.renderBackend`，刷新后生效。
  * 外观设置里显示实际用上的渲染接口；选的和页面打开时不同就提示刷新。
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -9,7 +9,7 @@ import { AppearanceSettings } from "../customize/AppearanceSettings.tsx";
 import { createColorScheme } from "../customize/color-scheme.ts";
 import { createUiTheme } from "../customize/ui-theme.ts";
 import { STORED_KEYS } from "../customize/settings-transfer.ts";
-import { RENDER_BACKEND_KEY, RENDER_BACKEND_STORAGE, readRenderBackend, reportRenderBackend, writeRenderBackend } from "./render-backend.ts";
+import { RENDER_BACKEND_KEY, RENDER_BACKEND_STORAGE, defaultRenderBackend, readRenderBackend, reportRenderBackend, writeRenderBackend } from "./render-backend.ts";
 
 function memoryStorage() {
   const map = new Map<string, string>();
@@ -24,6 +24,17 @@ describe("渲染后端偏好", () => {
     expect(readRenderBackend(storage)).toBe("webgpu");
     storage.setItem(RENDER_BACKEND_KEY, JSON.stringify("vulkan"));
     expect(readRenderBackend(storage)).toBe("webgl");
+  });
+
+  it("没选过时 Mac 默认 WebGPU（省电），其他平台默认 WebGL；选过的照旧", () => {
+    expect(defaultRenderBackend({ platform: "MacIntel" })).toBe("webgpu");
+    expect(defaultRenderBackend({ platform: "Win32" })).toBe("webgl");
+    expect(defaultRenderBackend({ platform: "Linux x86_64" })).toBe("webgl");
+    expect(defaultRenderBackend(undefined)).toBe("webgl");
+    const storage = memoryStorage();
+    expect(readRenderBackend(storage, "webgpu")).toBe("webgpu");
+    writeRenderBackend("webgl", storage);
+    expect(readRenderBackend(storage, "webgpu")).toBe("webgl");
   });
 
   it("登记为可导出的设置", () => {

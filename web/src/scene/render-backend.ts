@@ -1,5 +1,5 @@
 /**
- * Scene 的渲染接口偏好（设置里叫“渲染接口”；“后端”在词表里指 Server）：WebGL（默认）或 WebGPU（试验）。偏好存在 `msc.renderBackend`，新建的视图按它选；
+ * Scene 的渲染接口偏好（设置里叫“渲染接口”；“后端”在词表里指 Server）：WebGL 或 WebGPU，默认见 defaultRenderBackend。偏好存在 `msc.renderBackend`，新建的视图按它选；
  * 已建好的视图换不了渲染器，所以改了要刷新页面才生效。
  *
  * 选 WebGPU 时浏览器不支持就由 Pixi 的 autoDetectRenderer 退回 WebGL（再不行 Canvas）；
@@ -17,8 +17,16 @@ export type ActiveRenderBackend = RenderBackend | "canvas";
 
 const isBackend = (value: unknown): value is RenderBackend => (RENDER_BACKENDS as readonly unknown[]).includes(value);
 
-export function readRenderBackend(storage: KeyValueStorage | undefined = browserStorage()): RenderBackend {
-  return readJson<RenderBackend>(storage, RENDER_BACKEND_KEY, (v) => (isBackend(v) ? v : undefined), "webgl");
+/** 没选过时的默认：Mac 上 WebGPU 明显省电（实测比 WebGL 低约 10W），其他平台仍是 WebGL */
+export function defaultRenderBackend(nav: Pick<Navigator, "platform"> | undefined = globalThis.navigator): RenderBackend {
+  return nav?.platform.startsWith("Mac") ? "webgpu" : "webgl";
+}
+
+export function readRenderBackend(
+  storage: KeyValueStorage | undefined = browserStorage(),
+  fallback: RenderBackend = defaultRenderBackend(),
+): RenderBackend {
+  return readJson<RenderBackend>(storage, RENDER_BACKEND_KEY, (v) => (isBackend(v) ? v : undefined), fallback);
 }
 
 export function writeRenderBackend(backend: RenderBackend, storage: KeyValueStorage | undefined = browserStorage()): void {

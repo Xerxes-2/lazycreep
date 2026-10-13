@@ -6,7 +6,7 @@ import { useI18n, type MessageKey } from "../i18n";
 import type { StrangerColoring } from "../scene/theme.ts";
 import { colorToHex, hexToColor, PALETTE_KEYS, type ColorScheme } from "./color-scheme.ts";
 import { UI_THEME_PREFERENCES, type UiThemeStore } from "./ui-theme.ts";
-import { activeRenderBackend, readRenderBackend, RENDER_BACKENDS, writeRenderBackend, type RenderBackend } from "../scene/render-backend.ts";
+import { activeRenderBackend, defaultRenderBackend, readRenderBackend, RENDER_BACKENDS, writeRenderBackend, type RenderBackend } from "../scene/render-backend.ts";
 
 export interface AppearanceSettingsProps {
   readonly uiTheme: UiThemeStore;
@@ -63,6 +63,7 @@ export function AppearanceSettings(props: AppearanceSettingsProps) {
             <label>
               <input type="radio" name="render-backend" value={choice} checked={backend() === choice} onChange={() => chooseBackend(choice)} />
               {t(`customize.renderBackend.${choice}` as MessageKey)}
+              {choice === defaultRenderBackend() ? t("customize.renderBackend.default") : ""}
             </label>
           )}
         </For>
