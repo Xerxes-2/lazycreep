@@ -273,11 +273,20 @@ export function MapView(props: MapViewProps) {
     const s = scene();    if (v && s) v.show(s);
   });
 
-  // 视口停下来一段时间后才取所有权：拖动、缩放过程中不发请求
+  // 视口停下来一段时间后才取所有权：拖动、缩放过程中不发请求。
+  // 只看世界（Shard + 尺寸），不看整个 MapState：roomMap2 每 Tick 都改它，快的私服上计时器会被一直重置
+  const world = createMemo(
+    () => {
+      const state = mapState();
+      return state && { shard: state.shard, size: state.size };
+    },
+    undefined,
+    { equals: (a, b) => a === b || (!!a && !!b && a.shard === b.shard && a.size === b.size) },
+  );
   let settleTimer: ReturnType<typeof setTimeout> | undefined;
   createEffect(() => {
     const cam = camera();
-    const state = mapState();
+    const state = world();
     const current = loader();
     clearTimeout(settleTimer);
     if (!cam || !state || !settings.token() || !visible()) return;

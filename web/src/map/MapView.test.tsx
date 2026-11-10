@@ -177,6 +177,19 @@ describe("World Map 页面", () => {
     expect(statsCalls.length).toBeGreaterThan(0);
   });
 
+  it("roomMap2 每 Tick 更新地图（快的私服）也不推迟取所有权：首次显示就取到", async () => {
+    mount({ settleMs: 300 });
+    await settle(() => expect(shown.length).toBeGreaterThan(0));
+    search("W13S28");
+    let tick = 0;
+    const ticks = setInterval(() => roomMaps.forEach((listener) => listener({ s: [[tick++ % 50, 10]] })), 50);
+    try {
+      await settle(() => expect(statsCalls.flat()).toContain("W13S28"));
+    } finally {
+      clearInterval(ticks);
+    }
+  });
+
   it("拖动中不取所有权，停下来之后才取", async () => {
     mount();
     await settle(() => expect(statsCalls.length).toBeGreaterThan(0));
