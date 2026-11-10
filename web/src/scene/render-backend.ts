@@ -18,12 +18,11 @@ export type ActiveRenderBackend = RenderBackend | "canvas";
 const isBackend = (value: unknown): value is RenderBackend => (RENDER_BACKENDS as readonly unknown[]).includes(value);
 
 /**
- * 没选过时的默认：Mac 上 WebGPU 明显省电（实测比 WebGL 低约 10W），iPad 与 Android 也是；其他平台仍是 WebGL。
- * iPad 默认以桌面模式报 MacIntel，也有报 iPad 的；Android 的 platform 是 Linux armv8l 等，要看 userAgent。
+ * 没选过时的默认：Mac 上 WebGPU 明显省电（实测比 WebGL 低约 10W），iPad 也是（默认以桌面模式报 MacIntel，也有报 iPad 的）；
+ * 其他平台是 WebGL。Android 实测相反：Pixel 上 Chrome 的 WebGPU 比 WebGL 更费 CPU，Firefox 没有 WebGPU。
  */
-export function defaultRenderBackend(nav: Pick<Navigator, "platform" | "userAgent"> | undefined = globalThis.navigator): RenderBackend {
-  if (!nav) return "webgl";
-  return /^(Mac|iPad)/.test(nav.platform) || /Android/.test(nav.userAgent) ? "webgpu" : "webgl";
+export function defaultRenderBackend(nav: Pick<Navigator, "platform"> | undefined = globalThis.navigator): RenderBackend {
+  return nav && /^(Mac|iPad)/.test(nav.platform) ? "webgpu" : "webgl";
 }
 
 export function readRenderBackend(
