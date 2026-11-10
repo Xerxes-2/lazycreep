@@ -27,7 +27,12 @@ const STRIPPED_HEADERS = ["cookie", "cdn-loop", "x-http-method-override", "x-htt
 /** 赛季静态资源（#47）：只读，转发到静态资源主机的 /seasons/ 下 */
 const SEASON_STATIC_PREFIX = "/season-static/";
 
-const PROXIED_PREFIXES = [...routes.apiPrefixes.map((p) => `${p}/`), "/room-history/", "/map-tiles/", SEASON_STATIC_PREFIX];
+/** 自定义 Server（xxscreeps）的地图瓦片：只读，转发到 API 上游的 /assets/map/ 下 */
+const SERVER_TILES_PREFIX = "/server-tiles/";
+
+const READ_ONLY_PREFIXES = [SEASON_STATIC_PREFIX, SERVER_TILES_PREFIX];
+
+const PROXIED_PREFIXES = [...routes.apiPrefixes.map((p) => `${p}/`), "/room-history/", "/map-tiles/", ...READ_ONLY_PREFIXES];
 
 type Middleware = (req: IncomingMessage, res: ServerResponse, next: () => void) => void;
 
@@ -53,7 +58,7 @@ function writeGuard(): Middleware {
     }
     const method = req.method ?? "GET";
     if (method === "GET" || method === "HEAD") return next();
-    const readOnly = path.startsWith(SEASON_STATIC_PREFIX) || raw.startsWith(SEASON_STATIC_PREFIX);
+    const readOnly = READ_ONLY_PREFIXES.some((prefix) => path.startsWith(prefix) || raw.startsWith(prefix));
     if (!readOnly && method === "POST" && allowed.has(path)) return next();
     res.statusCode = 403;
     res.end(readOnly ? "gateway: read only" : "gateway: write not allowed");
@@ -68,6 +73,11 @@ function proxyTable(apiUpstream: string, tilesUpstream: string, seasonStaticUpst
     });
   };
   const api: ProxyOptions = { target: apiUpstream, changeOrigin: true, configure };
+  // 静态资源不需要身份，token 不带过去（与 Caddyfile 一致）
+  const withoutToken: ProxyOptions["configure"] = (proxy, options) => {
+    configure(proxy, options);
+    proxy.on("proxyReq", (proxyReq) => proxyReq.removeHeader("x-token"));
+  };
   return {
     ...Object.fromEntries(routes.apiPrefixes.map((prefix) => [`${prefix}/`, api])),
     "/room-history/": api,
@@ -80,12 +90,14 @@ function proxyTable(apiUpstream: string, tilesUpstream: string, seasonStaticUpst
     [SEASON_STATIC_PREFIX]: {
       target: seasonStaticUpstream,
       changeOrigin: true,
-      configure: (proxy, options) => {
-        configure(proxy, options);
-        // 静态资源主机不需要身份，token 不带过去（与 Caddyfile 一致）
-        proxy.on("proxyReq", (proxyReq) => proxyReq.removeHeader("x-token"));
-      },
+      configure: withoutToken,
       rewrite: (path) => path.replace(/^\/season-static\//, "/seasons/"),
+    },
+    [SERVER_TILES_PREFIX]: {
+      target: apiUpstream,
+      changeOrigin: true,
+      configure: withoutToken,
+      rewrite: (path) => path.replace(/^\/server-tiles\//, "/assets/map/"),
     },
   };
 }

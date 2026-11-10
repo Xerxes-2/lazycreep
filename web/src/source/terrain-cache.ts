@@ -3,8 +3,8 @@
  * （每次约 1.4 秒，且有每小时 360 次的限额），来回切换房间时地形立即出现。
  *
  * - 内存里一份，按 Server 持久化一份（`msc.terrainCache.<server id>`）；同一房间的并发请求只发一次。
- * - “赛季”标识取版本信息里本赛季的瓦片根地址（`mapTileRoot`，map-tiles.ts；MMO 为 null）：
- *   换赛季时存储里的旧地形整体作废。版本信息取不到时只用内存，不写存储。
+ * - “赛季”标识取瓦片根地址：版本信息里本赛季的（`mapTileRoot`，map-tiles.ts），没有时取 Server 的默认根地址；
+ *   换赛季或换瓦片来源时存储里的旧地形整体作废（地形可能是从旧瓦片解出来的）。版本信息取不到时只用内存，不写存储。
  * - 条目有上限，按最近使用淘汰：存储里的对象按使用先后排列（JSON 保持字符串键的插入顺序）。
  */
 import { isRecord, readJson, writeJson, type KeyValueStorage, type StoredKey } from "../storage/local-store.ts";
@@ -23,7 +23,7 @@ export const TERRAIN_CACHE_STORAGE: StoredKey = {
 export const TERRAIN_CACHE_MAX_ROOMS = 200;
 
 interface Stored {
-  /** 赛季标识：本赛季瓦片根地址；MMO 为 "" */
+  /** 赛季标识：瓦片根地址 */
   readonly season: string;
   /** `<shard>/<room>` → 编码后的地形；先后即使用先后（最早使用的在前） */
   readonly rooms: Readonly<Record<string, string>>;
@@ -39,6 +39,8 @@ function decodeStored(value: unknown): Stored | undefined {
 export interface TerrainCacheOptions {
   readonly storage: KeyValueStorage | undefined;
   readonly serverId: string;
+  /** Server 的默认瓦片根地址（版本信息里没有本赛季根地址时） */
+  readonly tileRoot: string;
   readonly getVersion: () => Promise<ServerVersion>;
   readonly fetch: (shard: string, room: string) => Promise<Terrain>;
   /**
@@ -70,7 +72,7 @@ export function createTerrainCache(
 
   const season = (): Promise<string | undefined> =>
     options.getVersion().then(
-      (version) => version.mapTileRoot ?? "",
+      (version) => version.mapTileRoot ?? options.tileRoot,
       () => undefined,
     );
   const read = (current: string): Record<string, string> => {

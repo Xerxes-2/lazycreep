@@ -5,7 +5,7 @@
 #   MSC_ADDRESS         监听地址，默认 127.0.0.1
 #   MSC_PORT            监听端口，默认 8080
 #   MSC_WEB_ROOT        前端构建产物目录（必填）
-#   MSC_API_UPSTREAM    API 与 room-history 上游（必填；启动脚本默认取 gateway/routes.json 的 apiOrigin）
+#   MSC_API_UPSTREAM    API、room-history 与自定义 Server 瓦片（/server-tiles/）的上游（必填；启动脚本默认取 gateway/routes.json 的 apiOrigin）
 #   MSC_TILES_UPSTREAM  地图瓦片 CDN（必填；启动脚本默认取 gateway/routes.json 的 tilesOrigin）
 #   MSC_SEASON_STATIC_UPSTREAM  赛季静态资源主机（必填；启动脚本默认取 gateway/routes.json 的 seasonStaticOrigin）
 #   MSC_POST_ALLOWLIST  允许转发的 POST 完整路径，空格分隔（必填，由 gateway/routes.json 展开）
@@ -71,6 +71,18 @@ http://:{$MSC_PORT:8080} {
 		rewrite * /map{path}
 		reverse_proxy {$MSC_TILES_UPSTREAM} {
 			import upstream_headers
+		}
+	}
+
+	# 自定义 Server（xxscreeps）的地图瓦片：官方 CDN 没有它们的世界，从 API 上游自己的 /assets/map/ 取。
+	# 只读，不需要身份。
+	handle_path /server-tiles/* {
+		respond @ambiguous_path "gateway: ambiguous path" 400
+		respond @not_read "gateway: read only" 403
+		rewrite * /assets/map{path}
+		reverse_proxy {$MSC_API_UPSTREAM} {
+			import upstream_headers
+			header_up -X-Token
 		}
 	}
 

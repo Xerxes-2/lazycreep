@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createEffect, createRoot } from "solid-js";
-import { createSettings } from "./settings.ts";
+import { SERVER_TILE_ROOT } from "../source/map-tiles.ts";
+import { CONNECTION_STORAGE, createSettings } from "./settings.ts";
 
 let dispose: (() => void) | undefined;
 
@@ -43,5 +44,20 @@ describe("连接设置的响应式粒度", () => {
     expect(runs.server).toBe(1);
     settings.addCustomServer({ name: "Home", apiRoot: "/home", socketUrl: "wss://home", sharded: false });
     expect(runs.server).toBe(2);
+  });
+});
+
+describe("自定义 Server 的瓦片", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("新加的与旧版本存下的自定义 Server 都从 Gateway 的 /server-tiles 取瓦片，官方 Server 不变", () => {
+    const old = { id: "custom-old", name: "Old", apiRoot: "/api", socketUrl: "ws://x", sharded: false };
+    const stored = { serverId: old.id, customServers: [{ ...old, tileRoot: "/map-tiles", historyRoot: "/room-history" }] };
+    localStorage.setItem(CONNECTION_STORAGE.key, JSON.stringify(stored));
+    const settings = createSettings(localStorage);
+    expect(settings.server().tileRoot).toBe(SERVER_TILE_ROOT);
+    expect(settings.addCustomServer({ ...old, name: "New" })?.tileRoot).toBe(SERVER_TILE_ROOT);
+    const official = settings.servers().filter((s) => !settings.isCustom(s.id));
+    expect(official.map((s) => s.tileRoot)).toEqual(["/map-tiles", "/map-tiles", "/map-tiles"]);
   });
 });

@@ -5,6 +5,7 @@
 import { describe, expect, it } from "vitest";
 import { STORED_KEYS } from "../customize/settings-transfer.ts";
 import { FixtureSource, fixtureBundle } from "./fixture-source.ts";
+import { SERVER_TILE_ROOT } from "./map-tiles.ts";
 import { SERVER_PRESETS } from "./servers.ts";
 import type { ServerConfig, ServerVersion, Source, Terrain } from "./source.ts";
 import { STATIC_CACHE_STORAGE, staticCached } from "./static-cache.ts";
@@ -90,6 +91,15 @@ describe("房间地形缓存", () => {
     const next = network({ root: "/season-static/season12/map" });
     await open(next, storage).getTerrain(SHARD, "W18S26");
     expect(next.terrain).toEqual(["W18S26"]);
+  });
+
+  it("同一 Server 换了默认瓦片根地址（自定义 Server 从官方 CDN 改到 /server-tiles）时旧地形作废", async () => {
+    const storage = memoryStorage();
+    const custom = { ...SEASON, tileRoot: "/map-tiles" };
+    await staticCached(network({ root: null }).factory, { storage })(custom, "t").getTerrain(SHARD, "W1N1");
+    const next = network({ root: null });
+    await staticCached(next.factory, { storage })({ ...custom, tileRoot: SERVER_TILE_ROOT }, "t").getTerrain(SHARD, "W1N1");
+    expect(next.terrain).toEqual(["W1N1"]);
   });
 
   it("请求失败不缓存，下次重新请求", async () => {

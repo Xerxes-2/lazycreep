@@ -138,6 +138,8 @@ BAD_PATHS = [
     "/season-static/season11/../../api/user/console",
     "/season-static/season11%2F..%2Frenderer/T.png",
     "/season-static/./season11/renderer/T.png",
+    "/server-tiles/shard0/../../api/user/console",
+    "/server-tiles/shard0%2F..%2FE0N0.png",
 ]
 
 
@@ -261,15 +263,22 @@ class GatewayTest(unittest.TestCase):
             self.assertNotIn("cookie", sent)
         self.assertEqual(api.received("GET", "/seasons/season11/renderer/T.png"), [])
 
-    def test_season_static_is_read_only_and_never_reaches_upstream(self):
+    def test_server_tiles_go_to_the_api_upstream_assets_map_path_without_token(self):
+        for method in ["GET", "HEAD"]:
+            status, _, _ = request(method, "/server-tiles/shard0/E25S9.png", headers={"X-Token": TOKEN})
+            self.assertEqual(status, 200, method)
+            [got] = api.received(method, "/assets/map/shard0/E25S9.png")
+            self.assertNotIn("x-token", {k.lower() for k in got["headers"]})
+
+    def test_season_static_and_server_tiles_are_read_only_and_never_reach_upstream(self):
         before = upstream_count()
-        path = "/season-static/season11/renderer/T.png"
-        for method in ["POST", "PUT", "DELETE", "PATCH", "OPTIONS"]:
-            status, _, _ = request(method, path, b"{}", {"Content-Type": "application/json"})
-            self.assertEqual(status, 403, method)
-        for endpoint in ROUTES["postAllowlist"]:
-            status, _, _ = request("POST", f"/season-static/{endpoint}", b"{}")
-            self.assertEqual(status, 403, endpoint)
+        for prefix in ["/season-static", "/server-tiles"]:
+            for method in ["POST", "PUT", "DELETE", "PATCH", "OPTIONS"]:
+                status, _, _ = request(method, f"{prefix}/season11/renderer/T.png", b"{}", {"Content-Type": "application/json"})
+                self.assertEqual(status, 403, f"{method} {prefix}")
+            for endpoint in ROUTES["postAllowlist"]:
+                status, _, _ = request("POST", f"{prefix}/{endpoint}", b"{}")
+                self.assertEqual(status, 403, endpoint)
         self.assertEqual(upstream_count(), before)
 
     def test_browser_and_cloudflare_headers_are_not_leaked_upstream(self):

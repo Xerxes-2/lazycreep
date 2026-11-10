@@ -210,6 +210,7 @@ export function withStaticCache(source: Source, options: StaticCacheOptions): So
   const getTerrain = createTerrainCache({
     storage: options.storage,
     serverId: source.server.id,
+    tileRoot: source.server.tileRoot,
     getVersion,
     fetch: (shard, room) => source.getTerrain(shard, room),
     ...(options.tilePixels ? { fromTile: tileTerrain(options.tilePixels) } : {}),

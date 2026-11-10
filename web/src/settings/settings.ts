@@ -4,6 +4,7 @@
  */
 import { batch, createSignal, type Accessor } from "solid-js";
 import { SERVER_PRESETS } from "../source/servers.ts";
+import { SERVER_TILE_ROOT } from "../source/map-tiles.ts";
 import type { ServerConfig } from "../source/source.ts";
 import { isRecord, readJson, writeJson, type KeyValueStorage, type StoredKey } from "../storage/local-store.ts";
 
@@ -67,7 +68,10 @@ function decode(value: unknown): Stored | undefined {
   const customServers = value["customServers"];
   return {
     serverId: typeof value["serverId"] === "string" ? value["serverId"] : DEFAULTS.serverId,
-    customServers: Array.isArray(customServers) ? customServers.filter(isServerConfig) : [],
+    // 旧版本存下的自定义 Server 指着官方 CDN 的瓦片
+    customServers: Array.isArray(customServers)
+      ? customServers.filter(isServerConfig).map((s) => ({ ...s, tileRoot: SERVER_TILE_ROOT }))
+      : [],
     token: typeof value["token"] === "string" ? value["token"] : "",
     shards: shards as Record<string, string>,
   };
@@ -113,7 +117,7 @@ export function createSettings(storage: KeyValueStorage | undefined): Settings {
         apiRoot,
         socketUrl,
         sharded: input.sharded,
-        tileRoot: "/map-tiles",
+        tileRoot: SERVER_TILE_ROOT,
         historyRoot: "/room-history",
       };
       update({ customServers: [...stored().customServers, config], serverId: config.id });

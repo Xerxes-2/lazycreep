@@ -22,6 +22,12 @@ export interface MapTiles {
   sector(cornerRoom: string): string;
 }
 
+/**
+ * 自定义 Server 的瓦片根地址：Gateway 转发到 API 上游自己的 `/assets/map/`（xxscreeps 在那里出单房间与 zoom1/zoom2 瓦片，
+ * 命名与官方 CDN 相同）。官方 CDN 没有私服的世界。
+ */
+export const SERVER_TILE_ROOT = "/server-tiles";
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 

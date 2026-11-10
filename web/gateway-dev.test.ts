@@ -107,6 +107,8 @@ const BAD_PATHS = [
   "/season-static/season11/../../api/user/console",
   "/season-static/season11%2F..%2Frenderer/T.png",
   "/season-static/./season11/renderer/T.png",
+  "/server-tiles/shard0/../../api/user/console",
+  "/server-tiles/shard0%2F..%2FE0N0.png",
 ];
 
 describe("开发服务器的 Gateway 代理", () => {
@@ -197,15 +199,27 @@ describe("开发服务器的 Gateway 代理", () => {
     expect(api.seen.some((r) => r.path.startsWith("/seasons/"))).toBe(false);
   });
 
-  it("赛季静态资源只读：GET / HEAD 以外的方法返回 403，不到达上游", async () => {
-    const before = upstreamCount();
-    // OPTIONS 由 Vite 自己的 CORS 中间件先回答，不经代理，这里不列
-    for (const method of ["POST", "PUT", "DELETE", "PATCH"]) {
-      const res = await send(method, "/season-static/season11/renderer/T.png", { body: "{}" });
-      expect(res.status, method).toBe(403);
+  it("自定义 Server 瓦片：GET / HEAD 转发到 API 上游的 /assets/map/ 路径，不带 token", async () => {
+    for (const method of ["GET", "HEAD"]) {
+      const res = await send(method, "/server-tiles/shard0/E25S9.png", { headers: { "X-Token": TOKEN } });
+      expect(res.status, method).toBe(200);
+      const got = api.seen.find((r) => r.method === method && r.path === "/assets/map/shard0/E25S9.png");
+      expect(got, method).toBeDefined();
+      expect(got?.headers["x-token"]).toBeUndefined();
     }
-    for (const endpoint of routes.postAllowlist) {
-      expect((await send("POST", `/season-static/${endpoint}`, { body: "{}" })).status, endpoint).toBe(403);
+  });
+
+  it("赛季静态资源与自定义 Server 瓦片只读：GET / HEAD 以外的方法返回 403，不到达上游", async () => {
+    const before = upstreamCount();
+    for (const prefix of ["/season-static", "/server-tiles"]) {
+      // OPTIONS 由 Vite 自己的 CORS 中间件先回答，不经代理，这里不列
+      for (const method of ["POST", "PUT", "DELETE", "PATCH"]) {
+        const res = await send(method, `${prefix}/season11/renderer/T.png`, { body: "{}" });
+        expect(res.status, `${method} ${prefix}`).toBe(403);
+      }
+      for (const endpoint of routes.postAllowlist) {
+        expect((await send("POST", `${prefix}/${endpoint}`, { body: "{}" })).status, endpoint).toBe(403);
+      }
     }
     expect(upstreamCount()).toBe(before);
   });
