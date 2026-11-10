@@ -1,5 +1,5 @@
 /**
- * 渲染后端偏好：Mac 上默认 WebGPU，其他平台默认 WebGL；存在 `msc.renderBackend`，刷新后生效。
+ * 渲染后端偏好：Mac、iPad、Android 上默认 WebGPU，其他平台默认 WebGL；存在 `msc.renderBackend`，刷新后生效。
  * 外观设置里显示实际用上的渲染接口；选的和页面打开时不同就提示刷新。
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -26,10 +26,13 @@ describe("渲染后端偏好", () => {
     expect(readRenderBackend(storage)).toBe("webgl");
   });
 
-  it("没选过时 Mac 默认 WebGPU（省电），其他平台默认 WebGL；选过的照旧", () => {
-    expect(defaultRenderBackend({ platform: "MacIntel" })).toBe("webgpu");
-    expect(defaultRenderBackend({ platform: "Win32" })).toBe("webgl");
-    expect(defaultRenderBackend({ platform: "Linux x86_64" })).toBe("webgl");
+  it("没选过时 Mac、iPad、Android 默认 WebGPU（省电），其他平台默认 WebGL；选过的照旧", () => {
+    const nav = (platform: string, userAgent = "") => ({ platform, userAgent });
+    expect(defaultRenderBackend(nav("MacIntel"))).toBe("webgpu");
+    expect(defaultRenderBackend(nav("iPad"))).toBe("webgpu");
+    expect(defaultRenderBackend(nav("Linux armv8l", "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36"))).toBe("webgpu");
+    expect(defaultRenderBackend(nav("Win32"))).toBe("webgl");
+    expect(defaultRenderBackend(nav("Linux x86_64", "Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0"))).toBe("webgl");
     expect(defaultRenderBackend(undefined)).toBe("webgl");
     const storage = memoryStorage();
     expect(readRenderBackend(storage, "webgpu")).toBe("webgpu");
