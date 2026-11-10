@@ -96,6 +96,7 @@ export const en: Partial<Record<MessageKey, string>> = {
   "roomDetails.close": "Deselect",
   "roomDetails.raw": "Other fields",
   "roomDetails.field.type": "Type",
+  "roomDetails.field.siteType": "Builds",
   "roomDetails.field.owner": "Owner",
   "roomDetails.field.name": "Name",
   "roomDetails.field.position": "Position",

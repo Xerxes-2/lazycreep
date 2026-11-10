@@ -94,6 +94,7 @@ export const zhCN = {
   "roomDetails.close": "取消选中",
   "roomDetails.raw": "其他字段",
   "roomDetails.field.type": "类型",
+  "roomDetails.field.siteType": "要建的建筑",
   "roomDetails.field.owner": "所有者",
   "roomDetails.field.name": "名字",
   "roomDetails.field.position": "坐标",

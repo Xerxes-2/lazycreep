@@ -211,6 +211,15 @@ describe("对象详情", () => {
     });
   });
 
+  it("建筑工地：紧跟类型列出要建的建筑，不再出现在其他字段里", () => {
+    const site = { _id: "c1", type: "constructionSite", structureType: "extension", x: 3, y: 4, user: "u1", progress: 100, progressTotal: 3000 };
+    const d = describeObject(site, users, 1100);
+    expect(d.fields.map((f) => f.key).slice(0, 2)).toEqual(["type", "siteType"]);
+    expect(field(d, "siteType")).toBe("extension");
+    expect(field(d, "progress")).toBe("100 / 3000");
+    expect(d.raw).toEqual([]);
+  });
+
   describe("赛季 reactor", () => {
     const reactor = {
       _id: "re1",
