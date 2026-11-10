@@ -4,7 +4,7 @@
  *
  * 坐标：
  * - 有符号房间坐标：E0 / S0 为 0，W0 / N0 为 -1（W13 = -14）
- * - 世界坐标（Scene 单位，1 = 一个房间）：有符号坐标 + 世界尺寸的一半，所以世界左上角是 [0, 0)
+ * - 世界坐标（Scene 单位，1 = 一个房间）：有符号坐标 − 世界左上角房间（size.origin，默认居中），所以世界左上角是 [0, 0)
  *
  * 扩展点（#3 PvP 热点等）：在这里加字段，然后在 map-scene 的 MAP_LAYERS 里加一层。
  * 房间级信息（RCL、矿物、新手区……）随 RoomStats 扩展（来自 map-stats）；Power Bank 来自 roomMap2。
@@ -56,7 +56,36 @@ export function roomName(coord: RoomCoord): string {
 
 /** 有符号坐标的偏移：世界坐标 = 有符号坐标 + offset */
 export function worldOffset(size: WorldSize): RoomCoord {
+  if (size.origin) return { x: -size.origin.x, y: -size.origin.y };
   return { x: Math.floor(size.width / 2), y: Math.floor(size.height / 2) };
+}
+
+/**
+ * 求世界左上角要查 map-stats 的房间：锚点所在的行与列，两边各延伸一个世界宽。
+ * 锚点落在居中的世界里时为空——当作居中（官服），不多发请求。
+ * shortcut: 与居中范围重叠的裁剪世界会被当成居中；遇到再改成总是探测。
+ */
+export function originProbe(size: WorldSize, anchor: string): string[] {
+  const at = parseRoomName(anchor);
+  if (!at) return [];
+  const offset = worldOffset({ width: size.width, height: size.height });
+  const wx = at.x + offset.x;
+  const wy = at.y + offset.y;
+  if (wx >= 0 && wy >= 0 && wx < size.width && wy < size.height) return [];
+  const rooms: string[] = [];
+  for (let d = 1 - size.width; d < size.width; d++) rooms.push(roomName({ x: at.x + d, y: at.y }));
+  for (let d = 1 - size.height; d < size.height; d++) if (d !== 0) rooms.push(roomName({ x: at.x, y: at.y + d }));
+  return rooms;
+}
+
+/** 存在的房间里最左、最上的坐标；没有房间时为 undefined。 */
+export function originOf(rooms: Iterable<string>): RoomCoord | undefined {
+  let origin: RoomCoord | undefined;
+  for (const room of rooms) {
+    const at = parseRoomName(room);
+    if (at) origin = origin ? { x: Math.min(origin.x, at.x), y: Math.min(origin.y, at.y) } : at;
+  }
+  return origin;
 }
 
 /** 世界坐标处的房间；世界之外为 undefined。 */

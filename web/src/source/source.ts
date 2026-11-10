@@ -203,6 +203,8 @@ export interface PlayerProfile {
 export interface WorldSize {
   readonly width: number;
   readonly height: number;
+  /** 世界左上角房间的有符号坐标；没有时世界以 W0N0/E0S0 为中心（官服） */
+  readonly origin?: { readonly x: number; readonly y: number };
 }
 
 /** map-stats 里一个房间的情况。 */

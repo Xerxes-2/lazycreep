@@ -54,7 +54,8 @@ interface Entry<T> {
 
 interface Stored {
   readonly shards?: Entry<readonly ShardInfo[]>;
-  readonly worldSize?: Readonly<Record<string, Entry<WorldSize>>>;
+  /** 旧版存在 `worldSize` 下、不带 origin：换个键让它重取，否则裁剪世界一直按居中算 */
+  readonly world?: Readonly<Record<string, Entry<WorldSize>>>;
   readonly version?: Entry<ServerVersion>;
 }
 
@@ -81,7 +82,9 @@ function decodeShards(value: unknown): readonly ShardInfo[] | undefined {
 
 function decodeSize(value: unknown): WorldSize | undefined {
   if (!isRecord(value) || !isNumber(value["width"]) || !isNumber(value["height"])) return undefined;
-  return { width: value["width"], height: value["height"] };
+  const origin = value["origin"];
+  if (!isRecord(origin) || !isNumber(origin["x"]) || !isNumber(origin["y"])) return { width: value["width"], height: value["height"] };
+  return { width: value["width"], height: value["height"], origin: { x: origin["x"], y: origin["y"] } };
 }
 
 function decodeVersion(value: unknown): ServerVersion | undefined {
@@ -106,13 +109,13 @@ function decodeStored(value: unknown): Stored | undefined {
   const shards = decodeEntry(value["shards"], decodeShards);
   const version = decodeEntry(value["version"], decodeVersion);
   const sizes: Record<string, Entry<WorldSize>> = {};
-  if (isRecord(value["worldSize"])) {
-    for (const [shard, raw] of Object.entries(value["worldSize"])) {
+  if (isRecord(value["world"])) {
+    for (const [shard, raw] of Object.entries(value["world"])) {
       const entry = decodeEntry(raw, decodeSize);
       if (entry) sizes[shard] = entry;
     }
   }
-  return { ...(shards ? { shards } : {}), ...(version ? { version } : {}), worldSize: sizes };
+  return { ...(shards ? { shards } : {}), ...(version ? { version } : {}), world: sizes };
 }
 
 /** 一个 Server 的持久化缓存；每次读写都直接对存储，同一 Server 的多个 Source 互相看得见 */
@@ -178,13 +181,13 @@ export function withStaticCache(source: Source, options: StaticCacheOptions): So
   const getWorldSize = (shard: string): Promise<WorldSize> =>
     cached(
       `worldSize:${shard}`,
-      store.read().worldSize?.[shard],
+      store.read().world?.[shard],
       WORLD_SIZE_FRESH_MS,
       () => source.getWorldSize(shard),
       (entry) =>
         store.update((stored) => ({
           ...stored,
-          worldSize: { ...stored.worldSize, [shard]: entry },
+          world: { ...stored.world, [shard]: entry },
         })),
     );
 

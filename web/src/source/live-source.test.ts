@@ -285,6 +285,34 @@ describe("LiveSource Console 命令", () => {
     expect(JSON.parse(seen[0]!.body)).toEqual({ expression: "1+1" });
   });
 
+  it("世界不以 W0N0 为中心（裁剪的 xxscreeps）：以起始房间为锚，从 map-stats 探出左上角", async () => {
+    const privateServer: ServerConfig = { ...SEASON, id: "private", apiRoot: "/api", sharded: false };
+    const stats: Record<string, { status: string }> = {};
+    for (let x = 23; x <= 27; x++) for (let y = 7; y <= 11; y++) stats[`E${x}S${y}`] = { status: "normal" };
+    const { source } = live({
+      server: privateServer,
+      token: TOKEN,
+      routes: {
+        "/api/game/world-size": { body: { ok: 1, width: 5, height: 5 } },
+        "/api/user/world-start-room": { body: { ok: 1, room: ["E25S9"] } },
+        "/api/game/map-stats": { body: { ok: 1, gameTime: 1, stats, users: {} } },
+      },
+    });
+    expect(await source.getWorldSize("shard0")).toEqual({ width: 5, height: 5, origin: { x: 23, y: 7 } });
+  });
+
+  it("起始房间在居中的世界里（官服）：不探 map-stats，尺寸照旧", async () => {
+    const { source, seen } = live({
+      token: TOKEN,
+      routes: {
+        ...seasonRoutes,
+        "/season/api/user/world-start-room?shard=shardSeason": { body: { ok: 1, room: [`${SHARD}:${OWN_ROOM}`] } },
+      },
+    });
+    expect(await source.getWorldSize(SHARD)).toEqual(await fixture.getWorldSize(SHARD));
+    expect(seen.some((r) => r.url.pathname.endsWith("map-stats"))).toBe(false);
+  });
+
   it("被拒绝时按原因归类：403 forbidden、429 rateLimited、响应体带 error 为 server", async () => {
     const reply = (r: Reply) => live({ token: TOKEN, routes: { "/season/api/user/console": r } }).source;
     await expect(reply({ status: 403, body: {} }).sendConsole(SHARD, "x")).rejects.toMatchObject({ kind: "forbidden" });

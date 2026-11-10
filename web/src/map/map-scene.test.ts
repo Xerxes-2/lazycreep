@@ -3,7 +3,8 @@ import { DEFAULT_THEME } from "../scene/theme.ts";
 import type { ImagePrimitive, Primitive, RectPrimitive } from "../scene/scene.ts";
 import type { MapStats } from "../source/source.ts";
 import { BLOCK_TILE_MIN_ZOOM, MAP_LAYER, ROOM_TILE_MIN_ZOOM, buildMapScene, type MapView } from "./map-scene.ts";
-import { applyMapStats, mapStateFrom, roomAtWorld, type MapState } from "./map-state.ts";
+import { applyMapStats, mapStateFrom, originOf, originProbe, roomAtWorld, type MapState } from "./map-state.ts";
+import { roomsByDistance } from "./room-map-feed.ts";
 
 const ME = "me-id";
 const OTHER = "other-id";
@@ -47,6 +48,26 @@ describe("MapState", () => {
     expect(roomAtWorld(state, 101.5, 101.5)).toBe("E50S50");
     expect(roomAtWorld(state, -0.1, 3)).toBeUndefined();
     expect(roomAtWorld(state, 3, 102)).toBeUndefined();
+  });
+
+  it("不以 W0N0 为中心的 5×5 世界（E23S7–E27S11）：房间名按 origin 推", () => {
+    const size = { width: 5, height: 5, origin: { x: 23, y: 7 } };
+    const state = mapStateFrom({ shard: "s", size, tiles });
+    expect(roomAtWorld(state, 0, 0)).toBe("E23S7");
+    expect(roomAtWorld(state, 2.5, 2.5)).toBe("E25S9");
+    expect(roomAtWorld(state, 4.9, 4.9)).toBe("E27S11");
+    expect(roomAtWorld(state, 5, 0)).toBeUndefined();
+    expect(roomsByDistance(size, { x0: 2, y0: 2, x1: 3, y1: 3 })[0]).toBe("E25S9");
+  });
+
+  it("origin 的探测：锚点在居中世界里不探；否则探锚点的行与列，取最左最上的存在房间", () => {
+    expect(originProbe({ width: 102, height: 102 }, "W13S28")).toEqual([]);
+    const probe = originProbe({ width: 5, height: 5 }, "E25S9");
+    expect(probe).toHaveLength(9 + 8);
+    expect(probe).toContain("E21S9");
+    expect(probe).toContain("E25S5");
+    const existing = probe.filter((r) => /^E2[3-7]S([7-9]|1[01])$/.test(r));
+    expect(originOf(existing)).toEqual({ x: 23, y: 7 });
   });
 
   it("map-stats 合并进来：后到的覆盖先到的，其他房间保留", () => {
