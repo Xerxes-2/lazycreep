@@ -33,6 +33,7 @@ import { KEYBINDINGS_STORAGE } from "./keybindings.ts";
 import { UI_THEME_STORAGE } from "./ui-theme.ts";
 import { RENDER_BACKEND_STORAGE } from "../scene/render-backend.ts";
 import { FRAME_RATE_STORAGE } from "../scene/frame-rate.ts";
+import { DEBUG_OVERLAY_STORAGE } from "../scene/debug-stats.ts";
 
 export const SETTINGS_FORMAT = "lazycreep/settings";
 /** 改名前（my-screeps-client）导出的备份：照样能导入 */
@@ -46,6 +47,7 @@ export const STORED_KEYS: readonly StoredKey[] = [
   UI_THEME_STORAGE,
   RENDER_BACKEND_STORAGE,
   FRAME_RATE_STORAGE,
+  DEBUG_OVERLAY_STORAGE,
   COLOR_SCHEME_STORAGE,
   KEYBINDINGS_STORAGE,
   ALLY_LIST_STORAGE,

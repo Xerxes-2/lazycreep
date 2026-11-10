@@ -1717,3 +1717,20 @@ body {
   height: 28px;
   margin-right: 0;
 }
+
+/* 调试信息叠加层：右下角，不拦截指针 */
+.debug-overlay {
+  position: fixed;
+  right: 8px;
+  bottom: 8px;
+  z-index: 60;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: rgb(0 0 0 / 70%);
+  color: #e6edf3;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre;
+  pointer-events: none;
+}

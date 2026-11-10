@@ -399,7 +399,7 @@ export function MapView(props: MapViewProps) {
     let created: SceneView | undefined;
     let observer: ResizeObserver | undefined;
     let detachGestures: (() => void) | undefined;
-    (props.createView ?? createSceneView)(size()).then(
+    (props.createView ?? createSceneView)({ ...size(), label: "map" }).then(
       (made) => {
         if (!alive) return made.destroy();
         created = made;

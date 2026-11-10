@@ -1,4 +1,5 @@
 import { createEffect, createSignal, Show, type Accessor } from "solid-js";
+import { DebugOverlay } from "./scene/DebugOverlay.tsx";
 import { createAllyList } from "./allies/ally-list.ts";
 import { AlertSettingsPanel } from "./alert/AlertSettingsPanel.tsx";
 import { createAlertSettings } from "./alert/alert-settings.ts";
@@ -208,6 +209,7 @@ export function App(props: Partial<ShellProps>) {
             onImported={onImported}
             lastImport={lastImport()}
           />
+          <DebugOverlay />
         </I18nProvider>
       )}
     </Show>

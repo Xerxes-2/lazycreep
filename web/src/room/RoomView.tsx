@@ -423,7 +423,7 @@ export function RoomView(props: RoomViewProps) {
     let alive = true;
     let created: SceneView | undefined;
     let observer: ResizeObserver | undefined;
-    (props.createView ?? createSceneView)(size()).then(
+    (props.createView ?? createSceneView)({ ...size(), label: "room" }).then(
       (made) => {
         if (!alive) return made.destroy();
         created = made;

@@ -7,6 +7,7 @@ import type { StrangerColoring } from "../scene/theme.ts";
 import { colorToHex, hexToColor, PALETTE_KEYS, type ColorScheme } from "./color-scheme.ts";
 import { UI_THEME_PREFERENCES, type UiThemeStore } from "./ui-theme.ts";
 import { FRAME_RATES, frameRate, setFrameRate } from "../scene/frame-rate.ts";
+import { debugOverlayEnabled, setDebugOverlay } from "../scene/debug-stats.ts";
 import { activeRenderBackend, defaultRenderBackend, readRenderBackend, RENDER_BACKENDS, writeRenderBackend, type RenderBackend } from "../scene/render-backend.ts";
 
 export interface AppearanceSettingsProps {
@@ -94,6 +95,10 @@ export function AppearanceSettings(props: AppearanceSettingsProps) {
           )}
         </For>
         <p class="settings__muted">{t("customize.frameRate.hint")}</p>
+        <label>
+          <input type="checkbox" name="debug-overlay" checked={debugOverlayEnabled()} onChange={(e) => setDebugOverlay(e.currentTarget.checked)} />
+          {t("customize.debugOverlay")}
+        </label>
       </fieldset>
 
       <fieldset class="settings__group">

@@ -13,6 +13,7 @@
  */
 import { readRenderBackend, reportRenderBackend, type RenderBackend } from "./render-backend.ts";
 import { frameInterval, frameRate, throttledSchedule } from "./frame-rate.ts";
+import { trackView } from "./debug-stats.ts";
 import { AlphaFilter, Container, Graphics, RendererType, Sprite, Text, Texture, Ticker, autoDetectRenderer, type Renderer } from "pixi.js";
 import { withCompositeImages } from "./composite-textures.ts";
 import { withPixelImages } from "./pixel-textures.ts";
@@ -41,6 +42,8 @@ export interface SceneViewOptions {
   readonly renderer?: SceneRenderer;
   /** 渲染接口偏好；默认读设置（render-backend.ts，默认 WebGL）。不支持 WebGPU 时 Pixi 退回 WebGL */
   readonly backend?: RenderBackend;
+  /** 调试叠加层里这个视图的名字（room / map / minimap） */
+  readonly label?: string;
   /** 安排一帧，默认按设置的帧率上限节流的 requestAnimationFrame（frame-rate.ts） */
   readonly schedule?: (frame: () => void) => void;
   /** 动画用的时钟（毫秒），默认 performance.now */
@@ -401,6 +404,7 @@ export async function createSceneView(options: SceneViewOptions): Promise<SceneV
   reportRenderBackend(
     renderer.type === RendererType.WEBGPU ? "webgpu" : renderer.type === RendererType.CANVAS ? "canvas" : "webgl",
   );
+  const debug = trackView(options.label ?? "scene", renderer.canvas);
   const schedule = options.schedule ?? throttledSchedule((step) => requestAnimationFrame(step), () => frameInterval(frameRate()));
   const now = options.now ?? (() => performance.now());
 
@@ -426,7 +430,10 @@ export async function createSceneView(options: SceneViewOptions): Promise<SceneV
     // settle() 之后（画面不在屏幕上）不画，等下一次 show() 或显式请求
     if (destroyed || stale) return;
     if (runs.size > 0) advance(now());
+    const started = performance.now();
     renderer.render({ container: stage });
+    const ended = performance.now();
+    debug.frame(ended, ended - started);
     // 还有动画没播完：下一帧继续
     if (runs.size > 0) requestRender();
   };
@@ -680,6 +687,7 @@ export async function createSceneView(options: SceneViewOptions): Promise<SceneV
     destroy() {
       if (destroyed) return;
       destroyed = true;
+      debug.dispose();
       // 摘下来的光照组不在 stage 里，单独销毁
       if (!lighting.parent) lighting.destroy({ children: true });
       stage.destroy({ children: true });

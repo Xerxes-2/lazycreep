@@ -192,7 +192,7 @@ export function Minimap(props: { readonly ctx: SectionContext; readonly shown: A
     let created: SceneView | undefined;
     let observer: ResizeObserver | undefined;
     let detach: (() => void) | undefined;
-    (ctx.createView ?? createSceneView)(measure()).then(
+    (ctx.createView ?? createSceneView)({ ...measure(), label: "minimap" }).then(
       (made) => {
         if (!alive) return made.destroy();
         created = made;
