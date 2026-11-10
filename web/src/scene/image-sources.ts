@@ -142,7 +142,8 @@ export async function rasterizeSvgText(svg: string, width: number, height: numbe
     const canvas = document.createElement("canvas");
     canvas.width = width;
     canvas.height = height;
-    const context = canvas.getContext("2d");
+    // Linux Firefox 的加速 canvas 上传到 WebGL 时红蓝对调（link 能量黄变青）；CPU canvas 不走那条路
+    const context = canvas.getContext("2d", { willReadFrequently: true });
     if (!context) throw new Error("canvas 2d 不可用");
     context.drawImage(image, 0, 0, width, height);
     return canvas;

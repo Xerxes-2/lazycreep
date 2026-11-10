@@ -17,6 +17,8 @@ export function withPixelImages(loader: TextureLoader): TextureLoader {
         resource: pixels.rgba,
         width: pixels.width,
         height: pixels.height,
+        // 字节是 RGBA；Pixi 对 Uint8Array 默认 bgra8unorm，WebGPU 会照此红蓝对调
+        format: "rgba8unorm",
         scaleMode: "nearest",
       });
       const texture = new Texture({ source });
