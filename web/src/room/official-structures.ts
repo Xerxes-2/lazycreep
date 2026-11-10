@@ -480,7 +480,7 @@ export const OFFICIAL_STRUCTURE_PAINTERS: ObjectPainters = {
 
 // ---- controller 的升级进度（controller.metadata.js 的 siteProgress：徽章上的白色扇形） ----
 /** 官方 constants.CONTROLLER_LEVELS：升到下一级所需的进度；8 级没有 */
-const CONTROLLER_LEVELS: Readonly<Record<number, number>> = { 1: 200, 2: 45_000, 3: 135_000, 4: 405_000, 5: 1_215_000, 6: 3_645_000, 7: 10_935_000 };
+export const CONTROLLER_LEVELS: Readonly<Record<number, number>> = { 1: 200, 2: 45_000, 3: 135_000, 4: 405_000, 5: 1_215_000, 6: 3_645_000, 7: 10_935_000 };
 export function controllerProgress(obj: RoomObject, layer: number): PrimitiveDraft[] {
   const total = CONTROLLER_LEVELS[num(obj, "level") ?? 0];
   const progress = num(obj, "progress") ?? 0;

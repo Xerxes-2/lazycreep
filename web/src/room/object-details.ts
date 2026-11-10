@@ -4,6 +4,7 @@
  */
 import type { RoomUser } from "../source/source.ts";
 import { BODY_PART_COLORS } from "./official-creeps.ts";
+import { CONTROLLER_LEVELS } from "./official-structures.ts";
 import type { RoomObject } from "./room-state.ts";
 
 export type DetailKey =
@@ -328,6 +329,12 @@ export function describeObject(
   }
   add("level", isNum(obj["level"]) ? String(obj["level"]) : undefined);
   add("progress", isNum(obj["progressTotal"]) ? ratio(obj["progress"], obj["progressTotal"]) : undefined);
+  if (obj["type"] === "controller" && !isNum(obj["progressTotal"])) {
+    // Server 不发 controller 的 progressTotal，按等级查官方表；8 级没有下一级
+    const total = isNum(obj["level"]) ? CONTROLLER_LEVELS[obj["level"]] : undefined;
+    const progress = isNum(obj["progress"]) ? obj["progress"] : 0;
+    if (total) add("progress", `${progress} / ${total} (${((progress / total) * 100).toFixed(1)}%)`);
+  }
   add("downgrade", until(obj["downgradeTime"]));
   controllerFields(obj, users, remaining, add);
   const spawning = obj["spawning"];

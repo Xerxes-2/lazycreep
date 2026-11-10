@@ -79,6 +79,12 @@ describe("对象详情", () => {
     expect(field(controller, "level")).toBe("7");
     expect(field(controller, "progress")).toBe("500 / 1000");
     expect(field(controller, "downgrade")).toBe("500");
+
+    // 实际 Server 不发 progressTotal：按等级补；8 级不列
+    const live = (level: number, progress?: number) => describeObject({ _id: "k", type: "controller", x: 1, y: 2, level, ...(progress === undefined ? {} : { progress }) }, users, 1000);
+    expect(field(live(5, 607_500), "progress")).toBe("607500 / 1215000 (50.0%)");
+    expect(field(live(2), "progress")).toBe("0 / 45000 (0.0%)");
+    expect(field(live(8, 0), "progress")).toBeUndefined();
   });
 
   it("source 与 mineral 的储量；没有的字段不出现", () => {
