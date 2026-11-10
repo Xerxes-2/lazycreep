@@ -29,6 +29,7 @@ import { createMapBadges } from "./map-badges.ts";
 import { ownershipBudgetStore } from "./ownership-budget.ts";
 import { createOwnershipHub } from "./ownership-hub.ts";
 import { roomMapHubFor } from "../source/room-map-hub.ts";
+import { SERVER_PRESETS } from "../source/servers.ts";
 import { createWorldMapLink } from "./world-map-link.ts";
 import type { SceneView, SceneViewOptions } from "../scene/pixi-scene-view.ts";
 import type { Theme } from "../scene/theme.ts";
@@ -74,9 +75,11 @@ export function MapAndRoom(props: MapAndRoomProps) {
   const source = useSharedSource(props.sourceFor, props.settings);
   const ownership = createMemo(() => {
     const src = source();
+    // 每小时 60 次是官服的限额；私服没有，套上它反复刷新几次所有权就不再来（429 照样退避）
+    const official = Object.values(SERVER_PRESETS).some((s) => s.id === src.server.id);
     const hub = createOwnershipHub({
       fetch: (shard, rooms) => src.getMapStats(shard, rooms),
-      budget: ownershipBudgetStore(browserStorage(), src.server.id),
+      ...(official ? { budget: ownershipBudgetStore(browserStorage(), src.server.id) } : { maxPerHour: Infinity }),
     });
     onCleanup(() => hub.dispose());
     return hub;

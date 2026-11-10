@@ -60,6 +60,19 @@ describe("MapState", () => {
     expect(roomsByDistance(size, { x0: 2, y0: 2, x1: 3, y1: 3 })[0]).toBe("E25S9");
   });
 
+  it("不以 W0N0 为中心的世界：map-stats 的所有者与矿物画在各自房间上", () => {
+    const state = applyMapStats(mapStateFrom({ shard: "s", size: { width: 5, height: 5, origin: { x: 23, y: 7 } }, tiles, me: ME }), {
+      shard: "s",
+      gameTime: 1,
+      rooms: { E25S8: { status: "normal", owner: { user: ME, level: 2 }, mineral: { type: "U", density: 3 } }, E26S8: { status: "normal", mineral: { type: "O", density: 3 } } },
+      users: { [ME]: { _id: ME, username: "me" } },
+    });
+    const scene = buildMapScene(state, view({ zoom: 100, visible: { x0: 0, y0: 0, x1: 5, y1: 5 } }));
+    expect(ownership(scene.primitives).map((p) => [p.key, p.x, p.y])).toEqual([["own:E25S8", 2, 1]]);
+    const minerals = scene.primitives.filter((p) => p.key?.startsWith("mineral:")).map((p) => p.key);
+    expect(minerals).toEqual(["mineral:E25S8", "mineral:E26S8"]);
+  });
+
   it("origin 的探测：锚点在居中世界里不探；否则探锚点的行与列，取最左最上的存在房间", () => {
     expect(originProbe({ width: 102, height: 102 }, "W13S28")).toEqual([]);
     const probe = originProbe({ width: 5, height: 5 }, "E25S9");
