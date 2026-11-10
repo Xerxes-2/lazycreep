@@ -67,8 +67,6 @@ export interface ObjectDetails {
 const KNOWN = new Set([
   "_id",
   "type",
-  // 建筑工地要建的建筑
-  "structureType",
   "room",
   "x",
   "y",
@@ -313,7 +311,8 @@ export function describeObject(
   const ratio = (a: unknown, b: unknown) => (isNum(a) ? (isNum(b) ? `${a} / ${b}` : String(a)) : undefined);
 
   add("type", typeof obj["type"] === "string" ? obj["type"] : undefined);
-  add("siteType", typeof obj["structureType"] === "string" ? obj["structureType"] : undefined);
+  const site = obj["type"] === "constructionSite";
+  if (site) add("siteType", typeof obj["structureType"] === "string" ? obj["structureType"] : undefined);
   const user = obj["user"];
   if (typeof user === "string") add("owner", users[user]?.username ?? user);
   add("name", typeof obj["name"] === "string" ? obj["name"] : typeof obj["creepName"] === "string" ? obj["creepName"] : undefined);
@@ -356,7 +355,7 @@ export function describeObject(
   reactorFields(obj, gameTime, add);
 
   const raw = Object.entries(obj)
-    .filter(([key]) => !KNOWN.has(key))
+    .filter(([key]) => !KNOWN.has(key) && !(site && key === "structureType"))
     .map(([key, value]) => [key, rawText(value)] as const);
 
   return { id: String(obj["_id"] ?? ""), fields, raw, ...(body.length > 0 ? { body } : {}) };

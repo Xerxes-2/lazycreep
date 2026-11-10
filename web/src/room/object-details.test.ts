@@ -224,6 +224,8 @@ describe("对象详情", () => {
     expect(field(d, "siteType")).toBe("extension");
     expect(field(d, "progress")).toBe("100 / 3000");
     expect(d.raw).toEqual([]);
+    const tower = describeObject({ _id: "t1", type: "tower", structureType: "tower", x: 3, y: 4 }, users, 1100);
+    expect(field(tower, "siteType")).toBeUndefined();
   });
 
   describe("赛季 reactor", () => {
