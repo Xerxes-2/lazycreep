@@ -12,6 +12,7 @@
  *   本来就要画的帧里，不额外请求帧。Canvas 渲染器没有滤镜，那里不画光照组（官方同样在非 WebGL 时隐藏光照）
  */
 import { readRenderBackend, reportRenderBackend, type RenderBackend } from "./render-backend.ts";
+import { frameInterval, frameRate, throttledSchedule } from "./frame-rate.ts";
 import { AlphaFilter, Container, Graphics, RendererType, Sprite, Text, Texture, Ticker, autoDetectRenderer, type Renderer } from "pixi.js";
 import { withCompositeImages } from "./composite-textures.ts";
 import { withPixelImages } from "./pixel-textures.ts";
@@ -40,7 +41,7 @@ export interface SceneViewOptions {
   readonly renderer?: SceneRenderer;
   /** 渲染接口偏好；默认读设置（render-backend.ts，默认 WebGL）。不支持 WebGPU 时 Pixi 退回 WebGL */
   readonly backend?: RenderBackend;
-  /** 安排一帧，默认 requestAnimationFrame */
+  /** 安排一帧，默认按设置的帧率上限节流的 requestAnimationFrame（frame-rate.ts） */
   readonly schedule?: (frame: () => void) => void;
   /** 动画用的时钟（毫秒），默认 performance.now */
   readonly now?: () => number;
@@ -400,7 +401,7 @@ export async function createSceneView(options: SceneViewOptions): Promise<SceneV
   reportRenderBackend(
     renderer.type === RendererType.WEBGPU ? "webgpu" : renderer.type === RendererType.CANVAS ? "canvas" : "webgl",
   );
-  const schedule = options.schedule ?? ((frame: () => void) => requestAnimationFrame(frame));
+  const schedule = options.schedule ?? throttledSchedule((step) => requestAnimationFrame(step), () => frameInterval(frameRate()));
   const now = options.now ?? (() => performance.now());
 
   const stage = new Container();

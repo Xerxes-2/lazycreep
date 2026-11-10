@@ -6,6 +6,7 @@ import { useI18n, type MessageKey } from "../i18n";
 import type { StrangerColoring } from "../scene/theme.ts";
 import { colorToHex, hexToColor, PALETTE_KEYS, type ColorScheme } from "./color-scheme.ts";
 import { UI_THEME_PREFERENCES, type UiThemeStore } from "./ui-theme.ts";
+import { FRAME_RATES, frameRate, setFrameRate } from "../scene/frame-rate.ts";
 import { activeRenderBackend, defaultRenderBackend, readRenderBackend, RENDER_BACKENDS, writeRenderBackend, type RenderBackend } from "../scene/render-backend.ts";
 
 export interface AppearanceSettingsProps {
@@ -80,6 +81,19 @@ export function AppearanceSettings(props: AppearanceSettingsProps) {
             </button>
           </p>
         </Show>
+      </fieldset>
+
+      <fieldset class="settings__group" data-testid="frame-rate">
+        <legend>{t("customize.frameRate.title")}</legend>
+        <For each={FRAME_RATES}>
+          {(choice) => (
+            <label>
+              <input type="radio" name="frame-rate" value={choice} checked={frameRate() === choice} onChange={() => setFrameRate(choice)} />
+              {t(`customize.frameRate.${choice}` as MessageKey)}
+            </label>
+          )}
+        </For>
+        <p class="settings__muted">{t("customize.frameRate.hint")}</p>
       </fieldset>
 
       <fieldset class="settings__group">
