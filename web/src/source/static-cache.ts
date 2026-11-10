@@ -54,8 +54,8 @@ interface Entry<T> {
 
 interface Stored {
   readonly shards?: Entry<readonly ShardInfo[]>;
-  /** 旧版存在 `worldSize` 下、不带 origin：换个键让它重取，否则裁剪世界一直按居中算 */
-  readonly world?: Readonly<Record<string, Entry<WorldSize>>>;
+  /** 旧版的 `worldSize`、`world` 可能存着没有锚点时猜的居中：换个键让它重取 */
+  readonly worlds?: Readonly<Record<string, Entry<WorldSize>>>;
   readonly version?: Entry<ServerVersion>;
 }
 
@@ -109,13 +109,13 @@ function decodeStored(value: unknown): Stored | undefined {
   const shards = decodeEntry(value["shards"], decodeShards);
   const version = decodeEntry(value["version"], decodeVersion);
   const sizes: Record<string, Entry<WorldSize>> = {};
-  if (isRecord(value["world"])) {
-    for (const [shard, raw] of Object.entries(value["world"])) {
+  if (isRecord(value["worlds"])) {
+    for (const [shard, raw] of Object.entries(value["worlds"])) {
       const entry = decodeEntry(raw, decodeSize);
       if (entry) sizes[shard] = entry;
     }
   }
-  return { ...(shards ? { shards } : {}), ...(version ? { version } : {}), world: sizes };
+  return { ...(shards ? { shards } : {}), ...(version ? { version } : {}), worlds: sizes };
 }
 
 /** 一个 Server 的持久化缓存；每次读写都直接对存储，同一 Server 的多个 Source 互相看得见 */
@@ -181,14 +181,13 @@ export function withStaticCache(source: Source, options: StaticCacheOptions): So
   const getWorldSize = (shard: string): Promise<WorldSize> =>
     cached(
       `worldSize:${shard}`,
-      store.read().world?.[shard],
+      store.read().worlds?.[shard],
       WORLD_SIZE_FRESH_MS,
       () => source.getWorldSize(shard),
-      (entry) =>
-        store.update((stored) => ({
-          ...stored,
-          world: { ...stored.world, [shard]: entry },
-        })),
+      (entry) => {
+        if (entry.value.guessed) return;
+        store.update((stored) => ({ ...stored, worlds: { ...stored.worlds, [shard]: entry } }));
+      },
     );
 
   const getVersion = (): Promise<ServerVersion> =>

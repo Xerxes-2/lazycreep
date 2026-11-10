@@ -44,7 +44,7 @@ import {
   type UserInfo,
 } from "./source.ts";
 import { mapTileUrls, type MapTiles } from "./map-tiles.ts";
-import { originOf, originProbe } from "../map/map-state.ts";
+import { originOf, originProbe, parseRoomName } from "../map/map-state.ts";
 import type { VisibilitySignal } from "../power/visibility.ts";
 import { browserSocket, ChannelSocket, type ReconnectOptions, type SocketFactory } from "./socket.ts";
 import {
@@ -344,6 +344,8 @@ export class LiveSource implements Source {
     const size = { width: wire.width, height: wire.height };
     const start = await this.api<{ room?: unknown }>("/user/world-start-room", this.shardQuery(shard)).catch(() => undefined);
     const anchor = Array.isArray(start?.room) && typeof start.room[0] === "string" ? start.room[0].replace(/^.*:/, "") : "";
+    // map-stats 不要 token，却要先知道房间；room-status 在 xxscreeps 上什么房间都答 normal：匿名时没有可用的锚点
+    if (!parseRoomName(anchor)) return { ...size, guessed: true };
     const probe = originProbe(size, anchor);
     if (probe.length === 0) return size;
     const stats = await this.getMapStats(shard, probe);

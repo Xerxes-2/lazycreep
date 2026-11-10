@@ -205,6 +205,8 @@ export interface WorldSize {
   readonly height: number;
   /** 世界左上角房间的有符号坐标；没有时世界以 W0N0/E0S0 为中心（官服） */
   readonly origin?: { readonly x: number; readonly y: number };
+  /** 没有锚点（没有或失效的 token）时按居中猜的：不进持久缓存，有了 token 再推一次 */
+  readonly guessed?: true;
 }
 
 /** map-stats 里一个房间的情况。 */

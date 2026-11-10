@@ -120,6 +120,21 @@ describe("当前用户：在途去重，短时间复用", () => {
 });
 
 describe("静态数据：持久化缓存", () => {
+  it("没有锚点时猜的世界尺寸不进持久缓存：下次（有了 token）重取", async () => {
+    const storage = memoryStorage();
+    const first = network();
+    const before = staticCached(first.factory, { storage })(SEASON, undefined);
+    const size = before.getWorldSize("shardSeason");
+    first.sizes[0]!.pending.resolve({ ...SIZE, guessed: true });
+    expect(await size).toEqual({ ...SIZE, guessed: true });
+    before.close();
+
+    const second = network();
+    const after = staticCached(second.factory, { storage })(SEASON, "t");
+    void after.getWorldSize("shardSeason");
+    expect(second.sizes).toHaveLength(1);
+  });
+
   it("拿到过的 Shard 列表与世界尺寸，下次启动（新的 Source）直接给出，不发请求", async () => {
     const storage = memoryStorage();
     const first = network();

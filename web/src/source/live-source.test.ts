@@ -91,6 +91,7 @@ const seasonRoutes: Record<string, Reply> = {
     })(),
   },
   "/season/api/game/world-size?shard=shardSeason": { body: { ok: 1, ...(recorded("worldSize") as object) } },
+  "/season/api/user/world-start-room?shard=shardSeason": { body: { ok: 1, room: [`${SHARD}:${OWN_ROOM}`] } },
   // 真实响应还带 decorations 与完整的用户徽章
   "/season/api/game/map-stats": { body: { ok: 1, decorations: {}, ...(recorded("mapStats") as object) } },
   "/room-history/shardSeason/W13S28/1024900.json": {
@@ -301,13 +302,23 @@ describe("LiveSource Console 命令", () => {
     expect(await source.getWorldSize("shard0")).toEqual({ width: 5, height: 5, origin: { x: 23, y: 7 } });
   });
 
+  it("没有 token、起始房间未授权：按居中猜，标为 guessed，不探 map-stats", async () => {
+    const privateServer: ServerConfig = { ...SEASON, id: "private", apiRoot: "/api", sharded: false };
+    const { source, seen } = live({
+      server: privateServer,
+      routes: {
+        "/api/game/world-size": { body: { ok: 1, width: 5, height: 5 } },
+        "/api/user/world-start-room": { status: 401, body: { error: "unauthorized" } },
+      },
+    });
+    expect(await source.getWorldSize("shard0")).toEqual({ width: 5, height: 5, guessed: true });
+    expect(seen.some((r) => r.url.pathname.endsWith("map-stats"))).toBe(false);
+  });
+
   it("起始房间在居中的世界里（官服）：不探 map-stats，尺寸照旧", async () => {
     const { source, seen } = live({
       token: TOKEN,
-      routes: {
-        ...seasonRoutes,
-        "/season/api/user/world-start-room?shard=shardSeason": { body: { ok: 1, room: [`${SHARD}:${OWN_ROOM}`] } },
-      },
+      routes: seasonRoutes,
     });
     expect(await source.getWorldSize(SHARD)).toEqual(await fixture.getWorldSize(SHARD));
     expect(seen.some((r) => r.url.pathname.endsWith("map-stats"))).toBe(false);
