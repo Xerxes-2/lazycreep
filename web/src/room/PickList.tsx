@@ -3,7 +3,7 @@
  * 点一行选中该对象；Esc、点列表外关闭（平移 / 缩放由 room-controls 关闭）。
  * 键盘：上下移动、Home / End、回车或空格确认。条目与位置的规则在 pick-list.ts。
  */
-import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { createSignal, Index, onCleanup, onMount, Show } from "solid-js";
 import { useI18n } from "../i18n";
 import { placePickList, type PickEntry } from "./pick-list.ts";
 
@@ -91,27 +91,28 @@ export function PickList(props: PickListProps) {
       style={{ left: `${place().left}px`, top: `${place().top}px` }}
       onKeyDown={onKeyDown}
     >
-      <For each={props.entries}>
+      {/* Index 而非 For：条目每 tick 重建成新对象，For 会重建 <li>，按下与松开落在不同元素上就丢了 click */}
+      <Index each={props.entries}>
         {(entry, index) => (
           <li
-            id={optionId(entry.id)}
+            id={optionId(entry().id)}
             class="pick-list__item"
             role="option"
-            data-object-id={entry.id}
-            aria-selected={index() === current()}
-            onPointerEnter={() => setActive(index())}
-            onClick={() => props.onPick(entry.id)}
+            data-object-id={entry().id}
+            aria-selected={index === current()}
+            onPointerEnter={() => setActive(index)}
+            onClick={() => props.onPick(entry().id)}
           >
             <span
               class="pick-list__mark"
               aria-hidden="true"
-              style={entry.color === undefined ? undefined : { background: hex(entry.color) }}
+              style={entry().color === undefined ? undefined : { background: hex(entry().color!) }}
             />
-            <span class="pick-list__label">{entry.name ?? entry.type}</span>
-            <Show when={entry.owner}>{(owner) => <span class="pick-list__owner">{owner()}</span>}</Show>
+            <span class="pick-list__label">{entry().name ?? entry().type}</span>
+            <Show when={entry().owner}>{(owner) => <span class="pick-list__owner">{owner()}</span>}</Show>
           </li>
         )}
-      </For>
+      </Index>
     </ul>
   );
 }
