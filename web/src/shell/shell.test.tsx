@@ -86,12 +86,13 @@ describe("固定外壳（#24）", () => {
     expect(shownSections()).toEqual([]);
 
     mount();
-    expect(shownView()).toEqual(["room"]);
+    // Main View 模式不持久化：房间不恢复，启动总在 World Map
+    expect(shownView()).toEqual(["map"]);
     expect(shownSections()).toEqual([]);
     q<HTMLButtonElement>("[data-action=toggle-sidebar]")!.click();
-    expect(shownSections()).toEqual(["room.info", "room.minimap", "room.selected", "room.display"]);
-    press("m");
     expect(sectionBody("map.pvp").hidden).toBe(true);
+    press("m");
+    expect(shownSections()).toEqual(["room.info", "room.minimap", "room.selected", "room.display"]);
   });
 
   it("Menu：Top Bar 按钮打开，列出各设置项，一次显示一项；Esc 与点外部关闭", () => {

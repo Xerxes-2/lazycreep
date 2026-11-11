@@ -166,7 +166,7 @@ describe("设置导出 / 导入（#5）", () => {
    * ADR 0005：固定外壳取代 #2 的网格停靠，`msc.layout.*` 两个布局键启动时清除、不迁移。
    * #54（ADR 0007）：画风设置删除，见 RETIRED_SETTING_KEYS。
    */
-  const RETIRED_KEYS: readonly string[] = ["msc.layout.desktop", "msc.layout.monitor", ...RETIRED_SETTING_KEYS];
+  const RETIRED_KEYS: readonly string[] = ["msc.layout.desktop", "msc.layout.monitor", "msc.mainView", ...RETIRED_SETTING_KEYS];
 
   it("源码里出现的每个 msc.* 存储键都已汇总到 STORED_KEYS（只用于清除的旧键除外）", () => {
     // 各模块只在自己的文件里写键的字面量；漏汇总的键在这里变红

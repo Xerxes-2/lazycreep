@@ -1,7 +1,7 @@
 /**
  * 外壳状态（#24，ADR 0005）：整页唯一的一份，Top Bar、Main View、Sidebar、Menu、Console Panel 都读写它。
  *
- * - Main View 模式（World Map / Room View）：运行状态，存 `msc.mainView`，不进设置导出。
+ * - Main View 模式（World Map / Room View）：不持久化，启动时是 World Map（房间也不持久化，恢复成 Room View 只会是空的）。
  * - Sidebar 是否收起（宽屏与窄屏底部面板各一份）、宽屏 Sidebar 宽度、各 Sidebar Section 的折叠（按区块 id）、
  *   Console Panel 开合与高度：用户设置，存 `msc.shell`，进设置导出。
  * - Menu 当前打开项、Room View 的房间：不持久化。
@@ -73,7 +73,6 @@ export interface NavigateTo {
 export type ShardSettings = Pick<Settings, "server" | "shard" | "setShard">;
 
 export const SHELL_STORAGE: StoredKey = { key: "msc.shell", kind: "json-object", role: "settings" };
-export const MAIN_VIEW_STORAGE: StoredKey = { key: "msc.mainView", kind: "json-string", role: "runtime" };
 
 /** Console Panel 高度（CSS 像素）的范围与默认值 */
 export const CONSOLE_HEIGHT = { min: 120, max: 800, initial: 260 } as const;
@@ -118,13 +117,16 @@ function decodePrefs(value: unknown): ShellPrefs | undefined {
   };
 }
 
-const decodeMode = (value: unknown): MainViewMode | undefined => (value === "map" || value === "room" ? value : undefined);
-
 /**
- * #2 网格停靠留下的两个布局键（ADR 0005：启动时清除，不迁移）。
+ * 启动时清除、不迁移的旧键：#2 网格停靠留下的两个布局键（ADR 0005），以及旧的 Main View 模式。
  * 它们已不是本应用存储的键，不登记进 STORED_KEYS；存储键扫描测试（settings-transfer.test.ts）把它们列为豁免。
  */
-export const LEGACY_LAYOUT_KEYS: readonly string[] = ["msc.layout.desktop", "msc.layout.monitor"];
+export const LEGACY_LAYOUT_KEYS: readonly string[] = [
+  "msc.layout.desktop",
+  "msc.layout.monitor",
+  // 旧的 Main View 模式：存了 room 时启动进空 Room View，启动画面一直等地图数据
+  "msc.mainView",
+];
 
 export function clearLegacyLayout(storage: (KeyValueStorage & Partial<Pick<Storage, "removeItem">>) | undefined): void {
   for (const key of LEGACY_LAYOUT_KEYS) removeKey(storage, key);
@@ -186,11 +188,7 @@ export function createShellState(
   };
   const change = (patch: Partial<ShellPrefs>) => save({ ...prefs(), ...patch });
 
-  const [mainView, setMainView] = createSignal<MainViewMode>(readJson(storage, MAIN_VIEW_STORAGE.key, decodeMode, "map"));
-  const showMainView = (mode: MainViewMode) => {
-    setMainView(mode);
-    writeJson(storage, MAIN_VIEW_STORAGE.key, mode);
-  };
+  const [mainView, showMainView] = createSignal<MainViewMode>("map");
 
   const [room, setRoom] = createSignal<RoomTarget>();
   const [replay, setReplay] = createSignal<ReplayAt | undefined>(undefined, {
