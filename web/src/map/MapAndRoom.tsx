@@ -75,11 +75,14 @@ export function MapAndRoom(props: MapAndRoomProps) {
   const source = useSharedSource(props.sourceFor, props.settings);
   const ownership = createMemo(() => {
     const src = source();
-    // 每小时 60 次是官服的限额；私服没有，套上它反复刷新几次所有权就不再来（429 照样退避）
+    // 每小时 60 次是官服的限额；私服没有，套上它反复刷新几次所有权就不再来（429 照样退避），
+    // 也就不必为省额度把缓存放长：私服一分钟一刷
     const official = Object.values(SERVER_PRESETS).some((s) => s.id === src.server.id);
     const hub = createOwnershipHub({
       fetch: (shard, rooms) => src.getMapStats(shard, rooms),
-      ...(official ? { budget: ownershipBudgetStore(browserStorage(), src.server.id) } : { maxPerHour: Infinity }),
+      ...(official
+        ? { budget: ownershipBudgetStore(browserStorage(), src.server.id) }
+        : { maxPerHour: Infinity, ttlMs: 60_000, backgroundTtlMs: 60_000 }),
     });
     onCleanup(() => hub.dispose());
     return hub;

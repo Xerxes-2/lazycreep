@@ -6,7 +6,7 @@
  * - 分批单位是 10×10 的扇区（按有符号坐标对齐，与游戏的 sector 一致）；只请求可见、且没有新鲜缓存的扇区
  * - 一次请求合并所有待取扇区，最多 maxRoomsPerRequest 个房间，按离可见区域中心的距离先近后远；
  *   剩下的在这次完成后接着取
- * - 结果缓存 ttlMs；任何时刻至多一个请求在途，在途期间的调用只记下最后的区域，完成后补一次
+ * - 结果缓存 ttlMs，过期时自己重取（不必等调用方再调）；任何时刻至多一个请求在途，在途期间的调用只记下最后的区域，完成后补一次
  * - 客户端自限每小时 maxPerHour 次（默认 30，给同一 Server 上的其他功能留余量），
  *   额度用完或被限流（429）时暂停，额度恢复后自动补上最后的区域
  *
@@ -100,7 +100,10 @@ export function createOwnershipLoader(options: OwnershipLoaderOptions): Ownershi
   let last: Want | undefined;
   let background: readonly RoomRef[] = [];
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let timerAt = Infinity;
   let disposed = false;
+  /** 本轮 run 看到的仍新鲜的扇区里最早过期的时刻：到时自己重取 */
+  let nextExpiry = Infinity;
 
   /** 与可见区域相交、还要取的扇区（世界之内的房间），先近后远 */
   const staleSectors = (want: Want, now: number): Sector[] => {
@@ -120,7 +123,11 @@ export function createOwnershipLoader(options: OwnershipLoaderOptions): Ownershi
       for (let sx = first(wx0, offset.x); sx <= first(wx1 - 1, offset.x); sx++) {
         const key = `${shard}:${sx},${sy}`;
         const at = fetchedAt.get(key);
-        if (inFlight.has(key) || (at !== undefined && now - at < ttl)) continue;
+        if (inFlight.has(key)) continue;
+        if (at !== undefined && now - at < ttl) {
+          nextExpiry = Math.min(nextExpiry, at + ttl);
+          continue;
+        }
         const rooms: string[] = [];
         for (let y = sy * SECTOR; y < (sy + 1) * SECTOR; y++) {
           if (y + offset.y < 0 || y + offset.y >= size.height) continue;
@@ -137,10 +144,14 @@ export function createOwnershipLoader(options: OwnershipLoaderOptions): Ownershi
     return sectors.sort((a, b) => a.distance - b.distance);
   };
 
+  /** 安排一次 run；已有更早的就不动（醒来的 run 会再安排下一次） */
   const wakeAt = (at: number) => {
+    if (timer !== undefined && timerAt <= at) return;
     clearTimeout(timer);
+    timerAt = at;
     timer = setTimeout(() => {
       timer = undefined;
+      timerAt = Infinity;
       run();
     }, Math.max(0, at - Date.now()));
   };
@@ -155,7 +166,11 @@ export function createOwnershipLoader(options: OwnershipLoaderOptions): Ownershi
       const sy = Math.floor(coord.y / SECTOR);
       const key = `${shard}:${sx},${sy}`;
       const at = fetchedAt.get(key);
-      if (inFlight.has(key) || (at !== undefined && now - at < backgroundTtl)) continue;
+      if (inFlight.has(key)) continue;
+      if (at !== undefined && now - at < backgroundTtl) {
+        nextExpiry = Math.min(nextExpiry, at + backgroundTtl);
+        continue;
+      }
       const sectors = byShard.get(shard) ?? new Map<string, Sector>();
       byShard.set(shard, sectors);
       if (sectors.has(key)) continue;
@@ -185,12 +200,14 @@ export function createOwnershipLoader(options: OwnershipLoaderOptions): Ownershi
   const run = () => {
     if (disposed || busy) return;
     const now = Date.now();
+    nextExpiry = Infinity;
     const visibleSectors = last ? staleSectors(last, now) : [];
+    const extra = visibleSectors.length > 0 ? undefined : staleBackground(now);
+    if (nextExpiry < Infinity) wakeAt(nextExpiry);
     if (visibleSectors.length > 0) {
       if (budget(now, maxPerHour)) send(last!.shard, visibleSectors, now);
       return;
     }
-    const extra = staleBackground(now);
     if (extra && budget(now, backgroundLimit)) send(extra.shard, extra.sectors, now);
   };
 

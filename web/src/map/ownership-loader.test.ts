@@ -87,6 +87,26 @@ describe("所有权加载器", () => {
     expect(calls).toHaveLength(2);
   });
 
+  it("缓存过期时自己重取最后的区域与补查清单，不等调用方再调", async () => {
+    const { loader, calls, finish } = harness({ ttlMs: 10 * 60_000, backgroundTtlMs: 60 * 60_000 });
+    loader.request(SHARD, SIZE, inSector);
+    await finish();
+    loader.requestRooms([{ shard: SHARD, room: "E5N5" }]);
+    await finish();
+    vi.advanceTimersByTime(10 * 60_000 - 1);
+    expect(calls).toHaveLength(2);
+    vi.advanceTimersByTime(1);
+    expect(calls).toHaveLength(3);
+    expect(calls[2]!.rooms).toContain("W13S28");
+    await finish();
+    // 地图区域每 10 分钟重取一次；补查清单到 60 分钟时重取
+    for (let minute = 10; minute < 60; minute += 10) {
+      vi.advanceTimersByTime(10 * 60_000);
+      await finish();
+    }
+    expect(calls.slice(3).some((c) => c.rooms.includes("E5N5"))).toBe(true);
+  });
+
   it("只请求还没缓存的扇区", async () => {
     const { loader, calls, finish } = harness();
     loader.request(SHARD, SIZE, inSector);
