@@ -22,6 +22,7 @@ import { createDecorationCache } from "./decoration-cache.ts";
 import { createSnapshotCache } from "./snapshot-cache.ts";
 import { createTerrainCache } from "./terrain-cache.ts";
 import { decodeTileTerrain, type TilePixels } from "./tile-terrain.ts";
+import { roomName, type RoomCoord } from "../map/map-state.ts";
 import type { ServerVersion, ShardInfo, Source, UserInfo, WorldSize } from "./source.ts";
 
 /** 每个 Server 一个键：`msc.staticCache.<server id>` */
@@ -178,17 +179,30 @@ export function withStaticCache(source: Source, options: StaticCacheOptions): So
       (entry) => store.update((stored) => ({ ...stored, shards: entry })),
     );
 
-  const getWorldSize = (shard: string): Promise<WorldSize> =>
-    cached(
-      `worldSize:${shard}`,
-      store.read().worlds?.[shard],
-      WORLD_SIZE_FRESH_MS,
-      () => source.getWorldSize(shard),
-      (entry) => {
-        if (entry.value.guessed) return;
-        store.update((stored) => ({ ...stored, worlds: { ...stored.worlds, [shard]: entry } }));
-      },
+  /** 每个 Shard 本 Source 核对一次：缓存的左上角房间还在不在这个世界里 */
+  const cornerChecks = new Map<string, Promise<boolean>>();
+  const cornerGone = (shard: string, origin: RoomCoord): Promise<boolean> => {
+    const corner = roomName(origin);
+    return source.getMapStats(shard, [corner]).then(
+      (stats) => (stats.rooms[corner]?.status ?? "out of borders") === "out of borders",
+      () => false,
     );
+  };
+
+  const getWorldSize = async (shard: string): Promise<WorldSize> => {
+    const slot = `worldSize:${shard}`;
+    const fetch = () => source.getWorldSize(shard);
+    const save = (entry: Entry<WorldSize>) => {
+      if (entry.value.guessed) return;
+      store.update((stored) => ({ ...stored, worlds: { ...stored.worlds, [shard]: entry } }));
+    };
+    const size = await cached(slot, store.read().worlds?.[shard], WORLD_SIZE_FRESH_MS, fetch, save);
+    // 私服可以在同一地址上换一个世界（xxscreeps 换地图重开）：缓存的原点房间不在了就重取
+    if (!size.origin || memory.has(slot)) return size;
+    let check = cornerChecks.get(shard);
+    if (!check) cornerChecks.set(shard, (check = cornerGone(shard, size.origin)));
+    return (await check) ? refresh(slot, fetch, save) : size;
+  };
 
   const getVersion = (): Promise<ServerVersion> =>
     cached(

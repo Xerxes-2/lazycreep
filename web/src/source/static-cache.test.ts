@@ -154,6 +154,39 @@ describe("静态数据：持久化缓存", () => {
     expect(second.sizes).toHaveLength(0);
   });
 
+  it("同一地址换了世界：缓存的原点房间不在了就重取，还在就照旧用缓存", async () => {
+    const storage = memoryStorage();
+    const old: WorldSize = { width: 11, height: 11, origin: { x: 20, y: 0 } };
+    const first = network();
+    const before = staticCached(first.factory, { storage })(SEASON, "t");
+    const got = before.getWorldSize("shard0");
+    first.sizes[0]!.pending.resolve(old);
+    await got;
+    before.close();
+
+    const open = (rooms: Record<string, { status: string }>) => {
+      const net = network();
+      const factory = (server: ServerConfig): Source => {
+        const base = net.factory(server);
+        base.getMapStats = (shard) => Promise.resolve({ shard, gameTime: 1, rooms, users: {} });
+        return base;
+      };
+      return { net, source: staticCached(factory, { storage })(SEASON, "t") };
+    };
+
+    const kept = open({ E20S0: { status: "normal" } });
+    expect(await kept.source.getWorldSize("shard0")).toEqual(old);
+    expect(kept.net.sizes).toHaveLength(0);
+    kept.source.close();
+
+    const swapped = open({});
+    const size = swapped.source.getWorldSize("shard0");
+    await flush();
+    const now: WorldSize = { width: 11, height: 11, origin: { x: -11, y: -11 } };
+    swapped.net.sizes[0]!.pending.resolve(now);
+    expect(await size).toEqual(now);
+  });
+
   it("按 Server 分开：别的 Server 不用这份缓存；世界尺寸按 Shard 分开", async () => {
     const storage = memoryStorage();
     const first = network();
