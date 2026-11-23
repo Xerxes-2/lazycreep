@@ -3,7 +3,8 @@
  * 已建好的视图换不了渲染器，所以改了要刷新页面才生效。
  *
  * 选 WebGPU 时浏览器不支持就由 Pixi 的 autoDetectRenderer 退回 WebGL（再不行 Canvas）；
- * 实际用上的接口记在 activeRenderBackend()，设置里显示，方便对比。
+ * 实际用上的接口记在 activeRenderBackend()，设置里显示，方便对比；选了 WebGPU 却退回时，Pixi 不说原因，
+ * 由 probeWebGPU 自己再走一遍同样的检测，卡在哪一步记在 webgpuFallback()。
  */
 import { createSignal } from "solid-js";
 import { browserStorage, readJson, writeJson, type KeyValueStorage, type StoredKey } from "../storage/local-store.ts";
@@ -40,3 +41,41 @@ const [active, setActive] = createSignal<ActiveRenderBackend>();
 /** 本页最近建好的视图实际用的接口；还没有视图时 undefined */
 export const activeRenderBackend = active;
 export const reportRenderBackend = (backend: ActiveRenderBackend): void => void setActive(backend);
+
+/** WebGPU 不可用卡在哪一步（与 Pixi 的 isWebGPUSupported 同样三步） */
+export interface WebGPUFallback {
+  readonly kind: "no-api" | "no-adapter" | "no-device";
+  readonly message?: string;
+}
+
+/** 只用到的 navigator.gpu 形状 */
+export interface GpuLike {
+  requestAdapter(): Promise<{ requestDevice(): Promise<{ destroy?(): void }> } | null>;
+}
+
+const messageOf = (error: unknown) => ({ message: error instanceof Error ? error.message : String(error) });
+
+/** 可用时 undefined；否则说明卡在哪一步 */
+export async function probeWebGPU(
+  gpu: GpuLike | undefined = (globalThis.navigator as { gpu?: GpuLike } | undefined)?.gpu,
+): Promise<WebGPUFallback | undefined> {
+  if (!gpu) return { kind: "no-api" };
+  let adapter: Awaited<ReturnType<GpuLike["requestAdapter"]>>;
+  try {
+    adapter = await gpu.requestAdapter();
+  } catch (error) {
+    return { kind: "no-adapter", ...messageOf(error) };
+  }
+  if (!adapter) return { kind: "no-adapter" };
+  try {
+    (await adapter.requestDevice()).destroy?.();
+    return undefined;
+  } catch (error) {
+    return { kind: "no-device", ...messageOf(error) };
+  }
+}
+
+const [fallback, setFallback] = createSignal<WebGPUFallback>();
+/** 选了 WebGPU 却退回时的原因；没退回时 undefined */
+export const webgpuFallback = fallback;
+export const reportWebGPUFallback = (reason: WebGPUFallback | undefined): void => void setFallback(reason);

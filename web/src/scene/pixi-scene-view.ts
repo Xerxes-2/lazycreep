@@ -11,7 +11,7 @@
  *   滤镜以 MULTIPLY 把合成好的光照图盖到世界里它之下的一切上（官方 lighting 图层的做法）。离屏合成只发生在
  *   本来就要画的帧里，不额外请求帧。Canvas 渲染器没有滤镜，那里不画光照组（官方同样在非 WebGL 时隐藏光照）
  */
-import { readRenderBackend, reportRenderBackend, type RenderBackend } from "./render-backend.ts";
+import { probeWebGPU, readRenderBackend, reportRenderBackend, reportWebGPUFallback, type RenderBackend } from "./render-backend.ts";
 import { frameInterval, frameRate, throttledSchedule } from "./frame-rate.ts";
 import { trackView } from "./debug-stats.ts";
 import { AlphaFilter, Container, Graphics, RendererType, Sprite, Text, Texture, Ticker, autoDetectRenderer, type Renderer } from "pixi.js";
@@ -487,6 +487,7 @@ export async function createSceneView(options: SceneViewOptions): Promise<SceneV
   stopTickers();
   let width = options.width;
   let height = options.height;
+  const preference = options.backend ?? readRenderBackend();
   const renderer: SceneRenderer =
     options.renderer ??
     (await autoDetectRenderer({
@@ -495,11 +496,15 @@ export async function createSceneView(options: SceneViewOptions): Promise<SceneV
       resolution: options.resolution ?? globalThis.devicePixelRatio ?? 1,
       autoDensity: true,
       antialias: true,
-      preference: options.backend ?? readRenderBackend(),
+      preference,
     }));
   reportRenderBackend(
     renderer.type === RendererType.WEBGPU ? "webgpu" : renderer.type === RendererType.CANVAS ? "canvas" : "webgl",
   );
+  if (!options.renderer) {
+    if (preference === "webgpu" && renderer.type !== RendererType.WEBGPU) void probeWebGPU().then(reportWebGPUFallback);
+    else reportWebGPUFallback(undefined);
+  }
   const debug = trackView(options.label ?? "scene", renderer.canvas);
   const schedule = options.schedule ?? throttledSchedule((step) => requestAnimationFrame(step), () => frameInterval(frameRate()));
   const now = options.now ?? (() => performance.now());

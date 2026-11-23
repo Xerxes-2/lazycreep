@@ -9,7 +9,7 @@ import { AppearanceSettings } from "../customize/AppearanceSettings.tsx";
 import { createColorScheme } from "../customize/color-scheme.ts";
 import { createUiTheme } from "../customize/ui-theme.ts";
 import { STORED_KEYS } from "../customize/settings-transfer.ts";
-import { RENDER_BACKEND_KEY, RENDER_BACKEND_STORAGE, defaultRenderBackend, readRenderBackend, reportRenderBackend, writeRenderBackend } from "./render-backend.ts";
+import { RENDER_BACKEND_KEY, RENDER_BACKEND_STORAGE, defaultRenderBackend, probeWebGPU, readRenderBackend, reportRenderBackend, reportWebGPUFallback, writeRenderBackend } from "./render-backend.ts";
 
 function memoryStorage() {
   const map = new Map<string, string>();
@@ -92,5 +92,25 @@ describe("外观设置里的渲染后端", () => {
     reportRenderBackend("canvas");
     mount();
     expect(group().querySelector("[data-render-backend-active]")!.textContent).toContain("Canvas");
+  });
+
+  it("选了 WebGPU 却退回了：说明卡在哪一步", () => {
+    reportRenderBackend("webgl");
+    reportWebGPUFallback({ kind: "no-adapter" });
+    mount();
+    expect(group().querySelector("[data-render-backend-fallback]")!.textContent).toContain("requestAdapter");
+    reportWebGPUFallback(undefined);
+    expect(group().querySelector("[data-render-backend-fallback]")).toBeNull();
+  });
+});
+
+describe("WebGPU 探测（Pixi 退回 WebGL 时不说原因）", () => {
+  it("没有 navigator.gpu / 适配器为空 / requestDevice 失败 / 正常", async () => {
+    expect(await probeWebGPU(undefined)).toEqual({ kind: "no-api" });
+    expect(await probeWebGPU({ requestAdapter: async () => null })).toEqual({ kind: "no-adapter" });
+    const failing = { requestAdapter: async () => ({ requestDevice: async () => Promise.reject(new Error("lost")) }) };
+    expect(await probeWebGPU(failing)).toEqual({ kind: "no-device", message: "lost" });
+    expect(await probeWebGPU({ requestAdapter: async () => Promise.reject(new Error("denied")) })).toEqual({ kind: "no-adapter", message: "denied" });
+    expect(await probeWebGPU({ requestAdapter: async () => ({ requestDevice: async () => ({ destroy() {} }) }) })).toBeUndefined();
   });
 });

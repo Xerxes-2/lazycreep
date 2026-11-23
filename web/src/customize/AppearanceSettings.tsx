@@ -8,7 +8,7 @@ import { colorToHex, hexToColor, PALETTE_KEYS, type ColorScheme } from "./color-
 import { UI_THEME_PREFERENCES, type UiThemeStore } from "./ui-theme.ts";
 import { FRAME_RATES, frameRate, setFrameRate } from "../scene/frame-rate.ts";
 import { debugOverlayEnabled, setDebugOverlay } from "../scene/debug-stats.ts";
-import { activeRenderBackend, defaultRenderBackend, readRenderBackend, RENDER_BACKENDS, writeRenderBackend, type RenderBackend } from "../scene/render-backend.ts";
+import { activeRenderBackend, defaultRenderBackend, webgpuFallback, readRenderBackend, RENDER_BACKENDS, writeRenderBackend, type RenderBackend } from "../scene/render-backend.ts";
 
 export interface AppearanceSettingsProps {
   readonly uiTheme: UiThemeStore;
@@ -74,6 +74,14 @@ export function AppearanceSettings(props: AppearanceSettingsProps) {
             backend: activeRenderBackend() ? t(`customize.renderBackend.name.${activeRenderBackend()!}` as MessageKey) : "—",
           })}
         </p>
+        <Show when={webgpuFallback()}>
+          {(reason) => (
+            <p class="settings__muted" data-render-backend-fallback>
+              {t(`customize.renderBackend.fallback.${reason().kind}` as MessageKey)}
+              {reason().message ? `（${reason().message}）` : ""}
+            </p>
+          )}
+        </Show>
         <Show when={backend() !== loadedWith}>
           <p class="settings__muted" data-render-backend-reload>
             {t("customize.renderBackend.reload")}{" "}
