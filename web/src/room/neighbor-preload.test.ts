@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Source } from "../source/source.ts";
-import { neighborRooms, preloadNeighbors } from "./neighbor-preload.ts";
+import { neighborRooms, preloadNeighbors, refreshNeighborSnapshots } from "./neighbor-preload.ts";
 
 /** 赛季服的世界：102×102 个房间，W50N50 在左上角 */
 const SIZE = { width: 102, height: 102 };
@@ -44,6 +44,24 @@ describe("预加载", () => {
     } as unknown as Source;
     await preloadNeighbors(source, "shardSeason", "W13S28", () => alive);
     expect(requested).toEqual(["W13S27"]);
+  });
+
+  it("取到的邻居快照报给 onSnapshot（地图与 Minimap 的所有权据此更新）；刷新时同样报告", async () => {
+    const snapshot = { objects: { c: { type: "controller", user: "u", level: 5 } }, users: {} };
+    const source = {
+      getWorldSize: async () => SIZE,
+      getTerrain: async (_shard: string, room: string) => ({ shard: "shardSeason", room, encoded: "" }),
+      getRoomSnapshot: async (_shard: string, room: string) => {
+        if (room === "W14S28") throw new Error("down");
+        return snapshot;
+      },
+    } as unknown as Source;
+    const seen: string[] = [];
+    await preloadNeighbors(source, "shardSeason", "W13S28", () => true, { onSnapshot: (room) => seen.push(room) });
+    expect(seen).toEqual(["W13S27", "W12S28", "W13S29"]);
+    seen.length = 0;
+    await refreshNeighborSnapshots(source, "shardSeason", "W13S28", () => true, (room) => seen.push(room));
+    expect(seen).toEqual(["W13S27", "W12S28", "W13S29"]);
   });
 
   it("同时取邻居的装饰（#61）；装饰失败、Source 没有这个方法都静默", async () => {

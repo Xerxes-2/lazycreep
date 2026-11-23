@@ -20,7 +20,7 @@ import { errorMessage, type SourceFactory } from "../settings/SettingsPage.tsx";
 import type { Settings } from "../settings/settings.ts";
 import { FixtureSource, fixtureBundle } from "../source/fixture-source.ts";
 import type { RoomDecorations } from "../source/room-decorations.ts";
-import type { Source, StreamError, Terrain } from "../source/source.ts";
+import type { RoomSnapshot, Source, StreamError, Terrain } from "../source/source.ts";
 import { browserStorage, type KeyValueStorage } from "../storage/local-store.ts";
 import { cameraKey } from "./room-camera-store.ts";
 import { RoomDetailsPanel, createRoomControls } from "./room-controls.tsx";
@@ -102,6 +102,11 @@ export interface RoomViewProps {
   readonly msPerTick?: Accessor<number | undefined> | undefined;
   /** Live 房间流每来一帧带 Tick 号的数据就报一次（Top Bar 在流期间以它为准，不发 `game/time`） */
   readonly onLiveTick?: ((shard: string, gameTime: number) => void) | undefined;
+  /**
+   * 看到了一个房间此刻的全部对象时报告：当前房间的实时状态（房间流、快照）与邻居快照；Replay 不报。
+   * 外壳据此即时更新地图与 Minimap 上的所有权（OwnershipHub.observe）
+   */
+  readonly onObserved?: ((shard: string, room: string, seen: RoomSnapshot | RoomState) => void) | undefined;
   /** 房间流按帧提交的调度（frame-throttle.ts）；默认下一个动画帧，测试可换成手动 */
   readonly frameSchedule?: FlushScheduler | undefined;
   /** 画面上的房间状态变化时回报（#26：房间信息区块） */
@@ -248,6 +253,7 @@ export function RoomView(props: RoomViewProps) {
       const throttle = createFrameThrottle(props.frameSchedule ?? animationFrameScheduler, (state: RoomState) => {
         if (latestTick !== undefined) props.onLiveTick?.(current.shard, latestTick);
         setRoomState(state);
+        props.onObserved?.(current.shard, current.room, state);
       });
       onCleanup(() => throttle.dispose());
       onCleanup(
@@ -269,7 +275,12 @@ export function RoomView(props: RoomViewProps) {
     // 房间快照（#63）：等第一帧要 1–4 秒，快照先到就先画（Tick 未知）；第一帧先到则丢弃迟到的快照。Replay 不取
     if (live) {
       void roomSnapshot(src, current.shard, current.room).then(
-        (snapshot) => alive && !streaming && snapshot && setRoomState(roomStateFrom(snapshot)),
+        (snapshot) => {
+          // 第一帧先到则丢弃：快照不比房间流新
+          if (!alive || streaming || !snapshot) return;
+          props.onObserved?.(current.shard, current.room, snapshot);
+          setRoomState(roomStateFrom(snapshot));
+        },
       );
     }
     // 装饰走 Source 的装饰缓存（decoration-cache.ts），从不拒绝
@@ -281,14 +292,24 @@ export function RoomView(props: RoomViewProps) {
         if (!alive) return;
         setTerrain(loaded);
         // 当前房间的地形到了再在后台预加载邻居（neighbor-preload.ts）；页面隐藏时不做
-        void preloadNeighbors(src, current.shard, current.room, () => alive && untrack(visible), { snapshots: live });
+        void preloadNeighbors(src, current.shard, current.room, () => alive && untrack(visible), {
+          snapshots: live,
+          onSnapshot: (room, snapshot) => props.onObserved?.(current.shard, room, snapshot),
+        });
       },
       (error: unknown) => alive && setTerrainError(errorMessage(t, error)),
     );
     // 停留期间定期刷新邻居快照（#63），切过去时不至于过期；页面隐藏时这一轮跳过，Replay 不刷新
     const refresh = live
       ? setInterval(() => {
-          if (alive && untrack(visible)) void refreshNeighborSnapshots(src, current.shard, current.room, () => alive && untrack(visible));
+          if (alive && untrack(visible))
+            void refreshNeighborSnapshots(
+              src,
+              current.shard,
+              current.room,
+              () => alive && untrack(visible),
+              (room, snapshot) => props.onObserved?.(current.shard, room, snapshot),
+            );
         }, SNAPSHOT_REFRESH_MS)
       : undefined;
     onCleanup(() => {

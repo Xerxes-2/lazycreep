@@ -88,3 +88,45 @@ describe("OwnershipHub", () => {
     expect(calls).toHaveLength(1);
   });
 });
+
+describe("OwnershipHub.observe", () => {
+  const controller = (fields: Record<string, unknown>) => ({ c: { type: "controller", ...fields } });
+
+  it("按看到的 controller 改写所有者与 RCL，保留 map-stats 的其余字段，并通知订阅者", async () => {
+    const { hub, calls, settle } = harness();
+    const seen: MapStats[] = [];
+    hub.subscribe((stats) => seen.push(stats));
+    hub.requestRooms([{ shard: "a", room: "W1N1" }]);
+    calls[0]!.resolve({
+      shard: "a",
+      gameTime: 1,
+      rooms: { W1N1: { status: "normal", owner: { user: "u", level: 3 }, mineral: { type: "H", density: 2 } } },
+      users: {},
+    });
+    await settle();
+    hub.observe("a", "W1N1", { objects: controller({ user: "u", level: 4 }), users: { u: { _id: "u", username: "bob" } } });
+    expect(hub.stats("a")?.rooms["W1N1"]).toEqual({ status: "normal", owner: { user: "u", level: 4 }, mineral: { type: "H", density: 2 } });
+    expect(hub.stats("a")?.users["u"]).toMatchObject({ username: "bob" });
+    expect(seen.at(-1)?.rooms).toEqual({ W1N1: hub.stats("a")?.rooms["W1N1"] });
+  });
+
+  it("预定记为 level 0；controller 无主时去掉所有者", () => {
+    const { hub } = harness();
+    hub.observe("a", "W2N2", { objects: controller({ reservation: { user: "v", endTime: 10 } }), users: {} });
+    expect(hub.stats("a")?.rooms["W2N2"]?.owner).toEqual({ user: "v", level: 0 });
+    hub.observe("a", "W2N2", { objects: controller({ level: 0 }), users: {} });
+    expect(hub.stats("a")?.rooms["W2N2"]).toEqual({ status: "normal" });
+  });
+
+  it("没有变化或没有 controller 时不通知", () => {
+    const { hub } = harness();
+    const seen: MapStats[] = [];
+    hub.subscribe((stats) => seen.push(stats));
+    hub.observe("a", "W3N3", { objects: controller({ user: "u", level: 2 }), users: {} });
+    hub.observe("a", "W3N3", { objects: controller({ user: "u", level: 2 }), users: {} });
+    hub.observe("a", "W5N5", { objects: { s: { type: "source" } }, users: {} });
+    hub.observe("a", "W6N6", { objects: controller({}), users: {} });
+    expect(seen).toHaveLength(1);
+    expect(hub.stats("a")?.rooms["W5N5"]).toBeUndefined();
+  });
+});

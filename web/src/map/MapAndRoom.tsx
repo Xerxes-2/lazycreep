@@ -209,6 +209,7 @@ export function MapAndRoom(props: MapAndRoomProps) {
               onBack={() => shell.navigate({ view: "map" })}
               display={display.display()}
               onShownState={setRoomState}
+              onObserved={(shard, room, seen) => ownership().observe(shard, room, seen)}
               onEnterReplay={(target, tick) => shell.navigate(replayAt(target, tick, true))}
             />
           </div>

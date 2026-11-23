@@ -26,6 +26,8 @@ export function neighborRooms(center: string, size: WorldSize): string[] {
 export interface PreloadOptions {
   /** 同时取快照（默认是）；Replay 期间不取 */
   readonly snapshots?: boolean;
+  /** 取到（或从缓存拿到）一个邻居的快照时 */
+  readonly onSnapshot?: (room: string, snapshot: RoomSnapshot) => void;
 }
 
 /** 逐个在后台取邻居的地形、装饰与快照；`alive()` 变 false（换房间、页面隐藏）就停；任何失败都静默（预加载只是优化），从不拒绝 */
@@ -43,7 +45,9 @@ export async function preloadNeighbors(
       await Promise.all([
         source.getTerrain(shard, neighbor).catch(() => undefined),
         roomDecorations(source, shard, neighbor),
-        options.snapshots === false ? undefined : roomSnapshot(source, shard, neighbor),
+        options.snapshots === false
+          ? undefined
+          : roomSnapshot(source, shard, neighbor).then((snapshot) => snapshot && alive() && options.onSnapshot?.(neighbor, snapshot)),
       ]);
     }
   } catch {
@@ -55,14 +59,21 @@ export async function preloadNeighbors(
  * Room View 停留期间定期调用：逐个刷新邻居的快照（比半个 SNAPSHOT_REFRESH_MS 旧的才重新请求），
  * 切过去时快照不至于过期。地形与装饰不刷新（有各自的长期缓存）。规则同 preloadNeighbors：可中止、静默、从不拒绝。
  */
-export async function refreshNeighborSnapshots(source: Source, shard: string, room: string, alive: () => boolean): Promise<void> {
+export async function refreshNeighborSnapshots(
+  source: Source,
+  shard: string,
+  room: string,
+  alive: () => boolean,
+  onSnapshot?: (room: string, snapshot: RoomSnapshot) => void,
+): Promise<void> {
   try {
     const size = await source.getWorldSize(shard);
     for (const neighbor of neighborRooms(room, size)) {
       if (!alive()) return;
       // 只要旧过半个间隔就刷新：定时器在打开房间时就开始计时，邻居快照是之后陆续取到的，
       // 若以整个间隔为界，第一次刷新时它们都还“不够旧”，实际间隔会变成两倍
-      await roomSnapshot(source, shard, neighbor, { maxAgeMs: SNAPSHOT_REFRESH_MS / 2 });
+      const snapshot = await roomSnapshot(source, shard, neighbor, { maxAgeMs: SNAPSHOT_REFRESH_MS / 2 });
+      if (snapshot && alive()) onSnapshot?.(neighbor, snapshot);
     }
   } catch {
     // 取不到世界尺寸等：这一轮不刷新
