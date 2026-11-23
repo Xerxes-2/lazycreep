@@ -6,6 +6,9 @@
  * - “赛季”标识取瓦片根地址：版本信息里本赛季的（`mapTileRoot`，map-tiles.ts），没有时取 Server 的默认根地址；
  *   换赛季或换瓦片来源时存储里的旧地形整体作废（地形可能是从旧瓦片解出来的）。版本信息取不到时只用内存，不写存储。
  * - 条目有上限，按最近使用淘汰：存储里的对象按使用先后排列（JSON 保持字符串键的插入顺序）。
+ * - 自定义 Server（verifyStored）：同一地址、同一瓦片根地址可能换了世界（xxscreeps 换地图、fabot sim 换 `--gen`），
+ *   赛季标识认不出来。每次打开第一次从存储命中时，先把存储里的交给 onPreview，再请求一次核对；
+ *   不一致就丢掉存储里的全部旧地形。核对期间别的房间等结果；核对请求失败时信任存储。官方 Server 不核对（限额）。
  */
 import { isRecord, readJson, writeJson, type KeyValueStorage, type StoredKey } from "../storage/local-store.ts";
 import type { ServerVersion, Terrain, TerrainOptions } from "./source.ts";
@@ -48,6 +51,8 @@ export interface TerrainCacheOptions {
    * 准确就直接用（不发 `room-terrain`），不准确就交给 onPreview 先画，再照常请求
    */
   readonly fromTile?: (shard: string, room: string) => Promise<TileTerrain | undefined>;
+  /** 存储里的地形可能属于同一地址上的旧世界：每次打开核对一次（自定义 Server） */
+  readonly verifyStored?: boolean;
 }
 
 export function createTerrainCache(
@@ -89,7 +94,44 @@ export function createTerrainCache(
     writeJson(options.storage, storageKey, { season: current, rooms });
   };
 
-  return async (shard, room, terrainOptions) => {
+  /** 请求准确地形，存进内存与存储；同一房间同时只发一次 */
+  const fetchInto = (shard: string, room: string, slot: string, current: string | undefined): Promise<Terrain> => {
+    const running = inFlight.get(slot);
+    if (running) return running;
+    const started = options.fetch(shard, room).then((terrain) => {
+      memory.set(slot, terrain);
+      if (current !== undefined) touch(current, slot, terrain.encoded);
+      return terrain;
+    });
+    inFlight.set(slot, started);
+    const done = () => inFlight.delete(slot);
+    started.then(done, done);
+    return started;
+  };
+
+  /** 存储是否可信：verifyStored 时由本次打开第一次从存储命中的房间核对，结果供之后的命中共用 */
+  let storeValid: Promise<boolean> | undefined = options.verifyStored ? undefined : Promise.resolve(true);
+  const verify = async (shard: string, room: string, slot: string, current: string, stored: string, terrainOptions?: TerrainOptions) => {
+    terrainOptions?.onPreview?.({ shard, room, encoded: stored });
+    const fresh = fetchInto(shard, room, slot, current);
+    storeValid = fresh.then(
+      (terrain) => terrain.encoded === stored,
+      () => true,
+    );
+    if (!(await storeValid)) {
+      // 换了世界：存储里只留本次打开后请求到的（都在内存里）
+      const rooms: Record<string, string> = {};
+      for (const [key, terrain] of memory) rooms[key] = terrain.encoded;
+      writeJson(options.storage, storageKey, { season: current, rooms });
+    }
+    return fresh.catch(() => {
+      const terrain = { shard, room, encoded: stored };
+      memory.set(slot, terrain);
+      return terrain;
+    });
+  };
+
+  const get = async (shard: string, room: string, terrainOptions?: TerrainOptions): Promise<Terrain> => {
     const slot = `${shard}/${room}`;
     const current = await season();
     const remembered = memory.get(slot);
@@ -100,6 +142,8 @@ export function createTerrainCache(
     if (current !== undefined) {
       const encoded = read(current)[slot];
       if (encoded !== undefined) {
+        if (!storeValid) return verify(shard, room, slot, current, encoded, terrainOptions);
+        if (!(await storeValid)) return get(shard, room, terrainOptions);
         const terrain = { shard, room, encoded };
         memory.set(slot, terrain);
         touch(current, slot, encoded);
@@ -117,16 +161,7 @@ export function createTerrainCache(
       return terrain;
     }
     if (tile) terrainOptions?.onPreview?.({ shard, room, encoded: tile.encoded });
-    const running = inFlight.get(slot);
-    if (running) return running;
-    const started = options.fetch(shard, room).then((terrain) => {
-      memory.set(slot, terrain);
-      if (current !== undefined) touch(current, slot, terrain.encoded);
-      return terrain;
-    });
-    inFlight.set(slot, started);
-    const done = () => inFlight.delete(slot);
-    started.then(done, done);
-    return started;
+    return fetchInto(shard, room, slot, current);
   };
+  return get;
 }

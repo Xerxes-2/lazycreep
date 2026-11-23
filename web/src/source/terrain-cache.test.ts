@@ -31,7 +31,7 @@ function memoryStorage() {
 const terrainOf = (room: string): Terrain => ({ shard: SHARD, room, encoded: room.padEnd(2500, "0").slice(0, 2500) });
 
 /** 记下每次 getTerrain；版本信息的瓦片根地址可换（模拟换赛季） */
-function network(season: { root: string | null } = { root: "/season-static/season11/map" }) {
+function network(season: { root: string | null } = { root: "/season-static/season11/map" }, world = { seed: "" }) {
   const terrain: string[] = [];
   let fail = false;
   const factory = (server: ServerConfig): Source => {
@@ -41,7 +41,7 @@ function network(season: { root: string | null } = { root: "/season-static/seaso
     base.getTerrain = async (shard, room) => {
       terrain.push(room);
       if (fail) throw new Error("down");
-      return { ...terrainOf(room), shard };
+      return { ...terrainOf(world.seed + room), room, shard };
     };
     return base;
   };
@@ -100,6 +100,66 @@ describe("房间地形缓存", () => {
     const next = network({ root: null });
     await staticCached(next.factory, { storage })({ ...custom, tileRoot: SERVER_TILE_ROOT }, "t").getTerrain(SHARD, "W1N1");
     expect(next.terrain).toEqual(["W1N1"]);
+  });
+
+  describe("自定义 Server（同一地址可能换了世界：xxscreeps 换地图、fabot sim 换 --gen）", () => {
+    const custom = { ...SEASON, id: "custom-sim", tileRoot: "/map-tiles" };
+    const openCustom = (net: ReturnType<typeof network>, storage: ReturnType<typeof memoryStorage>) =>
+      staticCached(net.factory, { storage })(custom, "t");
+    const stale = (room: string): Terrain => ({ ...terrainOf(room), shard: SHARD });
+
+    it("每次打开第一次从存储命中时核对一次：先把存储里的交给 onPreview，地形没变就照旧信任存储", async () => {
+      const storage = memoryStorage();
+      const first = openCustom(network({ root: null }), storage);
+      await first.getTerrain(SHARD, "W1N1");
+      await first.getTerrain(SHARD, "W2N2");
+      const next = network({ root: null });
+      const source = openCustom(next, storage);
+      const previews: Terrain[] = [];
+      expect(await source.getTerrain(SHARD, "W1N1", { onPreview: (t) => previews.push(t) })).toEqual(stale("W1N1"));
+      expect(previews).toEqual([stale("W1N1")]);
+      expect(await source.getTerrain(SHARD, "W2N2")).toEqual(stale("W2N2"));
+      expect(next.terrain).toEqual(["W1N1"]);
+    });
+
+    it("核对出地形变了：以新地形完成，存储里的其余房间整体作废", async () => {
+      const storage = memoryStorage();
+      const first = openCustom(network({ root: null }), storage);
+      await first.getTerrain(SHARD, "W1N1");
+      await first.getTerrain(SHARD, "W2N2");
+      const next = network({ root: null }, { seed: "gen2" });
+      const source = openCustom(next, storage);
+      const fresh = await source.getTerrain(SHARD, "W1N1");
+      expect(fresh.encoded).toBe(terrainOf("gen2W1N1").encoded);
+      expect((await source.getTerrain(SHARD, "W2N2")).encoded).toBe(terrainOf("gen2W2N2").encoded);
+      expect(next.terrain).toEqual(["W1N1", "W2N2"]);
+      // 再刷新：新世界的地形已存好
+      const again = network({ root: null }, { seed: "gen2" });
+      const reopened = openCustom(again, storage);
+      await reopened.getTerrain(SHARD, "W1N1");
+      await reopened.getTerrain(SHARD, "W2N2");
+      expect(again.terrain).toEqual(["W1N1"]);
+    });
+
+    it("核对期间同时要的其他房间等核对结果，不先用存储里的旧地形", async () => {
+      const storage = memoryStorage();
+      const first = openCustom(network({ root: null }), storage);
+      await first.getTerrain(SHARD, "W1N1");
+      await first.getTerrain(SHARD, "W2N2");
+      const next = network({ root: null }, { seed: "gen2" });
+      const source = openCustom(next, storage);
+      const [a, b] = await Promise.all([source.getTerrain(SHARD, "W1N1"), source.getTerrain(SHARD, "W2N2")]);
+      expect(a.encoded).toBe(terrainOf("gen2W1N1").encoded);
+      expect(b.encoded).toBe(terrainOf("gen2W2N2").encoded);
+    });
+
+    it("核对请求失败时用存储里的地形", async () => {
+      const storage = memoryStorage();
+      await openCustom(network({ root: null }), storage).getTerrain(SHARD, "W1N1");
+      const next = network({ root: null });
+      next.setFail(true);
+      expect(await openCustom(next, storage).getTerrain(SHARD, "W1N1")).toEqual(stale("W1N1"));
+    });
   });
 
   it("请求失败不缓存，下次重新请求", async () => {

@@ -14,6 +14,7 @@
  *
  * 用在 sharedSources 之内：每个 Server + token 的共享 Source 自带一份，所有调用方自动受益。
  */
+import { SERVER_PRESETS } from "./servers.ts";
 import type { SourceFactory } from "../settings/SettingsPage.tsx";
 import { isRecord, readJson, writeJson, type KeyValueStorage, type StoredKey } from "../storage/local-store.ts";
 import { rendererFromStored } from "./season-renderer.ts";
@@ -227,6 +228,8 @@ export function withStaticCache(source: Source, options: StaticCacheOptions): So
     getVersion,
     fetch: (shard, room) => source.getTerrain(shard, room),
     ...(options.tilePixels ? { fromTile: tileTerrain(options.tilePixels) } : {}),
+    // 自定义 Server 同一地址可能换了世界，存储里的地形每次打开核对一次；官方 Server 不核对（限额）
+    verifyStored: !Object.hasOwn(SERVER_PRESETS, source.server.id),
   });
 
   /** 房间装饰：一天核对一次，失败时给“没有装饰”（decoration-cache.ts） */
