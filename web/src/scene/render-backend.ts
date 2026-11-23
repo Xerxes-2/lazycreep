@@ -44,7 +44,7 @@ export const reportRenderBackend = (backend: ActiveRenderBackend): void => void 
 
 /** WebGPU 不可用卡在哪一步（与 Pixi 的 isWebGPUSupported 同样三步） */
 export interface WebGPUFallback {
-  readonly kind: "no-api" | "no-adapter" | "no-device";
+  readonly kind: "insecure" | "no-api" | "no-adapter" | "no-device";
   readonly message?: string;
 }
 
@@ -58,8 +58,10 @@ const messageOf = (error: unknown) => ({ message: error instanceof Error ? error
 /** 可用时 undefined；否则说明卡在哪一步 */
 export async function probeWebGPU(
   gpu: GpuLike | undefined = (globalThis.navigator as { gpu?: GpuLike } | undefined)?.gpu,
+  secure: boolean = globalThis.isSecureContext ?? true,
 ): Promise<WebGPUFallback | undefined> {
-  if (!gpu) return { kind: "no-api" };
+  // navigator.gpu 是 [SecureContext]：http 只有 localhost 算安全，局域网 / Tailscale 地址都不算
+  if (!gpu) return { kind: secure ? "no-api" : "insecure" };
   let adapter: Awaited<ReturnType<GpuLike["requestAdapter"]>>;
   try {
     adapter = await gpu.requestAdapter();

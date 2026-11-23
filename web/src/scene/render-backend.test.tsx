@@ -107,6 +107,8 @@ describe("外观设置里的渲染后端", () => {
 describe("WebGPU 探测（Pixi 退回 WebGL 时不说原因）", () => {
   it("没有 navigator.gpu / 适配器为空 / requestDevice 失败 / 正常", async () => {
     expect(await probeWebGPU(undefined)).toEqual({ kind: "no-api" });
+    // WebGPU 只在安全上下文里有：用局域网 / Tailscale 的 http 地址打开时没有 navigator.gpu
+    expect(await probeWebGPU(undefined, false)).toEqual({ kind: "insecure" });
     expect(await probeWebGPU({ requestAdapter: async () => null })).toEqual({ kind: "no-adapter" });
     const failing = { requestAdapter: async () => ({ requestDevice: async () => Promise.reject(new Error("lost")) }) };
     expect(await probeWebGPU(failing)).toEqual({ kind: "no-device", message: "lost" });

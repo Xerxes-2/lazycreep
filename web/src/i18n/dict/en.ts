@@ -292,6 +292,7 @@ export const en: Partial<Record<MessageKey, string>> = {
   "customize.renderBackend.name.webgl": "WebGL",
   "customize.renderBackend.name.webgpu": "WebGPU",
   "customize.renderBackend.name.canvas": "Canvas (neither WebGL nor WebGPU available)",
+  "customize.renderBackend.fallback.insecure": "WebGPU not used: the page is not a secure context (over http only localhost counts; LAN or Tailscale http addresses do not), so the browser hides navigator.gpu; open it over https or localhost",
   "customize.renderBackend.fallback.no-api": "WebGPU not used: the browser has no navigator.gpu (WebGPU disabled or browser too old)",
   "customize.renderBackend.fallback.no-adapter": "WebGPU not used: requestAdapter returned no adapter (the browser blocks WebGPU on this GPU or OS)",
   "customize.renderBackend.fallback.no-device": "WebGPU not used: the adapter could not create a device",

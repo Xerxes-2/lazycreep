@@ -290,6 +290,7 @@ export const zhCN = {
   "customize.renderBackend.name.webgl": "WebGL",
   "customize.renderBackend.name.webgpu": "WebGPU",
   "customize.renderBackend.name.canvas": "Canvas（WebGL 与 WebGPU 都不可用）",
+  "customize.renderBackend.fallback.insecure": "WebGPU 没用上：页面不是安全上下文（http 只有 localhost 算安全，局域网或 Tailscale 的 http 地址不算），浏览器不提供 navigator.gpu；改用 https 或 localhost 打开",
   "customize.renderBackend.fallback.no-api": "WebGPU 没用上：浏览器没有 navigator.gpu，WebGPU 没开启或浏览器太旧",
   "customize.renderBackend.fallback.no-adapter": "WebGPU 没用上：requestAdapter 没给适配器，浏览器把这块显卡或系统挡在了 WebGPU 之外",
   "customize.renderBackend.fallback.no-device": "WebGPU 没用上：适配器建不出设备",
