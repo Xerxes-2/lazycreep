@@ -315,16 +315,67 @@ describe("Pixi 适配层", () => {
         expect(sprite().texture).toBe(shown);
         expect(textures.unloads).toEqual([]);
 
-        // 还没就绪又换了一次：仍显示最早那张，中间那张不再需要
+        // 还没就绪又换了几次（墙每个 Tick 都在变）：仍显示最早那张；同时只加载一张，中间的不加载
         view.show(imageScene(tile("t", "/big/c")));
+        view.show(imageScene(tile("t", "/big/d")));
         frames.flush();
         expect(sprite().visible).toBe(true);
         expect(sprite().texture).toBe(shown);
-        expect(textures.unloads).toEqual(["/big/b"]);
+        expect(textures.loads).toEqual(["/big/a", "/big/b"]);
+        expect(textures.unloads).toEqual([]);
 
-        await textures.resolve("/big/c");
+        // b 就绪：先换上它（放掉 a），再加载最新的 d；c 从没加载
+        await textures.resolve("/big/b");
         frames.flush();
-        expect(textures.unloads).toEqual(["/big/b", "/big/a"]);
+        expect(sprite().visible).toBe(true);
+        expect(textures.unloads).toEqual(["/big/a"]);
+        expect(textures.loads).toEqual(["/big/a", "/big/b", "/big/d"]);
+
+        await textures.resolve("/big/d");
+        frames.flush();
+        expect(sprite().visible).toBe(true);
+        expect(textures.unloads).toEqual(["/big/a", "/big/b"]);
+        expect(textures.loads).toEqual(["/big/a", "/big/b", "/big/d"]);
+      });
+
+      it("换 url 后加载失败：继续显示旧纹理；之后再换 url 立即加载", async () => {
+        const frames = manualFrames();
+        const textures = manualTextures();
+        const renderer = await canvasRenderer();
+        const render = vi.spyOn(renderer, "render");
+        const view = await createSceneView({
+          width: 400,
+          height: 300,
+          renderer,
+          schedule: frames.schedule,
+          textures: { ...textures.textures, transient: (url: string) => url.startsWith("/big/") },
+        });
+        views.push(view);
+        const sprite = () => (render.mock.calls.at(-1)?.[0] as unknown as { container: Container }).container.getChildByLabel("t", true) as Sprite;
+        view.show(imageScene(tile("t", "/big/a")));
+        frames.flush();
+        await textures.resolve("/big/a");
+        view.show(imageScene(tile("t", "/big/b")));
+        await textures.reject("/big/b");
+        frames.flush();
+        expect(sprite().visible).toBe(true);
+        view.show(imageScene(tile("t", "/big/c")));
+        expect(textures.loads).toEqual(["/big/a", "/big/b", "/big/c"]);
+        await textures.resolve("/big/c");
+        expect(textures.unloads).toEqual(["/big/a"]);
+      });
+
+      it("换 url 期间又换回正在显示的那张：放掉在加载的，照旧显示", async () => {
+        const { view, step, textures } = await withTextures();
+        const transientView = view;
+        transientView.show(imageScene(tile("t", "/t/a.png")));
+        step();
+        await textures.resolve("/t/a.png");
+        transientView.show(imageScene(tile("t", "/t/b.png")));
+        transientView.show(imageScene(tile("t", "/t/a.png")));
+        await textures.resolve("/t/b.png");
+        // b 已经没人用：闲置（非 transient），没有再请求别的
+        expect(textures.loads).toEqual(["/t/a.png", "/t/b.png"]);
       });
 
       describe("可缩放的大贴图（房间级合成贴图）的档位", () => {
