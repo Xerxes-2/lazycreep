@@ -146,8 +146,9 @@ describe("Room View 页面", () => {
     watch("shardSeason", "W13S28");
     await settle(() => expect(tick()).toBe("1025238"));
 
-    // 首帧没有 gameTime，之后每帧一个新 Scene
-    expect(shown.length).toBeGreaterThanOrEqual(50);
+    // 首帧没有 gameTime；录制数据以 speed: Infinity 尽快推 50 个 Tick，比屏幕帧快：
+    // 每个动画帧至多提交一次（frame-throttle.ts），Scene 少于 Tick 数，最后停在最新的 Tick
+    expect(shown.length).toBeGreaterThan(1);
     const first = shown[0]!;
     const last = shown.at(-1)!;
     expect(last).not.toEqual(first);

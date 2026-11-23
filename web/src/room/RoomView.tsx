@@ -29,6 +29,8 @@ import { nextFacings, type Facings } from "./movement-tween.ts";
 import { PickList } from "./PickList.tsx";
 import { pickEntries } from "./pick-list.ts";
 import { ownerColorRule } from "./room-detail-rules.ts";
+import { createFrameThrottle } from "./frame-throttle.ts";
+import { animationFrameScheduler, type FlushScheduler } from "../source/room-map-hub.ts";
 import { reduceLiveTick, roomStateFrom, type RoomState } from "./room-state.ts";
 import type { HistoryCache } from "../replay/history-cache.ts";
 import { createReplayController } from "../replay/replay-controller.ts";
@@ -100,6 +102,8 @@ export interface RoomViewProps {
   readonly msPerTick?: Accessor<number | undefined> | undefined;
   /** Live 房间流每来一帧带 Tick 号的数据就报一次（Top Bar 在流期间以它为准，不发 `game/time`） */
   readonly onLiveTick?: ((shard: string, gameTime: number) => void) | undefined;
+  /** 房间流按帧提交的调度（frame-throttle.ts）；默认下一个动画帧，测试可换成手动 */
+  readonly frameSchedule?: FlushScheduler | undefined;
   /** 画面上的房间状态变化时回报（#26：房间信息区块） */
   readonly onShownState?: ((state: RoomState | undefined) => void) | undefined;
   /** 给了就由它进入 Replay（外壳经 navigate 打开 `#/replay?…`，#26）；不给时 Room View 自己打开 */
@@ -237,6 +241,15 @@ export function RoomView(props: RoomViewProps) {
     createEffect(() => {
       if (!live || !visible()) return;
       streaming = false;
+      // 增量逐个合并进 latest（便宜），房间状态每个动画帧至多提交一次（frame-throttle.ts）：
+      // 私服几毫秒一个 Tick 时，画不出来的 Tick 不重建 Scene
+      let latest: RoomState | undefined;
+      let latestTick: number | undefined;
+      const throttle = createFrameThrottle(props.frameSchedule ?? animationFrameScheduler, (state: RoomState) => {
+        if (latestTick !== undefined) props.onLiveTick?.(current.shard, latestTick);
+        setRoomState(state);
+      });
+      onCleanup(() => throttle.dispose());
       onCleanup(
         src.subscribeRoom(
           current.shard,
@@ -245,8 +258,9 @@ export function RoomView(props: RoomViewProps) {
             // 第一帧是全量：整体替换快照或旧状态（不当增量合并，否则已不存在的对象会残留）
             const first = !streaming;
             streaming = true;
-            if (tick.gameTime !== undefined) props.onLiveTick?.(current.shard, tick.gameTime);
-            setRoomState((state) => reduceLiveTick(first ? undefined : state, tick));
+            if (tick.gameTime !== undefined) latestTick = tick.gameTime;
+            latest = reduceLiveTick(first ? undefined : latest, tick);
+            throttle.push(latest);
           },
           setStreamError,
         ),
