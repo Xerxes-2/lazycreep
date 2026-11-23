@@ -141,6 +141,8 @@ function createTextureCache(loader: TextureLoader, limit: number, pixelsPerUnit:
   const slots = new Map<string, Slot>();
   /** 插入顺序即闲置先后 */
   const idle = new Set<string>();
+  /** url 换了、新纹理还没就绪的 sprite → 它仍在显示的旧 url */
+  const held = new Map<Sprite, string>();
   let closed = false;
 
   const paint = (sprite: Sprite, p: ImagePrimitive, texture: Texture | undefined) => {
@@ -185,7 +187,14 @@ function createTextureCache(loader: TextureLoader, limit: number, pixelsPerUnit:
           return;
         }
         slot.texture = texture;
-        for (const [sprite, p] of slot.users) paint(sprite, p, texture);
+        for (const [sprite, p] of slot.users) {
+          const shown = held.get(sprite);
+          if (shown !== undefined && shown !== url) {
+            held.delete(sprite);
+            release(sprite, shown);
+          }
+          paint(sprite, p, texture);
+        }
         if (slot.users.size > 0) onLoaded();
         // 在途期间又需要更大的
         request(url, slot);
@@ -205,29 +214,53 @@ function createTextureCache(loader: TextureLoader, limit: number, pixelsPerUnit:
     return slot;
   };
 
+  /** sprite 不再用 url 的纹理 */
+  const release = (sprite: Sprite, url: string) => {
+    const slot = slots.get(url);
+    if (!slot) return;
+    slot.users.delete(sprite);
+    if (slot.users.size === 0 && loader.transient?.(url)) {
+      slots.delete(url);
+      if (slot.texture || slot.loading) loader.unload(url);
+    } else if (slot.users.size === 0) {
+      idle.add(url);
+      evict();
+    }
+  };
+
   return {
-    /** 让 sprite 显示 p；url 变了就换纹理。 */
+    /**
+     * 让 sprite 显示 p；url 变了就换纹理。新纹理就绪前仍显示旧的（held），就绪后才放掉旧的：
+     * 合成贴图（地形、rampart）是 transient，换 url 时旧的立即卸载，否则放下 constructedWall 时整块地形会空一下。
+     */
     attach(sprite: Sprite, p: ImagePrimitive, previous?: ImagePrimitive) {
-      if (previous && previous.url !== p.url) this.detach(sprite, previous.url);
       const slot = slotFor(p);
       idle.delete(p.url);
       slot.users.set(sprite, p);
       slot.extentW = Math.max(slot.extentW, Math.abs(p.width));
       slot.extentH = Math.max(slot.extentH, Math.abs(p.height));
+      let shown = held.get(sprite);
+      held.delete(sprite);
+      if (previous && previous.url !== p.url) {
+        if (shown === undefined && slots.get(previous.url)?.texture) shown = previous.url;
+        else if (previous.url !== shown) release(sprite, previous.url);
+      }
+      if (shown === p.url) shown = undefined;
+      const shownSlot = shown === undefined ? undefined : slots.get(shown);
+      if (shown !== undefined && shownSlot && !slot.texture) {
+        held.set(sprite, shown);
+        shownSlot.users.set(sprite, p);
+      } else if (shown !== undefined) {
+        release(sprite, shown);
+      }
       request(p.url, slot);
-      paint(sprite, p, slot.texture);
+      paint(sprite, p, slot.texture ?? (held.has(sprite) ? shownSlot?.texture : undefined));
     },
     detach(sprite: Sprite, url: string) {
-      const slot = slots.get(url);
-      if (!slot) return;
-      slot.users.delete(sprite);
-      if (slot.users.size === 0 && loader.transient?.(url)) {
-        slots.delete(url);
-        if (slot.texture || slot.loading) loader.unload(url);
-      } else if (slot.users.size === 0) {
-        idle.add(url);
-        evict();
-      }
+      release(sprite, url);
+      const shown = held.get(sprite);
+      held.delete(sprite);
+      if (shown !== undefined) release(sprite, shown);
     },
     /** 缩放变了：在用的可缩放贴图需要时升档 */
     rescale() {
@@ -238,6 +271,7 @@ function createTextureCache(loader: TextureLoader, limit: number, pixelsPerUnit:
       for (const [url, slot] of slots) if (slot.texture || slot.loading) loader.unload(url);
       slots.clear();
       idle.clear();
+      held.clear();
     },
   };
 }

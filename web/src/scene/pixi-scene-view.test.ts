@@ -5,7 +5,7 @@
  * 文字测量、逐对象绘制调用）都真实走一遍，只是像素不落地。
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { autoDetectRenderer, Graphics, RendererType, Texture, type Container, type Filter } from "pixi.js";
+import { autoDetectRenderer, Graphics, RendererType, Texture, type Container, type Filter, type Sprite } from "pixi.js";
 import type { ImagePrimitive, Primitive, PrimitiveAnimation, Scene } from "./scene.ts";
 import { createSceneView, LIGHTING_LABEL, type SceneRenderer, type SceneView } from "./pixi-scene-view.ts";
 import { encodePixelImage } from "./pixel-image.ts";
@@ -276,10 +276,55 @@ describe("Pixi 适配层", () => {
         await textures.resolve("/big/W1N1");
         await textures.resolve("/t/a.png");
         view.show(imageScene(tile("t", "/big/W2N2")));
+        // 新贴图就绪前旧的还在显示，就绪后才卸载
+        expect(textures.unloads).toEqual([]);
+        await textures.resolve("/big/W2N2");
         expect(textures.unloads).toEqual(["/big/W1N1"]);
         // 回到原来的贴图要重新加载
         view.show(imageScene(tile("t", "/big/W1N1")));
         expect(textures.loads).toEqual(["/big/W1N1", "/t/a.png", "/big/W2N2", "/big/W1N1"]);
+      });
+
+      it("同一图元换了 url（放下 constructedWall 后地形合成贴图重算）：新纹理就绪前继续显示旧纹理，不闪", async () => {
+        const frames = manualFrames();
+        const textures = manualTextures();
+        const renderer = await canvasRenderer();
+        const render = vi.spyOn(renderer, "render");
+        const view = await createSceneView({
+          width: 400,
+          height: 300,
+          renderer,
+          schedule: frames.schedule,
+          textures: { ...textures.textures, transient: (url: string) => url.startsWith("/big/") },
+        });
+        views.push(view);
+        const sprite = () => {
+          const stage = render.mock.calls.at(-1)?.[0] as { container: Container } | undefined;
+          return stage!.container.getChildByLabel("t", true) as Sprite;
+        };
+        view.show(imageScene(tile("t", "/big/a")));
+        frames.flush();
+        await textures.resolve("/big/a");
+        frames.flush();
+        expect(sprite().visible).toBe(true);
+        const shown = sprite().texture;
+
+        view.show(imageScene(tile("t", "/big/b")));
+        frames.flush();
+        expect(sprite().visible).toBe(true);
+        expect(sprite().texture).toBe(shown);
+        expect(textures.unloads).toEqual([]);
+
+        // 还没就绪又换了一次：仍显示最早那张，中间那张不再需要
+        view.show(imageScene(tile("t", "/big/c")));
+        frames.flush();
+        expect(sprite().visible).toBe(true);
+        expect(sprite().texture).toBe(shown);
+        expect(textures.unloads).toEqual(["/big/b"]);
+
+        await textures.resolve("/big/c");
+        frames.flush();
+        expect(textures.unloads).toEqual(["/big/b", "/big/a"]);
       });
 
       describe("可缩放的大贴图（房间级合成贴图）的档位", () => {
