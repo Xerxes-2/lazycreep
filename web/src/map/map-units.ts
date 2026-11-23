@@ -1,7 +1,8 @@
 /**
- * World Map 的“单位”图层（#44），照官方 @screeps/map 的 UnitsLayer（docs/research/official-art-and-badges.md C 节）：
+ * World Map 的“单位”图层（#44），配色照官方 @screeps/map 的 UnitsLayer（docs/research/official-art-and-badges.md C 节）：
  * 已订阅 roomMap2 的每个房间画一张 50×50 的像素图（一格一像素，units-raster.ts，与 Minimap 同一画法），
- * 以加色混合叠在地形瓦片上。
+ * 直接盖在地形瓦片上、不加色：照官方默认世界地图（#!/map，Angular 的 appGameMapRoomObjects，putImageData）。
+ * 新版 #!/map2 的 @screeps/map 以加色混合叠上去，人工墙是纯黑，加色就看不见了。
  *
  * - 数据：use-map-info.ts 把每个房间最近一帧 roomMap2 原样记进 MapState.units（与 Power Bank 同一个订阅）。
  * - 选像素图而不是每点一个 rect：一个房间可有数百个点（道路、墙），可见的上百个房间就是数万个图元，
@@ -50,7 +51,6 @@ export function createUnitsPainter(encode?: (image: PixelImage) => string): MapL
         width: 1,
         height: 1,
         url,
-        blend: "add",
       });
     }
     return out;

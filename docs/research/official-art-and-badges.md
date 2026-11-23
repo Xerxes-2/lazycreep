@@ -90,6 +90,7 @@
 
 - **订阅**：`UnitsSubscriber` 对当前视野内的每个房间（`getRoomsInBound(bound)`）订阅 `roomMap2:<shard>/<room>`，移出视野即退订（`main.js` 约 222667–222744）。
 - **缩放门槛**：缩放参数 `scale < 50` 时 `unitsRestricted = true`，单位图层隐藏并停止订阅；`scale >= 50` 才显示（约 220891–220897；默认 `scale` 即 50）。
+- **两套世界地图**（2026-11-23 补充）：默认入口 `#!/map/:shard` 是旧版 Angular 世界地图（`components/game/world-map/world-map.html`），每房间一个 `app-game-map-room-objects`（`map-scale='3'`，`build.min.js` 的 `appGameMapRoomObjects`），同一份 COLORS 用 `putImageData` 直接写像素、**不加色**，所以黑色的人工墙（`w`）看得见；Room View 的小地图也是它。下面的 `@screeps/map` 是新版入口 `#!/map2`，以 ADD（`[ONE, ONE]`）叠上去，`w` 的纯黑加上去等于没画。`game/rooms?encoded=true` 给的地形只有自然地形，不含人工墙（PTR shard3 W42N13 核对）。本项目的 World Map 与 Minimap 都照旧版不加色。
 - **绘制**：`UnitsLayer.draw` 为每个房间生成一张 50×50 像素的纹理（一格一像素，`PIXI.Texture.fromBuffer`），以 `BLEND_MODES.ADD` 叠在地形瓦片上；每收到一帧该房间的 roomMap2 就重画（`@screeps/map/dist/layers/units.js`、`utils.js` 的 `roomObjects`）。
 - **配色**：固定类别 `COLORS`——`2`/`3`（Invader / Source Keeper）`[255,150,0]`、`w` 墙 `[0,0,0]`、`r` 道路 `[60,60,60]`、`pb` `[255,255,255]`、`m` 矿 `[170,170,170]`、`p` portal `[0,200,255]`、`k` Keeper 巢 `[100,0,0]`、`c` 控制器 `[80,80,80]`、`s` Source `[255,242,70]`；玩家（24 位 id 的键）用 `user.playerColor || user.badge.color1`；其余未知键 `[235,85,71]`（约 156970–157010、221110–221127）。
 - **对本项目的含义**：#17 / room-map-hub 已在每房间 ≥48px 时订阅视野内房间的 roomMap2，但只取 `pb`；画出全部点即可得到同样的效果，不需要新的数据通路。玩家颜色按用户决定沿用本项目的我方 / 盟友 / 陌生人规则，而非官方的徽章第一色。

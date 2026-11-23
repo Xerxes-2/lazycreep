@@ -6,7 +6,7 @@
  * （官方客户端即如此：每格一个 roomMap2 订阅）。位置与 World Map 的单位图层同一种像素图：每房间一张
  * 50×50（一格一像素，units-raster.ts），但不加色、直接盖在地形上：照官方 Angular 小地图
  * （build.min.js 的 appGameMapRoomObjects，putImageData），人工墙是黑色，加色就看不见了
- * （World Map 照 @screeps/map 加色，那里墙本来就不显示）。世界之外的格子什么都不画，也不可点。
+ * （World Map 同样不加色，见 map-units.ts）。世界之外的格子什么都不画，也不可点。
  */
 import { parseRoomName, roomName, worldOffset } from "../map/map-state.ts";
 import type { Color, Primitive, Scene } from "../scene/scene.ts";

@@ -333,7 +333,7 @@ describe("World Map 页面", () => {
       await settle(() =>
         expect(lastScene().primitives.find((p) => p.key === "pb:W13S28:0")).toMatchObject({ kind: "circle" }),
       );
-      expect(lastScene().primitives.find((p) => p.key === "units:W13S28")).toMatchObject({ kind: "image", blend: "add" });
+      expect(lastScene().primitives.find((p) => p.key === "units:W13S28")).toMatchObject({ kind: "image" });
       for (let i = 0; i < 10; i++) wheel(screenOf(W13S28.x, W13S28.y), 200);
       await settle(() => expect(roomMaps.size).toBe(0));
       expect(lastScene().primitives.some((p) => p.key.startsWith("units:"))).toBe(false);

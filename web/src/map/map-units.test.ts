@@ -53,11 +53,13 @@ function pixel(image: ImagePrimitive, x: number, y: number): number[] {
 const rgb = (color: number) => [(color >> 16) & 0xff, (color >> 8) & 0xff, color & 0xff, 255];
 
 describe("World Map 单位图层", () => {
-  it("每个房间一张 50×50 的像素图盖满房间格，以加色混合叠在地形瓦片之上", () => {
+  it("每个房间一张 50×50 的像素图盖满房间格，直接盖在地形瓦片之上", () => {
     const state = applyRoomUnits(world(), "W13S28", { s: [[10, 20]] });
     const [image, ...rest] = unitImages(state);
     expect(rest).toEqual([]);
-    expect(image).toMatchObject({ x: 37, y: 79, width: 1, height: 1, blend: "add" });
+    expect(image).toMatchObject({ x: 37, y: 79, width: 1, height: 1 });
+    // 不加色：官方默认世界地图（#!/map，appGameMapRoomObjects）直接写像素，黑色的人工墙才看得见
+    expect(image?.blend ?? "normal").toBe("normal");
     expect(image!.layer).toBeGreaterThan(MAP_LAYER.tile);
     const decoded = decodePixelImage(image!.url)!;
     expect([decoded.width, decoded.height]).toEqual([50, 50]);
