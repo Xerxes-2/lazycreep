@@ -62,16 +62,11 @@ export function worldOffset(size: WorldSize): RoomCoord {
 
 /**
  * 求世界左上角要查 map-stats 的房间：锚点所在的行与列，两边各延伸一个世界宽。
- * 锚点落在居中的世界里时为空——当作居中（官服），不多发请求。
- * shortcut: 与居中范围重叠的裁剪世界会被当成居中；遇到再改成总是探测。
+ * 锚点落在居中范围里也要探：fabot sim 的世界是 E0S0–E10S10，起始房间照样落在居中的 W4N4–E5S5 里。
  */
 export function originProbe(size: WorldSize, anchor: string): string[] {
   const at = parseRoomName(anchor);
   if (!at) return [];
-  const offset = worldOffset({ width: size.width, height: size.height });
-  const wx = at.x + offset.x;
-  const wy = at.y + offset.y;
-  if (wx >= 0 && wy >= 0 && wx < size.width && wy < size.height) return [];
   const rooms: string[] = [];
   for (let d = 1 - size.width; d < size.width; d++) rooms.push(roomName({ x: at.x + d, y: at.y }));
   for (let d = 1 - size.height; d < size.height; d++) if (d !== 0) rooms.push(roomName({ x: at.x, y: at.y + d }));

@@ -23,7 +23,7 @@ import { createDecorationCache } from "./decoration-cache.ts";
 import { createSnapshotCache } from "./snapshot-cache.ts";
 import { createTerrainCache } from "./terrain-cache.ts";
 import { decodeTileTerrain, type TilePixels } from "./tile-terrain.ts";
-import { roomName, type RoomCoord } from "../map/map-state.ts";
+import { roomName, worldOffset, type RoomCoord } from "../map/map-state.ts";
 import type { ServerVersion, ShardInfo, Source, UserInfo, WorldSize } from "./source.ts";
 
 /** 每个 Server 一个键：`msc.staticCache.<server id>` */
@@ -198,10 +198,12 @@ export function withStaticCache(source: Source, options: StaticCacheOptions): So
       store.update((stored) => ({ ...stored, worlds: { ...stored.worlds, [shard]: entry } }));
     };
     const size = await cached(slot, store.read().worlds?.[shard], WORLD_SIZE_FRESH_MS, fetch, save);
-    // 私服可以在同一地址上换一个世界（xxscreeps 换地图重开）：缓存的原点房间不在了就重取
-    if (!size.origin || memory.has(slot)) return size;
+    // 私服可以在同一地址上换一个世界（xxscreeps 换地图重开）：缓存的原点房间不在了就重取。
+    // 自定义 Server 没有原点的缓存是旧版按居中猜的，核对居中的左上角
+    if (memory.has(slot) || (!size.origin && Object.hasOwn(SERVER_PRESETS, source.server.id))) return size;
+    const offset = worldOffset(size);
     let check = cornerChecks.get(shard);
-    if (!check) cornerChecks.set(shard, (check = cornerGone(shard, size.origin)));
+    if (!check) cornerChecks.set(shard, (check = cornerGone(shard, size.origin ?? { x: -offset.x, y: -offset.y })));
     return (await check) ? refresh(slot, fetch, save) : size;
   };
 

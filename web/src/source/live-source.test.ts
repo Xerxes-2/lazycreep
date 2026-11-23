@@ -302,6 +302,22 @@ describe("LiveSource Console 命令", () => {
     expect(await source.getWorldSize("shard0")).toEqual({ width: 5, height: 5, origin: { x: 23, y: 7 } });
   });
 
+  it("世界只在东南象限（fabot sim E0S0–E10S10）：起始房间落在居中范围里也探，不当成居中", async () => {
+    const privateServer: ServerConfig = { ...SEASON, id: "custom-sim", apiRoot: "/api", sharded: false };
+    const stats: Record<string, { status: string }> = {};
+    for (let x = 0; x <= 10; x++) for (let y = 0; y <= 10; y++) stats[`E${x}S${y}`] = { status: "normal" };
+    const { source } = live({
+      server: privateServer,
+      token: TOKEN,
+      routes: {
+        "/api/game/world-size": { body: { ok: 1, width: 11, height: 11 } },
+        "/api/user/world-start-room": { body: { ok: 1, room: ["E2S4"] } },
+        "/api/game/map-stats": { body: { ok: 1, gameTime: 1, stats, users: {} } },
+      },
+    });
+    expect(await source.getWorldSize("shard0")).toEqual({ width: 11, height: 11, origin: { x: 0, y: 0 } });
+  });
+
   it("没有 token、起始房间未授权：按居中猜，标为 guessed，不探 map-stats", async () => {
     const privateServer: ServerConfig = { ...SEASON, id: "private", apiRoot: "/api", sharded: false };
     const { source, seen } = live({

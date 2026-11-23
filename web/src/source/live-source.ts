@@ -45,6 +45,7 @@ import {
 } from "./source.ts";
 import { mapTileUrls, type MapTiles } from "./map-tiles.ts";
 import { originOf, originProbe, parseRoomName } from "../map/map-state.ts";
+import { SERVER_PRESETS } from "./servers.ts";
 import type { VisibilitySignal } from "../power/visibility.ts";
 import { browserSocket, ChannelSocket, type ReconnectOptions, type SocketFactory } from "./socket.ts";
 import {
@@ -338,7 +339,7 @@ export class LiveSource implements Source {
     return mapTileUrls(version?.mapTileRoot ?? this.server.tileRoot, shard);
   }
 
-  /** world-size 不说世界在哪：裁剪过的私服（xxscreeps）不以 W0N0 为中心，以起始房间为锚探出左上角。 */
+  /** world-size 不说世界在哪：私服（xxscreeps 裁剪的地图、fabot sim 的 E0S0 起）不一定以 W0N0 为中心，以起始房间为锚探出左上角。官服居中，不探。 */
   async getWorldSize(shard: string): Promise<WorldSize> {
     const wire = await this.api<WireWorldSize>("/game/world-size", this.shardQuery(shard));
     const size = { width: wire.width, height: wire.height };
@@ -346,8 +347,8 @@ export class LiveSource implements Source {
     const anchor = Array.isArray(start?.room) && typeof start.room[0] === "string" ? start.room[0].replace(/^.*:/, "") : "";
     // map-stats 不要 token，却要先知道房间；room-status 在 xxscreeps 上什么房间都答 normal：匿名时没有可用的锚点
     if (!parseRoomName(anchor)) return { ...size, guessed: true };
+    if (Object.hasOwn(SERVER_PRESETS, this.server.id)) return size;
     const probe = originProbe(size, anchor);
-    if (probe.length === 0) return size;
     const stats = await this.getMapStats(shard, probe);
     const origin = originOf(Object.entries(stats.rooms).flatMap(([room, s]) => (s.status === "out of borders" ? [] : [room])));
     return origin ? { ...size, origin } : size;

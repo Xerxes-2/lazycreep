@@ -187,6 +187,31 @@ describe("静态数据：持久化缓存", () => {
     expect(await size).toEqual(now);
   });
 
+  it("自定义 Server 缓存里是按居中猜的尺寸（旧版没探原点）：居中的左上角房间不在就重取", async () => {
+    const SIM: ServerConfig = { ...SEASON, id: "custom-sim", apiRoot: "/api", sharded: false };
+    const storage = memoryStorage();
+    const first = network();
+    const before = staticCached(first.factory, { storage })(SIM, "t");
+    const got = before.getWorldSize("shard0");
+    first.sizes[0]!.pending.resolve({ width: 11, height: 11 });
+    await got;
+    before.close();
+
+    const net = network();
+    const probed: string[][] = [];
+    const factory = (server: ServerConfig): Source => {
+      const base = net.factory(server);
+      base.getMapStats = (shard, rooms) => (probed.push([...rooms]), Promise.resolve({ shard, gameTime: 1, rooms: {}, users: {} }));
+      return base;
+    };
+    const size = staticCached(factory, { storage })(SIM, "t").getWorldSize("shard0");
+    await flush();
+    expect(probed).toEqual([["W4N4"]]);
+    const now: WorldSize = { width: 11, height: 11, origin: { x: 0, y: 0 } };
+    net.sizes[0]!.pending.resolve(now);
+    expect(await size).toEqual(now);
+  });
+
   it("按 Server 分开：别的 Server 不用这份缓存；世界尺寸按 Shard 分开", async () => {
     const storage = memoryStorage();
     const first = network();

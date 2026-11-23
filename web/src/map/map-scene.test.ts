@@ -73,8 +73,10 @@ describe("MapState", () => {
     expect(minerals).toEqual(["mineral:E25S8", "mineral:E26S8"]);
   });
 
-  it("origin 的探测：锚点在居中世界里不探；否则探锚点的行与列，取最左最上的存在房间", () => {
-    expect(originProbe({ width: 102, height: 102 }, "W13S28")).toEqual([]);
+  it("origin 的探测：探锚点的行与列（两边各一个世界宽），取最左最上的存在房间", () => {
+    // 锚点落在居中范围里也探：fabot sim 是 E0S0–E10S10，起始房间 E2S4 在居中的 W4N4–E5S5 里
+    const sim = originProbe({ width: 11, height: 11 }, "E2S4");
+    expect(originOf(sim.filter((r) => /^E([0-9]|10)S([0-9]|10)$/.test(r)))).toEqual({ x: 0, y: 0 });
     const probe = originProbe({ width: 5, height: 5 }, "E25S9");
     expect(probe).toHaveLength(9 + 8);
     expect(probe).toContain("E21S9");
