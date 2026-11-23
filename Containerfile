@@ -35,4 +35,4 @@ ENV MSC_ADDRESS=0.0.0.0 \
     XDG_CONFIG_HOME=/tmp
 USER nobody
 EXPOSE 8080
-ENTRYPOINT ["/bin/sh", "-c", ". /etc/lazycreep/defaults.sh && export MSC_API_UPSTREAM MSC_TILES_UPSTREAM MSC_SEASON_STATIC_UPSTREAM MSC_POST_ALLOWLIST && exec caddy run --adapter caddyfile --config /etc/lazycreep/Caddyfile \"$@\"", "--"]
+ENTRYPOINT ["/bin/sh", "-c", ". /etc/lazycreep/defaults.sh && export MSC_API_UPSTREAM MSC_TILES_UPSTREAM MSC_SEASON_STATIC_UPSTREAM MSC_POST_ALLOWLIST && echo \"lazycreep: http://localhost:$MSC_PORT/\" >&2 && exec caddy run --adapter caddyfile --config /etc/lazycreep/Caddyfile \"$@\"", "--"]
