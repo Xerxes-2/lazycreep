@@ -94,7 +94,7 @@ describe("Minimap 的 Scene", () => {
     expect(at(0, 2)).toBeUndefined();
   });
 
-  it("roomMap2 与 World Map 同一画法：每房间一张 50×50 像素图（一格一像素），加色混合叠在瓦片与所有权之上", () => {
+  it("roomMap2 与 World Map 同一画法：每房间一张 50×50 像素图（一格一像素），直接盖在瓦片与所有权之上", () => {
     const ME = "5a0000000000000000000001";
     const FOE = "5a0000000000000000000002";
     const scene = buildMinimapScene(
@@ -123,6 +123,23 @@ describe("Minimap 的 Scene", () => {
     const tileLayer = of(scene.primitives, "image").find((p) => p.key.startsWith("tile:"))!.layer;
     const ownLayer = 10;
     expect(units.every((p) => p.layer > tileLayer && p.layer > ownLayer)).toBe(true);
+  });
+
+  it("路与墙单独一张图，在瓦片之上、所有权色块之下（与平原一起被染色，路不会比有主房间的平原暗）", () => {
+    const scene = buildMinimapScene(input({ positions: { W12S28: { w: [[1, 1]], r: [[2, 1]], s: [[3, 1]] } } }));
+    const images = of(scene.primitives, "image");
+    const ground = images.filter((p) => p.key.startsWith("ground:"));
+    expect(ground.map((p) => p.key)).toEqual(["ground:W12S28"]);
+    expect(ground[0]).toMatchObject({ x: 2, y: 1, width: 1, height: 1 });
+    const tileLayer = images.find((p) => p.key.startsWith("tile:"))!.layer;
+    expect(ground[0]!.layer).toBeGreaterThan(tileLayer);
+    expect(ground[0]!.layer).toBeLessThan(10);
+    expect(pixel(ground[0]!, 1, 1)).toEqual([0, 0, 0, 255]);
+    expect(pixel(ground[0]!, 2, 1)).toEqual([60, 60, 60, 255]);
+    expect(pixel(ground[0]!, 3, 1)[3]).toBe(0);
+    const units = images.find((p) => p.key === "units:W12S28")!;
+    expect(pixel(units, 1, 1)[3]).toBe(0);
+    expect(pixel(units, 2, 1)[3]).toBe(0);
   });
 
   it("世界坐标换算到格子里的房间；边缘外与画面外为 undefined", () => {

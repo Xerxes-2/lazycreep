@@ -37,11 +37,13 @@ function world(): MapState {
 
 const zoomed = { theme: DEFAULT_THEME, zoom: ICON_MIN_ZOOM, visible: { x0: 36, y0: 78, x1: 40, y1: 81 } };
 
-function unitImages(state: MapState, layers: readonly MapLayerPainter[] = MAP_LAYERS, zoom = ICON_MIN_ZOOM) {
+function imagesWith(prefix: string, state: MapState, layers: readonly MapLayerPainter[] = MAP_LAYERS, zoom = ICON_MIN_ZOOM) {
   return buildMapScene(state, { ...zoomed, zoom }, layers).primitives.filter(
-    (p): p is ImagePrimitive => p.kind === "image" && p.key.startsWith("units:"),
+    (p): p is ImagePrimitive => p.kind === "image" && p.key.startsWith(prefix),
   );
 }
+const unitImages = (state: MapState, layers?: readonly MapLayerPainter[], zoom?: number) => imagesWith("units:", state, layers, zoom);
+const groundImages = (state: MapState) => imagesWith("ground:", state);
 
 /** 像素图里 (x, y) 处的 [r, g, b, a] */
 function pixel(image: ImagePrimitive, x: number, y: number): number[] {
@@ -88,10 +90,14 @@ describe("World Map 单位图层", () => {
       "2": [[9, 1]],
       "3": [[10, 1]],
     };
-    const [image] = unitImages(applyRoomUnits(world(), "W13S28", frame));
-    expect([1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((x) => pixel(image!, x, 1))).toEqual([
+    const state = applyRoomUnits(world(), "W13S28", frame);
+    const [ground] = groundImages(state);
+    const [image] = unitImages(state);
+    expect([1, 2].map((x) => pixel(ground!, x, 1))).toEqual([
       [0, 0, 0, 255],
       [60, 60, 60, 255],
+    ]);
+    expect([3, 4, 5, 6, 7, 8, 9, 10].map((x) => pixel(image!, x, 1))).toEqual([
       [255, 255, 255, 255],
       [170, 170, 170, 255],
       [0, 200, 255, 255],
@@ -117,8 +123,25 @@ describe("World Map 单位图层", () => {
   });
 
   it("同一格上玩家的点盖过道路等固定类别", () => {
-    const [image] = unitImages(applyRoomUnits(world(), "W13S28", { [ME]: [[5, 5]], r: [[5, 5]] }));
+    const [image] = unitImages(applyRoomUnits(world(), "W13S28", { [ME]: [[5, 5]], r: [[5, 5]], c: [[5, 5]] }));
     expect(pixel(image!, 5, 5)).toEqual(rgb(DEFAULT_THEME.owned));
+  });
+
+  it("路与墙单独一张图，画在所有权色块之下，与平原一起被主人色染色；其余点在色块之上保持原色", () => {
+    // 官方没有所有权色块：路（60）比平原（43）略亮、墙是黑的。色块若压在路下面，有主房间的路就比染过色的平原暗
+    const state = applyRoomUnits(world(), "W13S28", { w: [[1, 1]], r: [[2, 1]], s: [[3, 1]] });
+    const [ground, ...moreGround] = groundImages(state);
+    const [units] = unitImages(state);
+    expect(moreGround).toEqual([]);
+    expect(ground).toMatchObject({ x: 37, y: 79, width: 1, height: 1 });
+    expect(ground!.layer).toBeGreaterThan(MAP_LAYER.tile);
+    expect(ground!.layer).toBeLessThan(MAP_LAYER.ownership);
+    expect(units!.layer).toBeGreaterThan(MAP_LAYER.ownership);
+    expect(pixel(ground!, 3, 1)).toEqual([0, 0, 0, 0]);
+    expect(pixel(units!, 1, 1)).toEqual([0, 0, 0, 0]);
+    expect(pixel(units!, 2, 1)).toEqual([0, 0, 0, 0]);
+    // 只有路和墙的房间没有上层的图
+    expect(unitImages(applyRoomUnits(world(), "W13S28", { r: [[2, 1]] }))).toEqual([]);
   });
 
   it("门槛以下不画；没收到 roomMap2 的房间与不可见的房间不画", () => {

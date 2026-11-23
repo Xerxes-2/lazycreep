@@ -5,6 +5,8 @@
  * - 颜色：固定类别用官方 COLORS；玩家按 ownerColor（我方 / 盟友 / 陌生人，与所有权同一条规则）；
  *   未知键用官方的红色。同一格有多个点时玩家盖过固定类别。
  * - 按“这一帧 + 着色”缓存：别的房间更新导致 Scene 重建时，没变的房间不重新编码。
+ * - 路与墙（{@link isGroundKey}）另画一张“地面”图，放在所有权色块之下：官方没有色块，路（60）比平原（43）略亮、
+ *   墙是黑的；色块若压在路下面，有主房间的平原被染亮，路反而显得暗。其余的点画在色块之上保持原色。
  */
 import type { Color } from "../scene/scene.ts";
 import { encodePixelImage, type PixelImage } from "../scene/pixel-image.ts";
@@ -41,12 +43,16 @@ export interface UnitsColoring {
 /** 一帧 → 像素图的 data URL；没有可画的点时为 undefined */
 export type UnitsRaster = (frame: RoomMapUpdate, coloring: UnitsColoring) => string | undefined;
 
+/** 路与墙：画进所有权色块之下的“地面”图 */
+const GROUND_KEYS: ReadonlySet<string> = new Set(["w", "r"]);
+export const isGroundKey = (key: string): boolean => GROUND_KEYS.has(key);
+
 /** 一帧里每个键的颜色，按绘制先后：固定类别、未知键，最后玩家（盖在上面） */
-function colorsOf(frame: RoomMapUpdate, { ownerColor, knownUsers }: UnitsColoring): Array<[string, Color]> {
+function colorsOf(frame: RoomMapUpdate, { ownerColor, knownUsers }: UnitsColoring, keep: (key: string) => boolean): Array<[string, Color]> {
   const fixed: Array<[string, Color]> = [];
   const players: Array<[string, Color]> = [];
   for (const [key, points] of Object.entries(frame)) {
-    if (points.length === 0) continue;
+    if (points.length === 0 || !keep(key)) continue;
     const known = FIXED_COLORS[key];
     if (known !== undefined) fixed.push([key, known]);
     else if (!isNotPlayer(key) && (PLAYER_ID.test(key) || key in knownUsers)) players.push([key, ownerColor(key)]);
@@ -70,11 +76,15 @@ function rasterize(frame: RoomMapUpdate, colors: ReadonlyArray<[string, Color]>)
   return { width: ROOM_SIZE, height: ROOM_SIZE, rgba };
 }
 
-/** encode 可换（测试数编码次数）；每个使用方各有一份缓存 */
-export function createUnitsRaster(encode: (image: PixelImage) => string = encodePixelImage): UnitsRaster {
+/**
+ * encode 可换（测试数编码次数）；每个使用方各有一份缓存。
+ * part：`ground` 只画路与墙，`top` 画其余的点。
+ */
+export function createUnitsRaster(part: "ground" | "top", encode: (image: PixelImage) => string = encodePixelImage): UnitsRaster {
+  const keep = part === "ground" ? isGroundKey : (key: string) => !isGroundKey(key);
   const cache = new WeakMap<RoomMapUpdate, { readonly signature: string; readonly url: string }>();
   return (frame, coloring) => {
-    const colors = colorsOf(frame, coloring);
+    const colors = colorsOf(frame, coloring, keep);
     if (colors.length === 0) return undefined;
     const signature = colors.map(([key, color]) => `${key}:${color}`).join();
     let cached = cache.get(frame);

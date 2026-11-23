@@ -3,6 +3,7 @@
  * 已订阅 roomMap2 的每个房间画一张 50×50 的像素图（一格一像素，units-raster.ts，与 Minimap 同一画法），
  * 直接盖在地形瓦片上、不加色：照官方默认世界地图（#!/map，Angular 的 appGameMapRoomObjects，putImageData）。
  * 新版 #!/map2 的 @screeps/map 以加色混合叠上去，人工墙是纯黑，加色就看不见了。
+ * 路与墙另一张图，放在所有权色块之下（见 units-raster.ts）。
  *
  * - 数据：use-map-info.ts 把每个房间最近一帧 roomMap2 原样记进 MapState.units（与 Power Bank 同一个订阅）。
  * - 选像素图而不是每点一个 rect：一个房间可有数百个点（道路、墙），可见的上百个房间就是数万个图元，
@@ -31,7 +32,8 @@ export function retainUnits(state: MapState, rooms: ReadonlySet<string>): MapSta
 
 /** encode 可换（测试数编码次数）；每个画师各有一份缓存 */
 export function createUnitsPainter(encode?: (image: PixelImage) => string): MapLayerPainter {
-  const raster = createUnitsRaster(encode);
+  const ground = createUnitsRaster("ground", encode);
+  const top = createUnitsRaster("top", encode);
   return (ctx) => {
     if (ctx.zoom < ICON_MIN_ZOOM) return [];
     const coloring = { ownerColor: ctx.ownerColor, knownUsers: ctx.state.users };
@@ -39,19 +41,14 @@ export function createUnitsPainter(encode?: (image: PixelImage) => string): MapL
     for (const room of ctx.visibleRooms) {
       const frame = ctx.state.units[room.name];
       if (!frame) continue;
-      const url = raster(frame, coloring);
-      if (url === undefined) continue;
-      out.push({
-        kind: "image",
-        key: `units:${room.name}`,
-        // 在所有权色块之上、区域覆盖之下（MAP_LAYER 只在调用时读：本模块与 map-scene.ts 互相引用）
-        layer: MAP_LAYER.ownership + 5,
-        x: room.x,
-        y: room.y,
-        width: 1,
-        height: 1,
-        url,
-      });
+      const cell = { kind: "image", x: room.x, y: room.y, width: 1, height: 1 } as const;
+      // MAP_LAYER 只在调用时读：本模块与 map-scene.ts 互相引用
+      const groundUrl = ground(frame, coloring);
+      // 瓦片之上、所有权色块之下：与平原一起被染色
+      if (groundUrl !== undefined) out.push({ ...cell, key: `ground:${room.name}`, layer: MAP_LAYER.ownership - 5, url: groundUrl });
+      const topUrl = top(frame, coloring);
+      // 所有权色块之上、区域覆盖之下
+      if (topUrl !== undefined) out.push({ ...cell, key: `units:${room.name}`, layer: MAP_LAYER.ownership + 5, url: topUrl });
     }
     return out;
   };

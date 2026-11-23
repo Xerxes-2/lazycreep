@@ -6,7 +6,7 @@
  * （官方客户端即如此：每格一个 roomMap2 订阅）。位置与 World Map 的单位图层同一种像素图：每房间一张
  * 50×50（一格一像素，units-raster.ts），但不加色、直接盖在地形上：照官方 Angular 小地图
  * （build.min.js 的 appGameMapRoomObjects，putImageData），人工墙是黑色，加色就看不见了
- * （World Map 同样不加色，见 map-units.ts）。世界之外的格子什么都不画，也不可点。
+ * （World Map 同样不加色，见 map-units.ts）。路与墙另一张图，放在所有权色块之下（见 units-raster.ts）。世界之外的格子什么都不画，也不可点。
  */
 import { parseRoomName, roomName, worldOffset } from "../map/map-state.ts";
 import type { Color, Primitive, Scene } from "../scene/scene.ts";
@@ -39,14 +39,15 @@ export interface MinimapCell {
   readonly row: number;
 }
 
-const LAYER = { tile: 0, ownership: 10, units: 20, frame: 30 } as const;
+const LAYER = { tile: 0, ground: 5, ownership: 10, units: 20, frame: 30 } as const;
 
 const OWNED_ALPHA = 0.35;
 const RESERVED_ALPHA = 0.15;
 const FRAME_WIDTH = 0.03;
 
 /** 全页共用一份像素图缓存 */
-const unitsRaster = createUnitsRaster();
+const groundRaster = createUnitsRaster("ground");
+const unitsRaster = createUnitsRaster("top");
 
 /** 3×3 格里在世界之内的格子（按行）；不是常规房间名时为空 */
 export function minimapCells(center: string, size: WorldSize): MinimapCell[] {
@@ -80,6 +81,11 @@ export function buildMinimapScene(input: MinimapInput): Scene {
   const coloring = { ownerColor: input.ownerColor, knownUsers: input.users ?? {} };
   for (const { room, col, row } of minimapCells(input.center, input.size)) {
     out.push({ kind: "image", key: `tile:${room}`, layer: LAYER.tile, x: col, y: row, width: 1, height: 1, url: input.tileUrl(room) });
+    const frame = input.positions[room];
+    const groundUrl = frame && groundRaster(frame, coloring);
+    if (groundUrl !== undefined) {
+      out.push({ kind: "image", key: `ground:${room}`, layer: LAYER.ground, x: col, y: row, width: 1, height: 1, url: groundUrl });
+    }
 
     const owner = roomOwnership(input.rooms[room]);
     if (owner.kind !== "none") {
@@ -96,7 +102,6 @@ export function buildMinimapScene(input: MinimapInput): Scene {
       });
     }
 
-    const frame = input.positions[room];
     const url = frame && unitsRaster(frame, coloring);
     if (url !== undefined) {
       out.push({ kind: "image", key: `units:${room}`, layer: LAYER.units, x: col, y: row, width: 1, height: 1, url });
