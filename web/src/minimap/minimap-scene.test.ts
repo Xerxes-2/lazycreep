@@ -111,8 +111,10 @@ describe("Minimap 的 Scene", () => {
     expect(units).toHaveLength(2);
     const east = units.find((p) => p.key === "units:W12S28")!;
     const northWest = units.find((p) => p.key === "units:W14S27")!;
-    expect(east).toMatchObject({ x: 2, y: 1, width: 1, height: 1, blend: "add" });
-    expect(northWest).toMatchObject({ x: 0, y: 0, width: 1, height: 1, blend: "add" });
+    expect(east).toMatchObject({ x: 2, y: 1, width: 1, height: 1 });
+    expect(northWest).toMatchObject({ x: 0, y: 0, width: 1, height: 1 });
+    // 不加色：官方 Angular 小地图（appGameMapRoomObjects）用 putImageData 直接盖在地形上，黑色的人工墙才看得见
+    expect(east.blend ?? "normal").toBe("normal");
     expect(pixel(east, 10, 20)).toEqual([0, 0, 255, 255]);
     // 固定类别用官方颜色（Source 黄）
     expect(pixel(east, 5, 5)).toEqual([0xff, 0xf2, 0x46, 255]);
