@@ -12,6 +12,7 @@ import { parseRoomName, roomName, worldOffset } from "../map/map-state.ts";
 import type { Color, Primitive, Scene } from "../scene/scene.ts";
 import type { Theme } from "../scene/theme.ts";
 import { createUnitsRaster } from "../map/units-raster.ts";
+import { ownershipColor } from "../map/map-scene.ts";
 import { roomOwnership, type RoomMapUpdate, type RoomStats, type WorldSize } from "../source/source.ts";
 
 export interface MinimapInput {
@@ -97,7 +98,7 @@ export function buildMinimapScene(input: MinimapInput): Scene {
         y: row,
         width: 1,
         height: 1,
-        fill: input.ownerColor(owner.user),
+        fill: ownershipColor(input.theme, input.ownerColor, owner.user),
         alpha: owner.kind === "reserved" ? RESERVED_ALPHA : OWNED_ALPHA,
       });
     }

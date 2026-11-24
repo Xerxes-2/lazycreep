@@ -325,6 +325,7 @@ export const en: Partial<Record<MessageKey, string>> = {
   "customize.palette.owned": "Mine",
   "customize.palette.ally": "Allies",
   "customize.palette.neutral": "Unowned",
+  "customize.palette.npc": "Invaders / Source Keepers",
   "customize.palette.structure": "Structures",
   "customize.palette.structureOutline": "Structure outline",
   "customize.palette.wall": "Walls",

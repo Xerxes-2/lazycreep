@@ -108,6 +108,9 @@ const ROOM_MAP_CATEGORIES: ReadonlySet<string> = new Set(["w", "r", "pb", "p", "
 /** roomMap2 里 NPC 的“用户 id”：2 Invader、3 Source Keeper */
 const NPC_USERS: ReadonlySet<string> = new Set(["2", "3"]);
 
+/** Invader 或 Source Keeper 的用户 id（roomMap2 的键、map-stats 与房间对象的 user） */
+export const isNpcUser = (user: unknown): boolean => typeof user === "string" && NPC_USERS.has(user);
+
 /** roomMap2 的这个键不是玩家（地形 / 设施类键或 NPC） */
 export const isNotPlayer = (key: string): boolean => ROOM_MAP_CATEGORIES.has(key) || NPC_USERS.has(key);
 

@@ -94,6 +94,21 @@ describe("Minimap 的 Scene", () => {
     expect(at(0, 2)).toBeUndefined();
   });
 
+  it("Invader / Source Keeper 的房间用 Theme 的 npc 色，不进陌生玩家调色板", () => {
+    const theme = { ...DEFAULT_THEME, npc: 0x123456 };
+    const scene = buildMinimapScene(
+      input({
+        theme,
+        rooms: {
+          W12S28: { status: "normal", owner: { user: "2", level: 0 } },
+          W13S27: { status: "normal", owner: { user: "3", level: 8 } },
+        },
+      }),
+    );
+    const fills = of(scene.primitives, "rect").filter((r) => r.key.startsWith("own:")).map((r) => r.fill);
+    expect(fills).toEqual([0x123456, 0x123456]);
+  });
+
   it("roomMap2 与 World Map 同一画法：每房间一张 50×50 像素图（一格一像素），直接盖在瓦片与所有权之上", () => {
     const ME = "5a0000000000000000000001";
     const FOE = "5a0000000000000000000002";

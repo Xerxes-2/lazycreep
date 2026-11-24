@@ -9,7 +9,7 @@
 import type { Color, Primitive, Scene } from "../scene/scene.ts";
 import type { Theme } from "../scene/theme.ts";
 import { ownerColorRule } from "../room/room-detail-rules.ts";
-import { roomOwnership } from "../source/source.ts";
+import { isNpcUser, roomOwnership } from "../source/source.ts";
 import { paintAlliedHighlight, paintMinerals, paintPowerBanks, paintRcl, paintZones } from "./map-info-layers.ts";
 import { roomName, worldOffset, type MapState } from "./map-state.ts";
 import { paintUnits } from "./map-units.ts";
@@ -149,6 +149,14 @@ function cornerTiles(ctx: MapPaintContext, span: number, kind: string, url: (cor
   }));
 }
 
+/**
+ * 所有权色块的颜色：Invader / Source Keeper 占有或预定的房间用 Theme 的 npc 色，
+ * 不进陌生玩家调色板，否则与恰好挑到同一色的玩家分不开。World Map 与 Minimap 共用
+ */
+export function ownershipColor(theme: Theme, ownerColor: (user: string) => Color, user: string): Color {
+  return isNpcUser(user) ? theme.npc : ownerColor(user);
+}
+
 const OWNED_ALPHA = 0.45;
 const RESERVED_ALPHA = 0.2;
 const OWNED_BORDER = 0.08;
@@ -159,7 +167,7 @@ export const paintOwnership: MapLayerPainter = (ctx) => {
   for (const room of ctx.visibleRooms) {
     const owner = roomOwnership(ctx.state.rooms[room.name]);
     if (owner.kind === "none") continue;
-    const color = ctx.ownerColor(owner.user);
+    const color = ownershipColor(ctx.theme, ctx.ownerColor, owner.user);
     const reserved = owner.kind === "reserved";
     out.push({
       kind: "rect",

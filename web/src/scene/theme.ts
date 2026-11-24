@@ -16,6 +16,8 @@ export interface Theme {
   readonly strangers: readonly Color[];
   /** 无主或主人未知 */
   readonly neutral: Color;
+  /** Invader 与 Source Keeper：与陌生玩家调色板（多是暖色）分得开 */
+  readonly npc: Color;
 
   readonly structure: Color;
   readonly structureOutline: Color;
@@ -46,6 +48,7 @@ export const DEFAULT_THEME: Theme = {
   ally: 0x6ccf8e,
   strangers: [0xe5534b, 0xf0883e, 0xd16dd1, 0xe0b040, 0xff7b9c, 0xb08a5a],
   neutral: 0x9e9e9e,
+  npc: 0xffffff,
 
   structure: 0x3c3c3c,
   structureOutline: 0x8a8a8a,

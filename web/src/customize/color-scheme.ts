@@ -17,6 +17,7 @@ export const PALETTE_KEYS = [
   "owned",
   "ally",
   "neutral",
+  "npc",
   "structure",
   "structureOutline",
   "wall",

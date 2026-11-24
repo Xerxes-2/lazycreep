@@ -323,6 +323,7 @@ export const zhCN = {
   "customize.palette.owned": "我方",
   "customize.palette.ally": "盟友",
   "customize.palette.neutral": "无主",
+  "customize.palette.npc": "Invader / Source Keeper",
   "customize.palette.structure": "建筑",
   "customize.palette.structureOutline": "建筑轮廓",
   "customize.palette.wall": "城墙",
