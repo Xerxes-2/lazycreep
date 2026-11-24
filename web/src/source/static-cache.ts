@@ -180,12 +180,21 @@ export function withStaticCache(source: Source, options: StaticCacheOptions): So
       (entry) => store.update((stored) => ({ ...stored, shards: entry })),
     );
 
-  /** 每个 Shard 本 Source 核对一次：缓存的左上角房间还在不在这个世界里 */
-  const cornerChecks = new Map<string, Promise<boolean>>();
-  const cornerGone = (shard: string, origin: RoomCoord): Promise<boolean> => {
-    const corner = roomName(origin);
-    return source.getMapStats(shard, [corner]).then(
-      (stats) => (stats.rooms[corner]?.status ?? "out of borders") === "out of borders",
+  /**
+   * 每个 Shard 本 Source 核对一次：缓存的世界与 Server 上的还是不是同一个。
+   * 只看左上角不够：fabot sim 从 E0S0 起的 11×11 换成 31×31，左上角还在。核对左上、右下两角在世界里，
+   * 四边外一格不在（map-stats 不答的房间算世界外）
+   */
+  const worldChecks = new Map<string, Promise<boolean>>();
+  const worldChanged = (shard: string, size: WorldSize, origin: RoomCoord): Promise<boolean> => {
+    const at = (dx: number, dy: number) => roomName({ x: origin.x + dx, y: origin.y + dy });
+    const inside = [at(0, 0), at(size.width - 1, size.height - 1)];
+    const outside = [at(-1, 0), at(0, -1), at(size.width, 0), at(0, size.height)];
+    return source.getMapStats(shard, [...inside, ...outside]).then(
+      (stats) => {
+        const inWorld = (room: string) => (stats.rooms[room]?.status ?? "out of borders") !== "out of borders";
+        return !inside.every(inWorld) || outside.some(inWorld);
+      },
       () => false,
     );
   };
@@ -198,12 +207,12 @@ export function withStaticCache(source: Source, options: StaticCacheOptions): So
       store.update((stored) => ({ ...stored, worlds: { ...stored.worlds, [shard]: entry } }));
     };
     const size = await cached(slot, store.read().worlds?.[shard], WORLD_SIZE_FRESH_MS, fetch, save);
-    // 私服可以在同一地址上换一个世界（xxscreeps 换地图重开）：缓存的原点房间不在了就重取。
+    // 私服可以在同一地址上换一个世界（xxscreeps 换地图重开、sim 换尺寸）：核对不上就重取。
     // 自定义 Server 没有原点的缓存是旧版按居中猜的，核对居中的左上角
     if (memory.has(slot) || (!size.origin && Object.hasOwn(SERVER_PRESETS, source.server.id))) return size;
     const offset = worldOffset(size);
-    let check = cornerChecks.get(shard);
-    if (!check) cornerChecks.set(shard, (check = cornerGone(shard, size.origin ?? { x: -offset.x, y: -offset.y })));
+    let check = worldChecks.get(shard);
+    if (!check) worldChecks.set(shard, (check = worldChanged(shard, size, size.origin ?? { x: -offset.x, y: -offset.y })));
     return (await check) ? refresh(slot, fetch, save) : size;
   };
 

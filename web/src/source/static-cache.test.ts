@@ -154,7 +154,7 @@ describe("静态数据：持久化缓存", () => {
     expect(second.sizes).toHaveLength(0);
   });
 
-  it("同一地址换了世界：缓存的原点房间不在了就重取，还在就照旧用缓存", async () => {
+  it("同一地址换了世界：缓存的世界核对不上（原点房间不在了）就重取，核对得上就照旧用缓存", async () => {
     const storage = memoryStorage();
     const old: WorldSize = { width: 11, height: 11, origin: { x: 20, y: 0 } };
     const first = network();
@@ -174,7 +174,7 @@ describe("静态数据：持久化缓存", () => {
       return { net, source: staticCached(factory, { storage })(SEASON, "t") };
     };
 
-    const kept = open({ E20S0: { status: "normal" } });
+    const kept = open({ E20S0: { status: "normal" }, E30S10: { status: "normal" }, E31S0: { status: "out of borders" } });
     expect(await kept.source.getWorldSize("shard0")).toEqual(old);
     expect(kept.net.sizes).toHaveLength(0);
     kept.source.close();
@@ -184,6 +184,37 @@ describe("静态数据：持久化缓存", () => {
     await flush();
     const now: WorldSize = { width: 11, height: 11, origin: { x: -11, y: -11 } };
     swapped.net.sizes[0]!.pending.resolve(now);
+    expect(await size).toEqual(now);
+  });
+
+  it("同一原点换了更大的世界（sim 从 11×11 换成 31×31）：边外的房间在世界里，重取", async () => {
+    const SIM: ServerConfig = { ...SEASON, id: "custom-sim", apiRoot: "/api", sharded: false };
+    const storage = memoryStorage();
+    const old: WorldSize = { width: 11, height: 11, origin: { x: 0, y: 0 } };
+    const first = network();
+    const before = staticCached(first.factory, { storage })(SIM, "t");
+    const got = before.getWorldSize("shard0");
+    first.sizes[0]!.pending.resolve(old);
+    await got;
+    before.close();
+
+    const net = network();
+    const probed: string[][] = [];
+    const factory = (server: ServerConfig): Source => {
+      const base = net.factory(server);
+      base.getMapStats = (shard, rooms) => {
+        probed.push([...rooms]);
+        // E0S0–E30S30 都在，别的不答
+        const all = Object.fromEntries(rooms.filter((r) => /^E([0-9]|[12][0-9]|30)S([0-9]|[12][0-9]|30)$/.test(r)).map((r) => [r, { status: "normal" }]));
+        return Promise.resolve({ shard, gameTime: 1, rooms: all, users: {} });
+      };
+      return base;
+    };
+    const size = staticCached(factory, { storage })(SIM, "t").getWorldSize("shard0");
+    await flush();
+    expect(probed).toEqual([["E0S0", "E10S10", "W0S0", "E0N0", "E11S0", "E0S11"]]);
+    const now: WorldSize = { width: 31, height: 31, origin: { x: 0, y: 0 } };
+    net.sizes[0]!.pending.resolve(now);
     expect(await size).toEqual(now);
   });
 
@@ -206,7 +237,7 @@ describe("静态数据：持久化缓存", () => {
     };
     const size = staticCached(factory, { storage })(SIM, "t").getWorldSize("shard0");
     await flush();
-    expect(probed).toEqual([["W4N4"]]);
+    expect(probed[0]?.[0]).toBe("W4N4");
     const now: WorldSize = { width: 11, height: 11, origin: { x: 0, y: 0 } };
     net.sizes[0]!.pending.resolve(now);
     expect(await size).toEqual(now);
