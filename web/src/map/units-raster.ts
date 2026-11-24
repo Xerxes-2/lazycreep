@@ -2,7 +2,7 @@
  * roomMap2 一帧 → 50×50 像素图（一格一像素），照官方 @screeps/map 的 UnitsLayer
  * （docs/research/official-art-and-badges.md C 节）。World Map 的单位图层与 Minimap 共用这一种画法。
  *
- * - 颜色：固定类别用官方 COLORS，只有 Invader / Source Keeper 例外（见 NPC_COLOR）；玩家按 ownerColor（我方 / 盟友 / 陌生人，与所有权同一条规则）；
+ * - 颜色：固定类别用官方 COLORS；玩家按 ownerColor（我方 / 盟友 / 陌生人，与所有权同一条规则）；
  *   未知键用官方的红色。同一格有多个点时玩家盖过固定类别。
  * - 按“这一帧 + 着色”缓存：别的房间更新导致 Scene 重建时，没变的房间不重新编码。
  * - 路与墙（{@link isGroundKey}）另画一张“地面”图，放在所有权色块之下：官方没有色块，路（60）比平原（43）略亮、
@@ -15,16 +15,10 @@ import { isNotPlayer, type RoomMapUpdate } from "../source/source.ts";
 /** 房间边长（格） */
 const ROOM_SIZE = 50;
 
-/**
- * Invader（2）与 Source Keeper（3）：官方是橙色 0xff9600，与陌生玩家调色板里的橙、金、红在一像素的点上分不出来。
- * 玩家色都是饱和色，NPC 用白色；与 Power Bank 同色无妨——Power Bank 只在过道，那里没有 NPC
- */
-const NPC_COLOR: Color = 0xffffff;
-
-/** 官方 COLORS（@screeps/map），NPC 除外 */
+/** 官方 COLORS（@screeps/map） */
 const FIXED_COLORS: Readonly<Record<string, Color>> = {
-  "2": NPC_COLOR,
-  "3": NPC_COLOR,
+  "2": 0xff9600,
+  "3": 0xff9600,
   w: 0x000000,
   r: 0x3c3c3c,
   pb: 0xffffff,
