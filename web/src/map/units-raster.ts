@@ -5,6 +5,9 @@
  * - 颜色：固定类别用官方 COLORS；玩家按 ownerColor（我方 / 盟友 / 陌生人，与所有权同一条规则）；
  *   未知键用官方的红色。同一格有多个点时玩家盖过固定类别。
  * - 按“这一帧 + 着色”缓存：别的房间更新导致 Scene 重建时，没变的房间不重新编码。
+ * - 再按像素内容缓存（最近用过的 UNITS_RASTER_CACHE_SIZE 张）：每个 Tick 都是新的一帧对象，但路与墙几乎不变，
+ *   没动的房间的单位点也一样；私服几毫秒一个 Tick 时逐帧重新编码 BMP 与 base64 很费（fabot sim 实测约占页面 CPU 1.5%）。
+ *   命中时给出同一个 URL，Scene 的图元不变，纹理也不重新上传。
  * - 路与墙（{@link isGroundKey}）另画一张“地面”图，放在所有权色块之下：官方没有色块，路（60）比平原（43）略亮、
  *   墙是黑的；色块若压在路下面，有主房间的平原被染亮，路反而显得暗。其余的点画在色块之上保持原色。
  */
@@ -76,6 +79,31 @@ function rasterize(frame: RoomMapUpdate, colors: ReadonlyArray<[string, Color]>)
   return { width: ROOM_SIZE, height: ROOM_SIZE, rgba };
 }
 
+/** 每个像素图缓存最多留几张（按最近使用）：够 World Map 订阅预算的 100 个房间都命中，每张约 23 KB */
+export const UNITS_RASTER_CACHE_SIZE = 256;
+
+const rotl = (x: number, r: number) => (x << r) | (x >>> (32 - r));
+
+/**
+ * MurmurHash3（x86_32）的逐字混合，按 32 位字读（50×50×4 字节，长度是 4 的倍数）。
+ * 不用逐字 FNV：这些图大多是透明里稀疏的几个点，逐字 FNV 在这种输入上大量相撞（单像素图 257 张里撞了一百多次）。
+ */
+function hashPixels(rgba: Uint8Array): number {
+  const words = new Uint32Array(rgba.buffer, rgba.byteOffset, rgba.byteLength >> 2);
+  let h = 0;
+  for (let i = 0; i < words.length; i++) {
+    let k = Math.imul(words[i]!, 0xcc9e2d51);
+    k = Math.imul(rotl(k, 15), 0x1b873593);
+    h = (Math.imul(rotl(h ^ k, 13), 5) + 0xe6546b64) | 0;
+  }
+  h ^= rgba.byteLength;
+  h = Math.imul(h ^ (h >>> 16), 0x85ebca6b);
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
+  return (h ^ (h >>> 16)) >>> 0;
+}
+
+const samePixels = (a: Uint8Array, b: Uint8Array) => a.length === b.length && a.every((v, i) => v === b[i]);
+
 /**
  * encode 可换（测试数编码次数）；每个使用方各有一份缓存。
  * part：`ground` 只画路与墙，`top` 画其余的点。
@@ -83,13 +111,31 @@ function rasterize(frame: RoomMapUpdate, colors: ReadonlyArray<[string, Color]>)
 export function createUnitsRaster(part: "ground" | "top", encode: (image: PixelImage) => string = encodePixelImage): UnitsRaster {
   const keep = part === "ground" ? isGroundKey : (key: string) => !isGroundKey(key);
   const cache = new WeakMap<RoomMapUpdate, { readonly signature: string; readonly url: string }>();
+  /** 像素内容 → URL，Map 的先后即最近使用的先后（最久没用的在前） */
+  const byPixels = new Map<number, { readonly rgba: Uint8Array; readonly url: string }>();
+  const encodeOnce = (image: PixelImage): string => {
+    const hash = hashPixels(image.rgba);
+    const hit = byPixels.get(hash);
+    if (hit) {
+      byPixels.delete(hash);
+      // 哈希撞上但内容不同：当作没命中，覆盖掉
+      if (samePixels(hit.rgba, image.rgba)) {
+        byPixels.set(hash, hit);
+        return hit.url;
+      }
+    }
+    const url = encode(image);
+    byPixels.set(hash, { rgba: image.rgba, url });
+    if (byPixels.size > UNITS_RASTER_CACHE_SIZE) byPixels.delete(byPixels.keys().next().value!);
+    return url;
+  };
   return (frame, coloring) => {
     const colors = colorsOf(frame, coloring, keep);
     if (colors.length === 0) return undefined;
     const signature = colors.map(([key, color]) => `${key}:${color}`).join();
     let cached = cache.get(frame);
     if (cached?.signature !== signature) {
-      cached = { signature, url: encode(rasterize(frame, colors)) };
+      cached = { signature, url: encodeOnce(rasterize(frame, colors)) };
       cache.set(frame, cached);
     }
     return cached.url;
