@@ -3,7 +3,7 @@ import { createRoot, createSignal } from "solid-js";
 import { FixtureSource, fixtureBundle } from "../source/fixture-source.ts";
 import type { RoomMapUpdate, Source } from "../source/source.ts";
 import { createCombatantFeed } from "./combatant-feed.ts";
-import { roomMapHubFor } from "../source/room-map-hub.ts";
+import { ROOM_MAP_MIN_INTERVAL_MS, roomMapHubFor } from "../source/room-map-hub.ts";
 import { createPvpFeed } from "./pvp-feed.ts";
 
 const season = fixtureBundle(
@@ -45,13 +45,13 @@ function setup(
   options: { token?: boolean; shown?: boolean; maxRooms?: number; budget?: number; allies?: string[]; frames?: Record<string, readonly RoomMapUpdate[]> } = {},
 ) {
   const source = new FixtureSource(season, { speed: Infinity });
-  // 指定房间改按顺序推给定的帧（录制里没有 NPC 的帧），每帧隔一个宏任务
+  // 指定房间改按顺序推给定的帧（录制里没有 NPC 的帧）；帧距大于订阅中心的分发间隔，每帧都分发得到（不被合并）
   const recorded = source.subscribeRoomMap.bind(source);
   source.subscribeRoomMap = (shard, room, listener, onError, opts) => {
     const frames = options.frames?.[room];
     if (!frames) return recorded(shard, room, listener, onError, opts);
     let live = true;
-    frames.forEach((frame, i) => setTimeout(() => live && listener(frame), 20 * (i + 1)));
+    frames.forEach((frame, i) => setTimeout(() => live && listener(frame), (ROOM_MAP_MIN_INTERVAL_MS + 20) * (i + 1)));
     return () => void (live = false);
   };
   const subs = tracked(source);

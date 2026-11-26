@@ -9,7 +9,9 @@
  *   被截断的房间不在租约的 granted() 里，消费方据此显示（例如 PvP 的“超出订阅上限”）。
  * - **按动画帧合并分发**：同一帧内同一频道的多次更新只把最新一帧分发一次，分发给此刻 granted 了
  *   该频道的每个消费方（只为画面服务的 Minimap、地图、PvP）。页面隐藏时 requestAnimationFrame 不跑，
- *   另有一个短定时器兜底。声明 everyFrame 的消费方（Attack Alert：按帧数计在场 Tick，而隐藏页面的定时器
+ *   另有一个短定时器兜底。两次分发至少隔 ROOM_MAP_MIN_INTERVAL_MS：私服几毫秒一个 Tick 时每个频道每秒上百帧，
+ *   每个动画帧都分发就要每帧重新栅格化、编码、上传 Minimap 九个房间的像素图（fabot sim 实测占页面 CPU 约三分之一）；
+ *   一格一像素的点每秒变十次已经够看。官服一个 Tick 好几秒，不受影响。声明 everyFrame 的消费方（Attack Alert：按帧数计在场 Tick，而隐藏页面的定时器
  *   可被浏览器节流到每分钟一次）不合并，每帧立即收到。
  * - 中心挂在一个 Source（共享 Source 的租约）上；Source 换了就换一个中心（roomMapHubFor）。
  */
@@ -21,6 +23,9 @@ export const ROOM_MAP_BUDGET = 100;
 
 /** 预算不够时谁先：数值大的优先 */
 export const ROOM_MAP_PRIORITY = { alert: 3, minimap: 2, pvp: 1, worldMap: 0 } as const;
+
+/** 两次分发（非 everyFrame 的消费方）之间的最短间隔 */
+export const ROOM_MAP_MIN_INTERVAL_MS = 100;
 
 /** 页面隐藏时 requestAnimationFrame 不跑：至多等这么久就分发 */
 const FLUSH_FALLBACK_MS = 100;
@@ -56,7 +61,7 @@ export interface RoomMapHub {
   dispose(): void;
 }
 
-/** 安排一次分发，返回取消函数；默认是下一个动画帧（带隐藏时的兜底定时器） */
+/** 安排一次分发，返回取消函数；默认是隔够 ROOM_MAP_MIN_INTERVAL_MS 后的下一个动画帧（带隐藏时的兜底定时器） */
 export type FlushScheduler = (flush: () => void) => () => void;
 
 export interface RoomMapHubOptions {
@@ -82,6 +87,33 @@ export const animationFrameScheduler: FlushScheduler = (flush) => {
   return cancel;
 };
 
+/**
+ * 给调度器加最短间隔：距上次分发不足 minInterval 时先等到够了，再交给 base（通常是下一个动画帧）。
+ * 前沿不等：间隔早已过去时与 base 一样即时。
+ */
+export function spacedScheduler(base: FlushScheduler, minInterval: number, now: () => number = () => performance.now()): FlushScheduler {
+  let last = -Infinity;
+  return (flush) => {
+    let cancelBase: (() => void) | undefined;
+    const run = () => {
+      cancelBase = base(() => {
+        last = now();
+        flush();
+      });
+    };
+    const wait = last + minInterval - now();
+    if (wait <= 0) {
+      run();
+      return () => cancelBase?.();
+    }
+    const timer = setTimeout(run, wait);
+    return () => {
+      clearTimeout(timer);
+      cancelBase?.();
+    };
+  };
+}
+
 interface Consumer {
   readonly options: RoomMapLeaseOptions;
   readonly order: number;
@@ -104,7 +136,7 @@ const sameSet = (a: ReadonlySet<string>, b: ReadonlySet<string>) => a.size === b
 
 export function createRoomMapHub(options: RoomMapHubOptions): RoomMapHub {
   const budget = options.budget ?? ROOM_MAP_BUDGET;
-  const schedule = options.schedule ?? animationFrameScheduler;
+  const schedule = options.schedule ?? spacedScheduler(animationFrameScheduler, ROOM_MAP_MIN_INTERVAL_MS);
   const consumers = new Set<Consumer>();
   const channels = new Map<string, Channel>();
   const pending = new Map<string, RoomMapUpdate>();

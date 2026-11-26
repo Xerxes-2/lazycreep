@@ -2,10 +2,18 @@
  * roomMap2 订阅中心的外部行为：只经 Source 上的订阅集合、租约的 granted 与 onFrame 观察。
  * 调度器换成手动的“动画帧”，以便验证同一帧内的合并。
  */
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createRoot } from "solid-js";
 import type { RoomMapOptions, RoomMapUpdate, Unsubscribe } from "./source.ts";
-import { createRoomMapHub, ROOM_MAP_BUDGET, ROOM_MAP_PRIORITY, type RoomMapLeaseOptions } from "./room-map-hub.ts";
+import {
+  createRoomMapHub,
+  ROOM_MAP_BUDGET,
+  ROOM_MAP_MIN_INTERVAL_MS,
+  ROOM_MAP_PRIORITY,
+  spacedScheduler,
+  type FlushScheduler,
+  type RoomMapLeaseOptions,
+} from "./room-map-hub.ts";
 
 interface Sub {
   readonly key: string;
@@ -13,7 +21,7 @@ interface Sub {
   readonly listener: (update: RoomMapUpdate) => void;
 }
 
-function harness(budget?: number) {
+function harness(budget?: number, wrap: (frame: FlushScheduler) => FlushScheduler = (frame) => frame) {
   const subs = new Set<Sub>();
   const source = {
     subscribeRoomMap(
@@ -32,13 +40,13 @@ function harness(budget?: number) {
   const hub = createRoomMapHub({
     source,
     ...(budget === undefined ? {} : { budget }),
-    schedule: (flush) => {
+    schedule: wrap((flush) => {
       frames.push(flush);
       return () => {
         const at = frames.indexOf(flush);
         if (at >= 0) frames.splice(at, 1);
       };
-    },
+    }),
   });
   /** 跑完排队的动画帧 */
   const animationFrame = () => {
@@ -184,5 +192,41 @@ describe("roomMap2 订阅中心", () => {
     h.push("s/A", { x: [[4, 4]] });
     h.animationFrame();
     expect(h.got).toHaveLength(3);
+  });
+
+  describe("分发间隔", () => {
+    afterEach(() => void vi.useRealTimers());
+
+    it("两次分发至少隔 ROOM_MAP_MIN_INTERVAL_MS：私服每秒上百个 Tick 时，只为画面服务的消费方不随每个动画帧重建", () => {
+      vi.useFakeTimers();
+      const h = harness(undefined, (frame) => spacedScheduler(frame, ROOM_MAP_MIN_INTERVAL_MS, Date.now));
+      const a = h.lease(ROOM_MAP_PRIORITY.minimap);
+      a.want(rooms("A"));
+      // 前沿立即排上动画帧
+      h.push("s/A", { x: [[1, 1]] });
+      h.animationFrame();
+      expect(h.got).toHaveLength(1);
+      // 间隔内：动画帧来了也不分发，留最新的
+      h.push("s/A", { x: [[2, 2]] });
+      h.animationFrame();
+      vi.advanceTimersByTime(ROOM_MAP_MIN_INTERVAL_MS / 2);
+      h.push("s/A", { x: [[3, 3]] });
+      h.animationFrame();
+      expect(h.got).toHaveLength(1);
+      // 间隔到了，下一个动画帧分发最新的一帧
+      vi.advanceTimersByTime(ROOM_MAP_MIN_INTERVAL_MS / 2);
+      h.animationFrame();
+      expect(h.got.map(([, , frame]) => frame)).toEqual([{ x: [[1, 1]] }, { x: [[3, 3]] }]);
+    });
+
+    it("everyFrame 的消费方（告警）不受间隔限制", () => {
+      vi.useFakeTimers();
+      const h = harness(undefined, (frame) => spacedScheduler(frame, ROOM_MAP_MIN_INTERVAL_MS, Date.now));
+      const alert = h.lease(ROOM_MAP_PRIORITY.alert, { everyFrame: true });
+      alert.want(rooms("A"));
+      h.push("s/A", { x: [[1, 1]] });
+      h.push("s/A", { x: [[2, 2]] });
+      expect(h.got).toHaveLength(2);
+    });
   });
 });

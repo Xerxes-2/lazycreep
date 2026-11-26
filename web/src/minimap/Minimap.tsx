@@ -3,7 +3,7 @@
  *
  * 数据：瓦片沿用 World Map 的单房间瓦片；所有权取全页的 OwnershipHub（缺的房间用 wantRooms 补查，
  * 与地图共用额度）；玩家位置点为 9 个房间各一个 roomMap2，经全页的 roomMap2 订阅中心订阅
- * （Minimap 优先级仅次于告警；中心按动画帧合并分发，Scene 每帧至多重建一次）。区块不在屏幕上（不在 Room View、Sidebar 收起、区块折叠）
+ * （Minimap 优先级仅次于告警；中心按动画帧合并分发、两次至少隔 100 ms，Scene 随之至多每 100 ms 重建一次）。区块不在屏幕上（不在 Room View、Sidebar 收起、区块折叠）
  * 或页面不可见时退掉全部订阅、不构建 Scene。
  *
  * 点相邻格经 shell.navigate 切房间；Replay 中以同一（当前）Tick 打开该房间的 Replay。世界外的格子不可点。
@@ -109,7 +109,7 @@ export function Minimap(props: { readonly ctx: SectionContext; readonly shown: A
     onCleanup(ctx.ownership().wantRooms(rooms.map((room) => ({ shard: current, room }))));
   });
 
-  // roomMap2：每格一个，经订阅中心（按动画帧合并分发）
+  // roomMap2：每格一个，经订阅中心（按动画帧合并分发，至少隔 100 ms）
   const [positions, setPositions] = createSignal<Readonly<Record<string, RoomMapUpdate>>>({});
   const replaying = createMemo(() => ctx.shell.location().replay !== undefined);
   const watched = createMemo<readonly RoomRef[]>(() => {
