@@ -204,7 +204,8 @@ export function TopBarStatus(props: TopBarStatusProps) {
       <Show when={settings.token() ? cpu() : undefined}>
         {(update) => (
           <span class="top-bar__cpu" data-status="cpu">
-            {t("topBar.cpu", { cpu: update().cpu, memory: Math.round(update().memory / 1024) })}
+            {/* cpu 是浮点毫秒数，私服常见一长串小数 */}
+            {t("topBar.cpu", { cpu: Math.round(update().cpu * 10) / 10, memory: Math.round(update().memory / 1024) })}
           </span>
         )}
       </Show>

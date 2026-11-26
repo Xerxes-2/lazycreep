@@ -242,6 +242,15 @@ describe("Top Bar 状态（#25）", () => {
     expect(status("cpu")!.textContent).toContain("65 KB");
   });
 
+  it("CPU 是浮点毫秒数：只留一位小数", async () => {
+    mount({ token: "token" });
+    await settle(() => expect(created[0]!.cpuSubscriptions).toBe(1));
+    created[0]!.emitCpu({ cpu: 1.7073020000825636, memory: 4096 });
+    expect(status("cpu")!.textContent).toContain("CPU 1.7 ");
+    created[0]!.emitCpu({ cpu: 23.04, memory: 4096 });
+    expect(status("cpu")!.textContent).toContain("CPU 23 ");
+  });
+
   it("没有 token 时不订阅 CPU，也不显示", async () => {
     mount();
     await settle(() => expect(status("tick")!.textContent).toMatch(/\d{7}/));
