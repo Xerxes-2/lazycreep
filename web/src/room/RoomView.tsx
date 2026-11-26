@@ -14,6 +14,7 @@ import { useI18n } from "../i18n";
 import { useVisible } from "../power/use-visible.ts";
 import type { VisibilitySignal } from "../power/visibility.ts";
 import { createSceneView, type SceneView, type SceneViewOptions } from "../scene/pixi-scene-view.ts";
+import { cappedFrameScheduler, frameInterval, frameRate } from "../scene/frame-rate.ts";
 import type { Scene } from "../scene/scene.ts";
 import { DEFAULT_THEME, type Theme } from "../scene/theme.ts";
 import { errorMessage, type SourceFactory } from "../settings/SettingsPage.tsx";
@@ -30,7 +31,7 @@ import { PickList } from "./PickList.tsx";
 import { pickEntries } from "./pick-list.ts";
 import { ownerColorRule } from "./room-detail-rules.ts";
 import { createFrameThrottle } from "./frame-throttle.ts";
-import { animationFrameScheduler, type FlushScheduler } from "../source/room-map-hub.ts";
+import type { FlushScheduler } from "../source/room-map-hub.ts";
 import { reduceLiveTick, roomStateFrom, type RoomState } from "./room-state.ts";
 import type { HistoryCache } from "../replay/history-cache.ts";
 import { createReplayController } from "../replay/replay-controller.ts";
@@ -107,7 +108,7 @@ export interface RoomViewProps {
    * 外壳据此即时更新地图与 Minimap 上的所有权（OwnershipHub.observe）
    */
   readonly onObserved?: ((shard: string, room: string, seen: RoomSnapshot | RoomState) => void) | undefined;
-  /** 房间流按帧提交的调度（frame-throttle.ts）；默认下一个动画帧，测试可换成手动 */
+  /** 房间流按帧提交的调度（frame-throttle.ts）；默认按帧率上限放行的动画帧，测试可换成手动 */
   readonly frameSchedule?: FlushScheduler | undefined;
   /** 画面上的房间状态变化时回报（#26：房间信息区块） */
   readonly onShownState?: ((state: RoomState | undefined) => void) | undefined;
@@ -246,11 +247,18 @@ export function RoomView(props: RoomViewProps) {
     createEffect(() => {
       if (!live || !visible()) return;
       streaming = false;
-      // 增量逐个合并进 latest（便宜），房间状态每个动画帧至多提交一次（frame-throttle.ts）：
+      // 增量逐个合并进 latest（便宜），房间状态每帧至多提交一次，帧按帧率上限算（frame-throttle.ts、frame-rate.ts）：
       // 私服几毫秒一个 Tick 时，画不出来的 Tick 不重建 Scene
       let latest: RoomState | undefined;
       let latestTick: number | undefined;
-      const throttle = createFrameThrottle(props.frameSchedule ?? animationFrameScheduler, (state: RoomState) => {
+      const schedule =
+        props.frameSchedule ??
+        cappedFrameScheduler(
+          (step) => requestAnimationFrame(step),
+          (id) => cancelAnimationFrame(id),
+          () => frameInterval(frameRate()),
+        );
+      const throttle = createFrameThrottle(schedule, (state: RoomState) => {
         if (latestTick !== undefined) props.onLiveTick?.(current.shard, latestTick);
         setRoomState(state);
         props.onObserved?.(current.shard, current.room, state);
