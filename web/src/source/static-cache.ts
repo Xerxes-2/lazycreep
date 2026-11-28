@@ -14,7 +14,7 @@
  *
  * 用在 sharedSources 之内：每个 Server + token 的共享 Source 自带一份，所有调用方自动受益。
  */
-import { SERVER_PRESETS } from "./servers.ts";
+import { isOfficialServer } from "./servers.ts";
 import type { SourceFactory } from "../settings/SettingsPage.tsx";
 import { isRecord, readJson, writeJson, type KeyValueStorage, type StoredKey } from "../storage/local-store.ts";
 import { rendererFromStored } from "./season-renderer.ts";
@@ -209,7 +209,7 @@ export function withStaticCache(source: Source, options: StaticCacheOptions): So
     const size = await cached(slot, store.read().worlds?.[shard], WORLD_SIZE_FRESH_MS, fetch, save);
     // 私服可以在同一地址上换一个世界（xxscreeps 换地图重开、sim 换尺寸）：核对不上就重取。
     // 自定义 Server 没有原点的缓存是旧版按居中猜的，核对居中的左上角
-    if (memory.has(slot) || (!size.origin && Object.hasOwn(SERVER_PRESETS, source.server.id))) return size;
+    if (memory.has(slot) || (!size.origin && isOfficialServer(source.server))) return size;
     const offset = worldOffset(size);
     let check = worldChecks.get(shard);
     if (!check) worldChecks.set(shard, (check = worldChanged(shard, size, size.origin ?? { x: -offset.x, y: -offset.y })));
@@ -240,7 +240,7 @@ export function withStaticCache(source: Source, options: StaticCacheOptions): So
     fetch: (shard, room) => source.getTerrain(shard, room),
     ...(options.tilePixels ? { fromTile: tileTerrain(options.tilePixels) } : {}),
     // 自定义 Server 同一地址可能换了世界，存储里的地形每次打开核对一次；官方 Server 不核对（限额）
-    verifyStored: !Object.hasOwn(SERVER_PRESETS, source.server.id),
+    verifyStored: !isOfficialServer(source.server),
   });
 
   /** 房间装饰：一天核对一次，失败时给“没有装饰”（decoration-cache.ts） */

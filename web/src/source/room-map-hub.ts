@@ -3,8 +3,8 @@
  *
  * - 消费方拿一个租约，登记“想要的房间（按重要性先后）+ 优先级”；中心按频道（`shard/room`）去重，
  *   同一频道在 Source 上只订阅一次（keepWhileHidden 的消费方另加一条不随页面隐藏暂停的订阅）。
- * - **总预算**：同时订阅的频道不超过 budget（默认 ROOM_MAP_BUDGET = 100，实测过的上限，
- *   见 docs/research/screeps-api-facts.md 第 2 节）。超出时按优先级截断：高优先级的先占，
+ * - **总预算**：同时订阅的频道不超过 budget（官服 ROOM_MAP_BUDGET = 100，实测过的上限，
+ *   见 docs/research/screeps-api-facts.md 第 2 节；私服不限，见 roomMapBudget）。超出时按优先级截断：高优先级的先占，
  *   同优先级按登记先后，每个消费方内部按它给的先后；别人已占的频道不重复计数。
  *   被截断的房间不在租约的 granted() 里，消费方据此显示（例如 PvP 的“超出订阅上限”）。
  * - **按动画帧合并分发**：同一帧内同一频道的多次更新只把最新一帧分发一次，分发给此刻 granted 了
@@ -16,10 +16,15 @@
  * - 中心挂在一个 Source（共享 Source 的租约）上；Source 换了就换一个中心（roomMapHubFor）。
  */
 import { createEffect, createMemo, createSignal, onCleanup, type Accessor } from "solid-js";
-import type { RoomMapUpdate, Source, Unsubscribe } from "./source.ts";
+import { isOfficialServer } from "./servers.ts";
+import type { RoomMapUpdate, ServerConfig, Source, Unsubscribe } from "./source.ts";
 
 /** 同时订阅的 roomMap2 频道上限（实测同一连接 100 个无错帧） */
 export const ROOM_MAP_BUDGET = 100;
+
+/** 同时订阅的 roomMap2 频道上限：100 是在官服上实测的；私服（isOfficialServer）不设上限 */
+export const roomMapBudget = (server: Pick<ServerConfig, "id"> | undefined): number =>
+  server && !isOfficialServer(server) ? Infinity : ROOM_MAP_BUDGET;
 
 /** 预算不够时谁先：数值大的优先 */
 export const ROOM_MAP_PRIORITY = { alert: 3, minimap: 2, pvp: 1, worldMap: 0 } as const;
@@ -272,11 +277,12 @@ export function createRoomMapHub(options: RoomMapHubOptions): RoomMapHub {
 
 /** 每个 Source 一个中心，Source 换了就换（旧中心退掉全部订阅）。需在 Solid 的 owner 里调用。 */
 export function roomMapHubFor(
-  source: Accessor<Pick<Source, "subscribeRoomMap">>,
+  source: Accessor<Pick<Source, "subscribeRoomMap"> & Partial<Pick<Source, "server">>>,
   options: Omit<RoomMapHubOptions, "source"> = {},
 ): Accessor<RoomMapHub> {
   return createMemo(() => {
-    const hub = createRoomMapHub({ ...options, source: source() });
+    const src = source();
+    const hub = createRoomMapHub({ budget: roomMapBudget(src.server), ...options, source: src });
     onCleanup(() => hub.dispose());
     return hub;
   });

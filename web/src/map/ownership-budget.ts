@@ -4,7 +4,10 @@
  * 每次刷新都会清零、以为额度还够，反复刷新就会把服务器的额度用完而被限流。
  * 多个标签页共用同一份记录（加载器每次判断额度前重新读）。
  */
+import { isOfficialServer } from "../source/servers.ts";
+import type { ServerConfig } from "../source/source.ts";
 import { isRecord, readJson, writeJson, type KeyValueStorage, type StoredKey } from "../storage/local-store.ts";
+import type { OwnershipLoaderOptions } from "./ownership-loader.ts";
 
 /** 每个 Server 一个键：`msc.mapStatsBudget.<server id>` */
 export const OWNERSHIP_BUDGET_STORAGE: StoredKey = {
@@ -40,4 +43,18 @@ export function ownershipBudgetStore(storage: KeyValueStorage | undefined, serve
     load: () => readJson(storage, key, decode, EMPTY),
     save: (state) => writeJson(storage, key, state),
   };
+}
+
+/**
+ * 按官服 / 私服（servers.ts 的 isOfficialServer）给所有权加载器的限额选项。
+ * - 官服：每小时 60 次是服务器的限额，加载器默认自限 30 次；给了 storage 时额度记录持久化（见上）
+ * - 私服：没有这个限额，套上它反复刷新几次所有权就不再来，也就不必为省额度把缓存放长：不限次数、一分钟一刷。
+ *   429 照样退避
+ */
+export function ownershipLimits(
+  server: Pick<ServerConfig, "id">,
+  storage?: KeyValueStorage,
+): Pick<OwnershipLoaderOptions, "budget" | "maxPerHour" | "ttlMs" | "backgroundTtlMs"> {
+  if (!isOfficialServer(server)) return { maxPerHour: Infinity, ttlMs: 60_000, backgroundTtlMs: 60_000 };
+  return storage ? { budget: ownershipBudgetStore(storage, server.id) } : {};
 }

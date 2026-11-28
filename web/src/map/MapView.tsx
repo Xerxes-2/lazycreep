@@ -22,6 +22,7 @@ import { panBy, screenToWorld } from "../scene/scene-camera.ts";
 import { centerOn, fitCamera, sceneRect, sceneZoom, visibleRect, zoomAt } from "./map-camera.ts";
 import { buildMapScene, MAP_LAYERS, type MapLayerPainter } from "./map-scene.ts";
 import { applyMapStats, mapStateFrom, roomAtWorld, type MapState } from "./map-state.ts";
+import { ownershipLimits } from "./ownership-budget.ts";
 import { createOwnershipLoader } from "./ownership-loader.ts";
 import type { OwnershipHub } from "./ownership-hub.ts";
 import { findRoom, useMapInfo } from "./use-map-info.ts";
@@ -178,6 +179,7 @@ export function MapView(props: MapViewProps) {
       fetch: (s, rooms) => src.getMapStats(s, rooms),
       onStats: (stats) => setMapState((state) => state && applyMapStats(state, stats)),
       onError: (error) => setOwnershipError(errorMessage(t, error)),
+      ...ownershipLimits(src.server),
     });
     onCleanup(() => created.dispose());
     return created;

@@ -26,10 +26,9 @@ import { pageCombatants } from "../pvp/PvpCombatants.tsx";
 import { createMapLayerPrefs, mapLayers } from "./map-layer-toggles.ts";
 import { badgeLayer } from "./map-badge-layer.ts";
 import { createMapBadges } from "./map-badges.ts";
-import { ownershipBudgetStore } from "./ownership-budget.ts";
+import { ownershipLimits } from "./ownership-budget.ts";
 import { createOwnershipHub } from "./ownership-hub.ts";
 import { roomMapHubFor } from "../source/room-map-hub.ts";
-import { SERVER_PRESETS } from "../source/servers.ts";
 import { createWorldMapLink } from "./world-map-link.ts";
 import type { SceneView, SceneViewOptions } from "../scene/pixi-scene-view.ts";
 import type { Theme } from "../scene/theme.ts";
@@ -75,14 +74,9 @@ export function MapAndRoom(props: MapAndRoomProps) {
   const source = useSharedSource(props.sourceFor, props.settings);
   const ownership = createMemo(() => {
     const src = source();
-    // 每小时 60 次是官服的限额；私服没有，套上它反复刷新几次所有权就不再来（429 照样退避），
-    // 也就不必为省额度把缓存放长：私服一分钟一刷
-    const official = Object.values(SERVER_PRESETS).some((s) => s.id === src.server.id);
     const hub = createOwnershipHub({
       fetch: (shard, rooms) => src.getMapStats(shard, rooms),
-      ...(official
-        ? { budget: ownershipBudgetStore(browserStorage(), src.server.id) }
-        : { maxPerHour: Infinity, ttlMs: 60_000, backgroundTtlMs: 60_000 }),
+      ...ownershipLimits(src.server, browserStorage()),
     });
     onCleanup(() => hub.dispose());
     return hub;

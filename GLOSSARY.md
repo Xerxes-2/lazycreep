@@ -8,6 +8,7 @@
 
 **Server（服务器）**:
 一个独立的 Screeps 游戏实例，有自己的 API 根路径。本项目支持三种：Season（赛季服）、MMO（官方主服）、Private（私服）。
+预置的 Server（Season、MMO、PTR）是官服，用户自己加的自定义 Server 一律当私服；官服的限额（map-stats 每小时次数、roomMap2 订阅上限等）只对官服生效，判据只有 `isOfficialServer` 一处。
 _Avoid_: 环境、后端
 
 **Shard**:
