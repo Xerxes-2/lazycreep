@@ -9,6 +9,7 @@
     "test": "pnpm --filter web test",
     "test:live": "pnpm --filter web test:live",
     "typecheck": "pnpm --filter web typecheck",
+    "prototype:stats": "pnpm --filter web dev --open /prototype-session-stats.html",
     "record": "node --env-file-if-exists=.env.local scripts/record-fixtures.ts"
   }
 }
