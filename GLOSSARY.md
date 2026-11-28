@@ -95,6 +95,10 @@ _Avoid_: 徽标、队徽
 列出最近若干 Tick 内发生过战斗的房间及涉及玩家（打 NPC 的也在内，另写出 NPC 对手），可点击跳转到对应 Room View。数据来自官方的 PvP 接口，代码里沿用 `pvp` 命名。
 _Avoid_: PvP 一览、PvE 一览、战斗列表、战争地图
 
+**Session Stats（本次统计）**:
+World Map 与 Room View 下都有的一个 Sidebar Section，显示本次会话里客户端看到的瞬时值随时间的变化：我的 CPU 与 Memory、Tick 时长、看过的房间的能量、升级进度与 creep 数。只用已有订阅里的数据，只放在内存里：不持久化、不跨标签页，刷新页面就清空，换 Server 或 token 重新开始；不用服务器汇总好的统计。房间指标只在那个房间在 Room View 里即时显示时才有。
+_Avoid_: 数据看板、仪表盘、统计面板
+
 **Attack Alert（遇袭通知）**:
 自己拥有的房间出现敌对行为时推送给用户的通知。
 _Avoid_: 警报、提醒

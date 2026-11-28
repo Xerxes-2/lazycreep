@@ -125,10 +125,10 @@ describe("Room View 的 Sidebar 区块与左侧按钮列（#26）", () => {
     history.replaceState(null, "", "/");
   });
 
-  it("区块顺序：房间信息、Minimap、选中对象、显示选项", () => {
+  it("区块顺序：房间信息、Minimap、选中对象、显示选项、本次统计", () => {
     mount();
     shell.navigate({ view: "room" });
-    expect(shownSections()).toEqual(["room.info", "room.minimap", "room.selected", "room.display"]);
+    expect(shownSections()).toEqual(["room.info", "room.minimap", "room.selected", "room.display", "room.stats"]);
   });
 
   it("房间信息：所有者、RCL、新手区、重生区、安全模式、控制器签名", async () => {

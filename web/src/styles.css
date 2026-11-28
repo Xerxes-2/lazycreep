@@ -1734,3 +1734,254 @@ body {
   white-space: pre;
   pointer-events: none;
 }
+
+/* ---- Session Stats（#65）：紧凑表格 + 展开；排版按区块自身宽度（container query） ---- */
+.session-stats {
+  container-type: inline-size;
+  --stats-line: var(--color-accent);
+  --stats-band: color-mix(in srgb, var(--color-accent) 22%, transparent);
+  --stats-gap-hidden: color-mix(in srgb, var(--muted) 18%, transparent);
+  --stats-gap-offline: color-mix(in srgb, var(--color-danger) 22%, transparent);
+  font-variant-numeric: var(--font-numeric);
+}
+
+.session-stats__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.session-stats__when {
+  font-size: var(--fs-small);
+  color: var(--color-secondary);
+}
+
+.session-stats__windows {
+  display: inline-flex;
+  gap: var(--space-1);
+}
+
+.session-stats__windows button {
+  font: inherit;
+  font-size: var(--fs-small);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--color-secondary);
+  cursor: pointer;
+}
+
+.session-stats__windows button[aria-pressed="true"] {
+  color: var(--color-primary);
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+}
+
+.session-stats__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.session-stats__focus {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.session-stats__hint {
+  margin: 0;
+  padding: var(--space-4) 0;
+  font-size: var(--fs-small);
+  color: var(--color-faint);
+  text-align: center;
+}
+
+.session-stats__lanehead {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.session-stats__lanelabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-small);
+  color: var(--color-secondary);
+}
+
+.session-stats__lanehead .session-stats__value {
+  font-size: 1.05rem;
+}
+
+.session-stats__range {
+  margin-left: auto;
+  white-space: nowrap;
+  font-size: var(--fs-small);
+  color: var(--color-faint);
+}
+
+.session-stats__unpick {
+  padding: 0 var(--space-1);
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--color-faint);
+  cursor: pointer;
+}
+
+.session-stats__plot {
+  height: 56px;
+}
+
+.session-stats__plot,
+.session-stats__conn {
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.session-stats__conn {
+  height: 6px;
+}
+
+.session-stats__spark {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.session-stats__line {
+  fill: none;
+  stroke: var(--stats-line);
+  stroke-width: 1.5;
+}
+
+.session-stats__band {
+  fill: var(--stats-band);
+}
+
+.session-stats__gap--hidden {
+  fill: var(--stats-gap-hidden);
+}
+
+.session-stats__gap--offline {
+  fill: var(--stats-gap-offline);
+}
+
+.session-stats__cursor {
+  stroke: var(--color-primary);
+  stroke-width: 1;
+  opacity: 0.6;
+}
+
+.session-stats__ok {
+  fill: var(--color-accent);
+  opacity: 0.6;
+}
+
+.session-stats__lane-gap--hidden {
+  fill: var(--muted);
+  opacity: 0.5;
+}
+
+.session-stats__lane-gap--offline {
+  fill: var(--color-danger);
+}
+
+.session-stats__axis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--color-faint);
+}
+
+.session-stats__group {
+  margin: var(--space-3) 0 var(--space-1);
+  font-size: 11px;
+  font-weight: var(--weight-strong);
+  color: var(--color-faint);
+}
+
+.session-stats__group:first-child {
+  margin-top: 0;
+}
+
+.session-stats__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 40%;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 22px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-s);
+  background: none;
+  font: inherit;
+  font-size: var(--fs-small);
+  color: var(--color-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.session-stats__row:hover {
+  background: color-mix(in srgb, var(--muted) 10%, transparent);
+}
+
+.session-stats__row[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+}
+
+.session-stats__row[data-empty] {
+  color: var(--color-faint);
+}
+
+.session-stats__row .session-stats__spark {
+  height: 16px;
+  pointer-events: none;
+}
+
+.session-stats__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-secondary);
+}
+
+.session-stats__row[data-empty] .session-stats__label {
+  color: var(--color-faint);
+}
+
+.session-stats__value {
+  font-weight: var(--weight-strong);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.session-stats__unit {
+  margin-left: 2px;
+  font-weight: var(--weight-regular);
+  font-size: var(--fs-small);
+  color: var(--color-faint);
+}
+
+@container (min-width: 420px) {
+  .session-stats__row {
+    grid-template-columns: minmax(0, 1fr) 7em 50%;
+  }
+
+  .session-stats__plot {
+    height: 72px;
+  }
+}
+
+/* 窄屏：表格行是整行宽的触摸目标，32px 高就按得到（同 copy-button）；照 44px 的通则，十几行指标的表格会长一倍 */
+.shell[data-layout="narrow"] .session-stats__row {
+  height: 32px;
+  min-height: 32px;
+}

@@ -235,7 +235,8 @@ describe("Top Bar 状态（#25）", () => {
 
   it("有 token 时订阅并显示我的 CPU", async () => {
     mount({ token: "token" });
-    await settle(() => expect(created[0]!.cpuSubscriptions).toBe(1));
+    // Top Bar 与 Session Stats 各一份（socket 层同一频道只订阅一次，#65）
+    await settle(() => expect(created[0]!.cpuSubscriptions).toBe(2));
     expect(status("cpu")).toBeNull();
     created[0]!.emitCpu({ cpu: 23, memory: 66571 });
     expect(status("cpu")!.textContent).toContain("23");
@@ -244,7 +245,8 @@ describe("Top Bar 状态（#25）", () => {
 
   it("CPU 是浮点毫秒数：只留一位小数", async () => {
     mount({ token: "token" });
-    await settle(() => expect(created[0]!.cpuSubscriptions).toBe(1));
+    // Top Bar 与 Session Stats 各一份（socket 层同一频道只订阅一次，#65）
+    await settle(() => expect(created[0]!.cpuSubscriptions).toBe(2));
     created[0]!.emitCpu({ cpu: 1.7073020000825636, memory: 4096 });
     expect(status("cpu")!.textContent).toContain("CPU 1.7 ");
     created[0]!.emitCpu({ cpu: 23.04, memory: 4096 });

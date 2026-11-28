@@ -40,6 +40,8 @@ import { createRoomDisplayOptions } from "../room/display-options.ts";
 import type { RoomState } from "../room/room-state.ts";
 import { MapView } from "./MapView.tsx";
 import { useSharedSource } from "../source/use-shared-source.ts";
+import { createSessionRecorder } from "../stats/session-recorder.ts";
+import { createSessionStatsUi } from "../stats/SessionStats.tsx";
 
 export interface MapAndRoomProps {
   readonly settings: Settings;
@@ -123,6 +125,15 @@ export function MapAndRoom(props: MapAndRoomProps) {
   // 战斗房间的参战者：全页一份，World Map 可见时订阅
   const combatants = pageCombatants({ source, roomMaps, pvp, settings: props.settings, allies: () => props.allies }, mapShown);
 
+  // Session Stats（#65）：全页一份，区块显示与否都在记
+  const sessionStats = createSessionRecorder({
+    source,
+    token: () => props.settings.token() || undefined,
+    visibility: page,
+    allies: () => props.allies,
+  });
+  const sessionStatsUi = createSessionStatsUi();
+
   const sectionContext: SectionContext = {
     shell,
     settings: props.settings,
@@ -142,6 +153,8 @@ export function MapAndRoom(props: MapAndRoomProps) {
     selectedId,
     roomState,
     display,
+    sessionStats,
+    sessionStatsUi,
   };
 
   return (
@@ -203,7 +216,10 @@ export function MapAndRoom(props: MapAndRoomProps) {
               onBack={() => shell.navigate({ view: "map" })}
               display={display.display()}
               onShownState={setRoomState}
-              onObserved={(shard, room, seen) => ownership().observe(shard, room, seen)}
+              onObserved={(shard, room, seen) => {
+                ownership().observe(shard, room, seen);
+                sessionStats.observeRoom(shard, room, seen);
+              }}
               onEnterReplay={(target, tick) => shell.navigate(replayAt(target, tick, true))}
             />
           </div>

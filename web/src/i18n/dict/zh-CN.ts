@@ -425,6 +425,34 @@ export const zhCN = {
 
   // #60
   "pickList.label": "选择对象",
+  // #65
+  "sessionStats.title": "本次统计",
+  "sessionStats.windowLabel": "时间窗口",
+  "sessionStats.window.5m": "5 分",
+  "sessionStats.window.30m": "30 分",
+  "sessionStats.window.all": "全部",
+  "sessionStats.now": "现在",
+  "sessionStats.ago": "−{time}",
+  "sessionStats.sec": "{s} 秒",
+  "sessionStats.min": "{m} 分",
+  "sessionStats.minSec": "{m} 分 {s} 秒",
+  "sessionStats.gap.hidden": "页面隐藏",
+  "sessionStats.gap.offline": "重连中",
+  "sessionStats.group.account": "账号",
+  "sessionStats.group.server": "服务器",
+  "sessionStats.group.currentRoom": "{room}（当前房间）",
+  "sessionStats.metric.cpu": "CPU",
+  "sessionStats.metric.memory": "Memory",
+  "sessionStats.metric.tick": "Tick 时长",
+  "sessionStats.metric.storage": "storage 能量",
+  "sessionStats.metric.terminal": "terminal 能量",
+  "sessionStats.metric.controller": "升级进度",
+  "sessionStats.metric.mine": "我的 creep",
+  "sessionStats.metric.hostile": "敌方 creep",
+  "sessionStats.pickHint": "点下面的行放大，最多 3 个",
+  "sessionStats.unpick": "移出焦点",
+  "sessionStats.noData": "这段时间没有数据",
+  "sessionStats.tickHint": "只在 Room View 即时显示时测得",
 } as const satisfies Record<string, string>;
 
 export type MessageKey = keyof typeof zhCN;

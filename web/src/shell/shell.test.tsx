@@ -68,10 +68,10 @@ describe("固定外壳（#24）", () => {
 
   it("Sidebar 的区块随 Main View 模式变化", () => {
     mount();
-    expect(shownSections()).toEqual(["map.search", "map.layers", "map.pointed", "map.pvp"]);
+    expect(shownSections()).toEqual(["map.search", "map.layers", "map.pointed", "map.stats", "map.pvp"]);
     expect(q("[data-section='map.pvp'] .pvp-overview")).not.toBeNull();
     press("m");
-    expect(shownSections()).toEqual(["room.info", "room.minimap", "room.selected", "room.display"]);
+    expect(shownSections()).toEqual(["room.info", "room.minimap", "room.selected", "room.display", "room.stats"]);
   });
 
   it("区块单独折叠、Sidebar 整条收起，重新挂载后都恢复", () => {
@@ -92,7 +92,7 @@ describe("固定外壳（#24）", () => {
     q<HTMLButtonElement>("[data-action=toggle-sidebar]")!.click();
     expect(sectionBody("map.pvp").hidden).toBe(true);
     press("m");
-    expect(shownSections()).toEqual(["room.info", "room.minimap", "room.selected", "room.display"]);
+    expect(shownSections()).toEqual(["room.info", "room.minimap", "room.selected", "room.display", "room.stats"]);
   });
 
   it("Menu：Top Bar 按钮打开，列出各设置项，一次显示一项；Esc 与点外部关闭", () => {

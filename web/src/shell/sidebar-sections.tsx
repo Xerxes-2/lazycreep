@@ -29,6 +29,8 @@ import type { SourceFactory } from "../settings/SettingsPage.tsx";
 import type { Settings } from "../settings/settings.ts";
 import type { Source } from "../source/source.ts";
 import type { RoomMapHub } from "../source/room-map-hub.ts";
+import { SessionStats, type SessionStatsUi } from "../stats/SessionStats.tsx";
+import type { SessionRecorder } from "../stats/session-recorder.ts";
 import { replayAt, type MainViewMode, type ShellState } from "./shell-state.ts";
 
 /** 区块可用的页面级数据与动作 */
@@ -66,6 +68,9 @@ export interface SectionContext {
   readonly roomState: Accessor<RoomState | undefined>;
   /** Room View 的显示选项（#26） */
   readonly display: RoomDisplayOptions;
+  /** Session Stats（#65）：全页一份的记录器与两个模式共用的界面状态 */
+  readonly sessionStats: SessionRecorder;
+  readonly sessionStatsUi: SessionStatsUi;
 }
 
 export interface SectionRender {
@@ -77,6 +82,15 @@ export interface SidebarSectionDef {
   readonly id: string;
   readonly title: MessageKey;
   readonly render: (ctx: SectionContext, section: SectionRender) => JSX.Element;
+}
+
+function SessionStatsSection(props: { ctx: SectionContext; shown: Accessor<boolean> }) {
+  const current = () => {
+    const where = props.ctx.shell.location();
+    // 不分 Shard 的 Server 上 location 的 shard 为 undefined，Room View 回报的是空串
+    return where.view === "room" && where.room !== undefined ? { shard: where.shard ?? "", room: where.room } : undefined;
+  };
+  return <SessionStats recorder={props.ctx.sessionStats} ui={props.ctx.sessionStatsUi} current={current} shown={props.shown} />;
 }
 
 function DetailsSection(props: { ctx: SectionContext }) {
@@ -109,11 +123,13 @@ export const SIDEBAR_SECTIONS: Readonly<Record<MainViewMode, readonly SidebarSec
     { id: "room.minimap", title: "minimap.title", render: (ctx, { shown }) => <Minimap ctx={ctx} shown={shown} /> },
     { id: "room.selected", title: "roomDetails.title", render: (ctx) => <DetailsSection ctx={ctx} /> },
     { id: "room.display", title: "roomSidebar.display.title", render: (ctx) => <DisplayOptionsSection options={ctx.display} /> },
+    { id: "room.stats", title: "sessionStats.title", render: (ctx, { shown }) => <SessionStatsSection ctx={ctx} shown={shown} /> },
   ],
   map: [
     { id: "map.search", title: "worldMapSidebar.search.title", render: (ctx) => <RoomSearchSection link={ctx.worldMap} /> },
     { id: "map.layers", title: "worldMapSidebar.layers.title", render: (ctx) => <MapLayersSection prefs={ctx.mapLayers} /> },
     { id: "map.pointed", title: "worldMapSidebar.pointed.title", render: (ctx) => <PointedRoomSection link={ctx.worldMap} /> },
+    { id: "map.stats", title: "sessionStats.title", render: (ctx, { shown }) => <SessionStatsSection ctx={ctx} shown={shown} /> },
     {
       id: "map.pvp",
       title: "pvp.title",
